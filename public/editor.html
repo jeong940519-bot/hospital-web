@@ -486,7 +486,7 @@ function renderEl(e){
     if(e.borderW>0) node.style.border=`${e.borderW}px solid ${e.borderColor}`;
   }
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
-  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
+  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍','hover-expand':'📂'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
   node.addEventListener('mousedown', ev=> startDrag(ev,e));
   node.addEventListener('dblclick', ev=>{ if(e.type==='text') startEdit(node,e); });
   node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); showLinkMenu(ev.clientX, ev.clientY, e); });
@@ -679,6 +679,7 @@ function renderProps(){
       <option value="tab-trigger"${et==='tab-trigger'?' selected':''}>🏷 탭 버튼</option>
       <option value="tab-content"${et==='tab-content'?' selected':''}>🏷 탭 내용</option>
       <option value="hover-zoom"${et==='hover-zoom'?' selected':''}>🔍 호버 줌</option>
+      <option value="hover-expand"${et==='hover-expand'?' selected':''}>📂 호버 펼침 (아코디언)</option>
       ${e.type==='text'?`<option value="counter"${et==='counter'?' selected':''}>🔢 숫자 카운터</option>`:''}
       ${e.type==='image'?`<option value="slider"${et==='slider'?' selected':''}>🎠 이미지 슬라이더</option>`:''}
     </select></div>`;
@@ -699,6 +700,9 @@ function renderProps(){
       html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">${et==='tab-trigger'?'클릭하면 같은 번호의 「탭 내용」만 표시됩니다.':'같은 번호의 「탭 버튼」을 클릭할 때 나타납니다.'}</div>`;
     } else if(et==='hover-zoom'){
       html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">마우스를 올리면 요소가 살짝 커집니다.<br>발행 시 자동으로 동작합니다.</div>`;
+    } else if(et==='hover-expand'){
+      html += `<div class="grp"><label>접힌 높이 (평소 보이는 높이 px)</label><input type="number" id="eff-colh" value="${eff.collapsedH||60}" min="20"></div>`;
+      html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">편집기에선 전체 높이(${e.h}px)로 보입니다.<br>발행 시 <b>${eff.collapsedH||60}px</b>로 접혀 있다가 마우스를 올리면 <b>${e.h}px</b>로 펼쳐집니다.<br><br>💡 카드 여러 개를 나란히 놓고 각각 이 효과를 주면<br>탭 아코디언처럼 동작합니다.</div>`;
     } else if(et==='counter'&&e.type==='text'){
       html += `<div class="grp"><label>목표 숫자</label><input type="number" id="eff-to" value="${eff.to||100}"></div>`;
       html += `<div class="grp"><label>시작 숫자</label><input type="number" id="eff-from" value="${eff.from||0}"></div>`;
@@ -845,6 +849,8 @@ function bindProps(e){
   });
   const effIv=$('eff-interval');
   if(effIv){effIv.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.interval=+effIv.value;renderProps();save(true);});effIv.addEventListener('change',snapshot);}
+  const effColH=$('eff-colh');
+  if(effColH){effColH.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.collapsedH=+effColH.value||60;renderProps();save(true);});effColH.addEventListener('change',snapshot);}
 }
 function syncPosInputs(e){
   const map={'p-x':e.x,'p-y':e.y,'p-w':e.w,'p-h':e.h,'p-rot':e.rot};
