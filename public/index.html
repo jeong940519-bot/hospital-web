@@ -154,6 +154,13 @@
     .ai-input-row input{flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none}
     .ai-input-row input:focus{border-color:var(--primary)}
     .ai-send{padding:9px 14px;background:var(--primary);color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:700}
+    .ai-img-btn{flex-shrink:0;width:40px;padding:0;background:var(--gray);border:1px solid var(--border);border-radius:8px;font-size:17px;cursor:pointer}
+    .ai-img-btn:hover{background:var(--primary);border-color:var(--primary)}
+    .ai-img-btn.has-img{background:var(--primary);border-color:var(--primary)}
+    .ai-img-preview{display:flex;align-items:center;gap:8px;margin-top:8px;padding:6px 8px;background:var(--gray);border:1px solid var(--border);border-radius:8px}
+    .ai-img-preview img{width:42px;height:42px;object-fit:cover;border-radius:6px;flex-shrink:0}
+    .ai-img-label{font-size:11px;color:var(--text-sub);flex:1;line-height:1.3}
+    .ai-img-remove{flex-shrink:0;width:22px;height:22px;border:none;background:#0002;border-radius:50%;font-size:14px;cursor:pointer;color:var(--text)}
     .ai-key-wrap{display:flex;gap:6px;margin-bottom:10px;align-items:center}
     .ai-key-wrap span{font-size:11px;color:var(--text-sub);white-space:nowrap}
     .ai-key-wrap input{flex:1;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:12px;font-family:inherit;outline:none}
@@ -529,18 +536,25 @@
       <input type="password" id="ai-key" placeholder="Firestore에서 자동 로드됨" />
     </div>
     <div class="ai-chips">
-      <span class="ai-chip" data-p="SEO를 최적화해줘. 병원 정보 바탕으로 title, description, keywords 작성해줘.">SEO 자동작성</span>
-      <span class="ai-chip" data-p="병원 소개 문구를 전문적이고 신뢰감 있게 다시 써줘.">소개 개선</span>
-      <span class="ai-chip" data-p="히어로 메인 카피를 환자 마음에 와닿는 문구로 3가지 제안해줘.">카피 제안</span>
-      <span class="ai-chip" data-p="카카오맵 연동 JavaScript 코드 작성해줘.">카카오맵</span>
-      <span class="ai-chip" data-p="온라인 예약 폼 HTML + Firestore 저장 코드 작성해줘.">예약폼</span>
-      <span class="ai-chip" data-p="현재 홈페이지에 추가하면 좋을 섹션이나 기능을 추천해줘.">기능 추천</span>
+      <span class="ai-chip" data-p="SEO를 최적화해서 바로 적용해줘.">SEO 자동적용</span>
+      <span class="ai-chip" data-p="병원 소개 문구를 전문적이고 신뢰감 있게 다시 써서 적용해줘.">소개 개선</span>
+      <span class="ai-chip" data-p="히어로 메인 제목과 부제목을 환자 마음에 와닿게 바꿔줘.">히어로 문구</span>
+      <span class="ai-chip" data-p="전체적으로 따뜻하고 신뢰감 있는 색상 테마로 바꿔줘.">색상 변경</span>
+      <span class="ai-chip" data-p="소아과를 진료과목에 추가해줘.">진료과목 추가</span>
+      <span class="ai-chip" data-p="더 부드럽고 읽기 편한 폰트로 바꿔줘.">폰트 변경</span>
     </div>
     <div class="ai-messages" id="ai-messages">
-      <div class="msg ai"><div class="role">AI</div><div class="bubble">홈페이지를 보면서 직접 도와드릴게요!<br>SEO, 문구 작성, 코드 생성, 디자인 제안 무엇이든 물어보세요.</div></div>
+      <div class="msg ai"><div class="role">AI</div><div class="bubble">명령하시면 홈페이지를 <b>직접 수정</b>해드려요!<br>예: "병원명을 OO으로 바꿔줘", "초록 테마로 바꿔줘", "소아과 추가해줘"<br><br>📷 <b>참고 사진 첨부</b> 시 그 디자인의 색상·분위기·문구 톤을 분석해 비슷하게 만들어드려요.</div></div>
     </div>
     <div class="ai-bottom">
+      <div class="ai-img-preview" id="ai-img-preview" style="display:none">
+        <img id="ai-img-thumb" src="" alt="참고 사진" />
+        <span class="ai-img-label">이 사진을 참고해서 비슷한 느낌으로 만들어요</span>
+        <button class="ai-img-remove" id="ai-img-remove" title="사진 제거">×</button>
+      </div>
       <div class="ai-input-row">
+        <button class="ai-img-btn" id="ai-img-btn" title="참고 사진 첨부">📷</button>
+        <input type="file" id="ai-img-file" accept="image/*" style="display:none" />
         <input type="text" id="ai-input" placeholder="무엇을 도와드릴까요?" />
         <button class="ai-send" id="ai-send">전송</button>
       </div>
@@ -591,7 +605,7 @@
 <section id="departments" class="section section-gray">
   <div class="container">
     <h2 class="section-title" data-editable="deptTitle" contenteditable="false">진료과목</h2>
-    <div class="dept-grid">
+    <div class="dept-grid" id="dept-grid">
       <div class="dept-card"><div class="dept-icon">🏥</div><h3 data-editable contenteditable="false">내과</h3><p data-editable contenteditable="false">소화기, 호흡기, 순환기 질환 전문</p></div>
       <div class="dept-card"><div class="dept-icon">🦴</div><h3 data-editable contenteditable="false">정형외과</h3><p data-editable contenteditable="false">관절, 척추, 스포츠 손상 치료</p></div>
       <div class="dept-card"><div class="dept-icon">🧠</div><h3 data-editable contenteditable="false">신경과</h3><p data-editable contenteditable="false">두통, 어지럼증, 신경계 질환</p></div>
@@ -817,6 +831,11 @@ async function loadContent() {
 loadContent();
 
 function applyContent(d) {
+  if (d.deptGridHtml) {
+    const grid = document.getElementById('dept-grid');
+    grid.innerHTML = d.deptGridHtml;
+    grid.querySelectorAll('[data-editable]').forEach(el => el.contentEditable = isAdmin ? 'true' : 'false');
+  }
   document.querySelectorAll('[data-editable]').forEach(el => {
     const key = el.dataset.editable;
     if (key && d[key] !== undefined) el.innerHTML = d[key];
@@ -860,6 +879,7 @@ window.saveAll = async () => {
     data.seoDesc = document.getElementById('seoDesc').value;
     data.seoKeywords = document.getElementById('seoKeywords').value;
     data.ogImage = document.getElementById('ogImage').value;
+    data.deptGridHtml = document.getElementById('dept-grid').innerHTML;
     data.updatedAt = new Date().toISOString();
     await setDoc(doc(db, 'site', 'content'), data);
     siteData = data;
@@ -1147,6 +1167,55 @@ document.getElementById('ai-input').addEventListener('keydown', e => { if (e.key
 document.querySelectorAll('.ai-chip').forEach(c => {
   c.addEventListener('click', () => { document.getElementById('ai-input').value = c.dataset.p; sendAI(); });
 });
+
+// ── 참고 사진 첨부 (비전 분석) ──
+let pendingImage = null; // { mediaType, data(base64 no prefix) }
+document.getElementById('ai-img-btn').addEventListener('click', () => document.getElementById('ai-img-file').click());
+document.getElementById('ai-img-remove').addEventListener('click', clearPendingImage);
+document.getElementById('ai-img-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = ''; // 같은 파일 다시 선택 가능하도록
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('이미지 파일만 가능합니다'); return; }
+  try {
+    const { mediaType, data, previewUrl } = await downscaleImage(file);
+    pendingImage = { mediaType, data };
+    document.getElementById('ai-img-thumb').src = previewUrl;
+    document.getElementById('ai-img-preview').style.display = 'flex';
+    document.getElementById('ai-img-btn').classList.add('has-img');
+  } catch(err) { toast('이미지를 불러오지 못했습니다'); }
+});
+function clearPendingImage() {
+  pendingImage = null;
+  document.getElementById('ai-img-preview').style.display = 'none';
+  document.getElementById('ai-img-thumb').src = '';
+  document.getElementById('ai-img-btn').classList.remove('has-img');
+}
+// 캔버스로 긴 변 최대 1280px, JPEG로 다운스케일 → 토큰/용량 절감
+function downscaleImage(file, max = 1280) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > max || height > max) {
+          const r = Math.min(max / width, max / height);
+          width = Math.round(width * r); height = Math.round(height * r);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const previewUrl = canvas.toDataURL('image/jpeg', 0.85);
+        resolve({ mediaType: 'image/jpeg', data: previewUrl.split(',')[1], previewUrl });
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 // ── AI 공통 호출 함수 (Cloud Function 경유 — CORS 우회) ──
 async function callClaude(key, body) {
   try {
@@ -1189,33 +1258,167 @@ function showCreditAlert() {
   document.body.appendChild(el);
 }
 
+// 현재 페이지의 모든 편집 필드 값을 수집 (AI에게 현재 상태 제공)
+function collectCurrentContent() {
+  const fields = {};
+  document.querySelectorAll('[data-editable]').forEach(el => {
+    const key = el.dataset.editable;
+    if (key) fields[key] = el.textContent.trim();
+  });
+  const depts = [];
+  document.querySelectorAll('#dept-grid .dept-card').forEach(card => {
+    depts.push({
+      icon: card.querySelector('.dept-icon')?.textContent || '',
+      name: card.querySelector('h3')?.textContent || '',
+      desc: card.querySelector('p')?.textContent || ''
+    });
+  });
+  return { fields, depts, theme: currentTheme || '기본', primaryColor: document.getElementById('colorText').value };
+}
+
+// AI가 반환한 액션을 실제 홈페이지에 적용
+function applyAiActions(actions) {
+  let changed = 0;
+  for (const a of (actions || [])) {
+    try {
+      if (a.type === 'text' && a.field) {
+        const el = document.querySelector(`[data-editable="${a.field}"]`);
+        if (el) { el.innerHTML = (a.value || '').replace(/\n/g, '<br>'); changed++; }
+      } else if (a.type === 'color') {
+        if (a.primary) applyColor(a.primary);
+        if (a.heroFrom) applyHeroColor('from', a.heroFrom);
+        if (a.heroTo) applyHeroColor('to', a.heroTo);
+        changed++;
+      } else if (a.type === 'font' && a.value) {
+        applyGFont(a.value); changed++;
+      } else if (a.type === 'theme') {
+        applyTheme(a.value || '', false); changed++;
+      } else if (a.type === 'seo') {
+        if (a.title !== undefined) document.getElementById('seoTitle').value = a.title;
+        if (a.desc !== undefined) document.getElementById('seoDesc').value = a.desc;
+        if (a.keywords !== undefined) document.getElementById('seoKeywords').value = a.keywords;
+        updateSeoPreview(); changed++;
+      } else if (a.type === 'addDept') {
+        const grid = document.getElementById('dept-grid');
+        const card = document.createElement('div');
+        card.className = 'dept-card';
+        card.innerHTML = `<div class="dept-icon">${a.icon || '🏥'}</div><h3 data-editable contenteditable="${isAdmin}">${esc(a.name || '새 진료과목')}</h3><p data-editable contenteditable="${isAdmin}">${esc(a.desc || '')}</p>`;
+        grid.appendChild(card); changed++;
+      } else if (a.type === 'removeDept') {
+        const cards = document.querySelectorAll('#dept-grid .dept-card');
+        if (cards[a.index]) { cards[a.index].remove(); changed++; }
+      } else if (a.type === 'updateDept') {
+        const card = document.querySelectorAll('#dept-grid .dept-card')[a.index];
+        if (card) {
+          if (a.icon) card.querySelector('.dept-icon').textContent = a.icon;
+          if (a.name) card.querySelector('h3').textContent = a.name;
+          if (a.desc) card.querySelector('p').textContent = a.desc;
+          changed++;
+        }
+      }
+    } catch(e) { console.log('액션 적용 실패:', a, e); }
+  }
+  return changed;
+}
+
 async function sendAI() {
   const key = document.getElementById('ai-key').value.trim() || DEFAULT_AI_KEY;
-  const input = document.getElementById('ai-input').value.trim();
-  if (!key) { toast('Claude API Key를 입력해주세요'); return; }
-  if (!input) return;
+  let input = document.getElementById('ai-input').value.trim();
+  const img = pendingImage; // 전송 시점 고정
+  if (!input && !img) return;
+  if (!input && img) input = '이 사진의 디자인(색상·분위기·폰트·문구 톤)을 분석해서 우리 홈페이지를 비슷한 느낌으로 바꿔줘.';
   const msgs = document.getElementById('ai-messages');
-  msgs.innerHTML += `<div class="msg user"><div class="role">나</div><div class="bubble">${esc(input)}</div></div>`;
+  const userImgHtml = img ? `<img src="data:${img.mediaType};base64,${img.data}" style="max-width:140px;border-radius:6px;display:block;margin-bottom:6px" />` : '';
+  msgs.innerHTML += `<div class="msg user"><div class="role">나</div><div class="bubble">${userImgHtml}${esc(input)}</div></div>`;
   document.getElementById('ai-input').value = '';
+  clearPendingImage();
   const lid = 'ai-' + Date.now();
-  msgs.innerHTML += `<div class="msg ai" id="${lid}"><div class="role">AI</div><div class="bubble">생성 중...</div></div>`;
+  msgs.innerHTML += `<div class="msg ai" id="${lid}"><div class="role">AI</div><div class="bubble">작업 중...</div></div>`;
   msgs.scrollTop = msgs.scrollHeight;
-  const ctx = `병원명:${siteData.hospitalName||''}|주소:${siteData.address||''}|전화:${siteData.phone||''}`;
+
+  const current = collectCurrentContent();
+  const systemPrompt = `당신은 병원 홈페이지를 직접 편집하는 AI 에이전트입니다.
+사용자의 자연어 명령을 받아, 홈페이지를 실제로 변경하는 "액션"을 JSON으로 생성합니다.
+
+## 현재 홈페이지 상태
+${JSON.stringify(current, null, 2)}
+
+## 편집 가능한 텍스트 필드 키
+hospitalName(병원명), heroTitle(메인제목), heroSubtitle(부제목), heroBtn(버튼문구),
+aboutTitle, aboutText(병원소개본문), deptTitle, doctorTitle,
+doctor0Name, doctor0Dept, doctor0Career, doctor1Name, doctor1Dept, doctor1Career,
+hoursTitle, hoursWeekday, hoursSat, hoursSun, hoursLunch,
+locationTitle, address(주소), phone(전화), parking(주차안내),
+contactTitle, contactDesc, footerInfo(푸터사업자정보)
+
+## 사용 가능한 테마
+"" (클래식블루/기본), "theme-2" (에메랄드), "theme-3" (다크프리미엄), "theme-4" (코랄)
+
+## 응답 형식 (반드시 이 JSON 형식만 출력, 다른 설명 금지)
+{
+  "reply": "사용자에게 보여줄 한국어 설명 (무엇을 바꿨는지)",
+  "actions": [
+    {"type":"text","field":"필드키","value":"새 내용"},
+    {"type":"color","primary":"#hex","heroFrom":"#hex","heroTo":"#hex"},
+    {"type":"font","value":"Noto Sans KR"},
+    {"type":"theme","value":"theme-2"},
+    {"type":"seo","title":"...","desc":"...","keywords":"..."},
+    {"type":"addDept","icon":"🏥","name":"소아과","desc":"설명"},
+    {"type":"removeDept","index":2},
+    {"type":"updateDept","index":0,"name":"...","desc":"..."}
+  ]
+}
+
+명령이 단순 질문이거나 코드 작성 요청이면 actions는 빈 배열 []로 두고 reply에 답변(또는 코드)을 작성하세요.
+색상은 반드시 #RRGGBB 형식. 폰트는 Google Fonts 한국어 폰트명.${img ? `
+
+## 참고 이미지 분석 지침
+사용자가 참고 홈페이지/디자인 사진을 첨부했습니다. 이미지를 분석해서:
+- 주요 색상과 강조색을 추출 → color 액션(primary, heroFrom, heroTo)으로 반영. 가장 가까운 테마가 있으면 theme 액션도 함께.
+- 글씨체 느낌(고딕/명조/둥근)을 보고 font 액션으로 반영.
+- 히어로 카피·소개 문구의 톤(고급/친근/신뢰 등)을 읽어 text 액션으로 비슷한 분위기로 다시 작성.
+- 진료과목 구성이 보이면 addDept/updateDept로 반영.
+픽셀 단위 복제가 아니라 톤&매너를 우리 고정 섹션 구조에 맞게 옮기는 것이 목표입니다. reply에 어떤 점을 참고했는지 설명하세요.` : ''}`;
+
+  const userContent = img
+    ? [
+        { type: 'image', source: { type: 'base64', media_type: img.mediaType, data: img.data } },
+        { type: 'text', text: input }
+      ]
+    : input;
+
   try {
     const data = await callClaude(key, {
-      model: 'claude-sonnet-4-6', max_tokens: 2048,
-      system: `병원 홈페이지 전문 AI. 한국어 답변. 현재정보: ${ctx}`,
-      messages: [{ role: 'user', content: input }]
+      model: 'claude-sonnet-4-6', max_tokens: 3000,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userContent }]
     });
-    const text = data.content?.[0]?.text || '응답 없음';
-    const fmt = text.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre>$2</pre>').replace(/\n/g, '<br>');
-    document.getElementById(lid).querySelector('.bubble').innerHTML = fmt;
+    const text = data.content?.[0]?.text || '';
+    let parsed = null;
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try { parsed = JSON.parse(jsonMatch[0]); } catch(e) {}
+    }
+
+    const bubble = document.getElementById(lid).querySelector('.bubble');
+    if (parsed && Array.isArray(parsed.actions)) {
+      const n = applyAiActions(parsed.actions);
+      let replyHtml = (parsed.reply || '완료했습니다.').replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre>$2</pre>').replace(/\n/g, '<br>');
+      if (n > 0) {
+        replyHtml += `<br><br><span style="color:#1a8a5c;font-size:12px">✓ ${n}개 항목이 적용되었습니다. 자동 저장 중...</span>`;
+        await saveAll();
+      }
+      bubble.innerHTML = replyHtml;
+    } else {
+      // JSON 파싱 실패 시 일반 답변으로 표시
+      bubble.innerHTML = (text || '응답 없음').replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre>$2</pre>').replace(/\n/g, '<br>');
+    }
   } catch(e) {
     document.getElementById(lid).querySelector('.bubble').textContent = e.message;
   }
   msgs.scrollTop = msgs.scrollHeight;
 }
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ── API Key 모달 ──
 window.openKeyModal = async () => {
