@@ -61,6 +61,7 @@
   .el.editing{cursor:text}
   .el.editing .inner{cursor:text;user-select:text}
   .link-badge{position:absolute;top:-9px;right:-9px;width:20px;height:20px;background:var(--accent);border-radius:50%;font-size:10px;display:flex;align-items:center;justify-content:center;z-index:40;box-shadow:0 1px 4px #0006}
+  .fx-badge{position:absolute;top:-9px;left:-9px;width:20px;height:20px;background:#e67e22;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;z-index:41;box-shadow:0 1px 4px #0006;cursor:default}
   /* 우클릭 링크 메뉴 */
   .ctx{position:fixed;z-index:9500;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:5px;min-width:190px;max-height:60vh;overflow:auto;box-shadow:0 10px 36px #000b;font-size:13px}
   .ctx .ci{padding:8px 12px;border-radius:6px;cursor:pointer;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -485,6 +486,7 @@ function renderEl(e){
     if(e.borderW>0) node.style.border=`${e.borderW}px solid ${e.borderColor}`;
   }
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
+  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
   node.addEventListener('mousedown', ev=> startDrag(ev,e));
   node.addEventListener('dblclick', ev=>{ if(e.type==='text') startEdit(node,e); });
   node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); showLinkMenu(ev.clientX, ev.clientY, e); });
@@ -665,6 +667,63 @@ function renderProps(){
     ${e.link?`<button class="tb-btn" id="el-link-go" style="width:100%;margin-top:6px">✎ 연결된 페이지 편집하러 가기</button>`:''}
   </div>`;
   html += `<div class="grp"><div class="btn-grp"><button id="el-front">맨앞</button><button id="el-back">맨뒤</button><button id="el-dup">복제</button></div></div>`;
+
+  // ── 이펙트 섹션 ──
+  { const eff=e.fx||{}, et=eff.type||'';
+    html += `<h4 style="margin-top:16px;border-top:1px solid var(--border);padding-top:14px">✨ 이펙트</h4>`;
+    html += `<div class="grp"><label>효과 선택</label><select id="eff-type">
+      <option value="">없음</option>
+      <option value="scroll-reveal"${et==='scroll-reveal'?' selected':''}>📜 스크롤 등장</option>
+      <option value="hover-show"${et==='hover-show'?' selected':''}>👁 호버 트리거</option>
+      <option value="hover-hide"${et==='hover-hide'?' selected':''}>👁 호버 대상 (숨김→표시)</option>
+      <option value="tab-trigger"${et==='tab-trigger'?' selected':''}>🏷 탭 버튼</option>
+      <option value="tab-content"${et==='tab-content'?' selected':''}>🏷 탭 내용</option>
+      <option value="hover-zoom"${et==='hover-zoom'?' selected':''}>🔍 호버 줌</option>
+      ${e.type==='text'?`<option value="counter"${et==='counter'?' selected':''}>🔢 숫자 카운터</option>`:''}
+      ${e.type==='image'?`<option value="slider"${et==='slider'?' selected':''}>🎠 이미지 슬라이더</option>`:''}
+    </select></div>`;
+    if(et==='scroll-reveal'){
+      html += `<div class="grp"><label>등장 방향</label><select id="eff-dir">
+        <option value="up"${(eff.dir||'up')==='up'?' selected':''}>⬆ 아래 → 위</option>
+        <option value="left"${eff.dir==='left'?' selected':''}>➡ 왼쪽 → 오른쪽</option>
+        <option value="right"${eff.dir==='right'?' selected':''}>⬅ 오른쪽 → 왼쪽</option>
+        <option value="fade"${eff.dir==='fade'?' selected':''}>✨ 페이드인</option>
+      </select></div>`;
+      html += `<div class="grp"><label>지연 ${eff.delay||0}ms</label><input type="range" id="eff-delay" min="0" max="1200" step="100" value="${eff.delay||0}"></div>`;
+    } else if(et==='hover-show'||et==='hover-hide'){
+      html += `<div class="grp"><label>그룹 ID <small style="color:var(--sub)">(트리거·대상 동일하게)</small></label><input type="text" id="eff-group" value="${eff.group||'g1'}"></div>`;
+      html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">${et==='hover-show'?'마우스를 올리면 같은 그룹의 「호버 대상」이 나타납니다.':'처음엔 숨겨져 있다가 「호버 트리거」에 올리면 나타납니다.'}</div>`;
+    } else if(et==='tab-trigger'||et==='tab-content'){
+      html += `<div class="grp"><label>그룹 ID</label><input type="text" id="eff-group" value="${eff.group||'tabs1'}"></div>`;
+      html += `<div class="grp"><label>탭 번호 (0=첫번째)</label><input type="number" id="eff-idx" value="${eff.idx||0}" min="0" max="20"></div>`;
+      html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">${et==='tab-trigger'?'클릭하면 같은 번호의 「탭 내용」만 표시됩니다.':'같은 번호의 「탭 버튼」을 클릭할 때 나타납니다.'}</div>`;
+    } else if(et==='hover-zoom'){
+      html += `<div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">마우스를 올리면 요소가 살짝 커집니다.<br>발행 시 자동으로 동작합니다.</div>`;
+    } else if(et==='counter'&&e.type==='text'){
+      html += `<div class="grp"><label>목표 숫자</label><input type="number" id="eff-to" value="${eff.to||100}"></div>`;
+      html += `<div class="grp"><label>시작 숫자</label><input type="number" id="eff-from" value="${eff.from||0}"></div>`;
+      html += `<div class="grp"><label>단위 (%, 명, + 등)</label><input type="text" id="eff-suf" value="${eff.suffix||''}"></div>`;
+      html += `<div class="grp"><label>속도 ${((eff.dur||2000)/1000).toFixed(1)}초</label><input type="range" id="eff-dur" min="500" max="5000" step="500" value="${eff.dur||2000}"></div>`;
+    } else if(et==='slider'&&e.type==='image'){
+      html += `<div class="grp"><label>추가 슬라이드</label>
+        <div id="eff-slides-list">${(eff.slides||[]).map((src,i)=>`
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+            <img src="${src}" style="width:44px;height:32px;object-fit:cover;border-radius:4px;border:1px solid var(--border)">
+            <span style="flex:1;font-size:11px;color:var(--sub)">슬라이드 ${i+2}</span>
+            <button class="danger" style="width:26px;height:26px;padding:0;font-size:13px" id="sl-del-${i}">×</button>
+          </div>`).join('')}
+        </div>
+        <button class="tb-btn" id="eff-sl-add" style="width:100%;margin-top:4px">＋ 이미지 추가</button>
+      </div>`;
+      html += `<div class="grp"><label>옵션</label><div class="btn-grp">
+        <button id="eff-auto" class="${eff.auto!==false?'on':''}">⏱ 자동</button>
+        <button id="eff-arrows" class="${eff.arrows!==false?'on':''}">◀▶</button>
+        <button id="eff-dots" class="${eff.dots!==false?'on':''}">● 점</button>
+      </div></div>`;
+      if(eff.auto!==false) html += `<div class="grp"><label>간격 ${((eff.interval||3000)/1000).toFixed(1)}초</label><input type="range" id="eff-interval" min="1000" max="8000" step="500" value="${eff.interval||3000}"></div>`;
+    }
+  }
+
   html += `<button class="danger" id="el-del">🗑 삭제</button>`;
   box.innerHTML = html;
   bindProps(e);
@@ -737,6 +796,55 @@ function bindProps(e){
   $('el-dup').addEventListener('click',()=>{ const c={...JSON.parse(JSON.stringify(e)),id:uid(),x:e.x+20,y:e.y+20}; page().elements.push(c); selId=c.id; afterMutate(); });
   $('el-front').addEventListener('click',()=>{ const arr=page().elements; const i=arr.findIndex(x=>x.id===e.id); arr.push(arr.splice(i,1)[0]); afterMutate(); });
   $('el-back').addEventListener('click',()=>{ const arr=page().elements; const i=arr.findIndex(x=>x.id===e.id); arr.unshift(arr.splice(i,1)[0]); afterMutate(); });
+
+  // ── 이펙트 바인딩 ──
+  const effSel=$('eff-type');
+  if(effSel) effSel.addEventListener('change',()=>{
+    const t=effSel.value;
+    if(t){if(!e.fx)e.fx={};e.fx.type=t;}else{delete e.fx;}
+    renderProps();liveStyle();snapshot();
+  });
+  const effDir=$('eff-dir');
+  if(effDir){effDir.addEventListener('change',()=>{if(!e.fx)e.fx={};e.fx.dir=effDir.value;snapshot();});}
+  const effDelay=$('eff-delay');
+  if(effDelay){effDelay.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.delay=+effDelay.value;renderProps();save(true);});effDelay.addEventListener('change',snapshot);}
+  const effGroup=$('eff-group');
+  if(effGroup){effGroup.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.group=effGroup.value;save(true);});effGroup.addEventListener('change',snapshot);}
+  const effIdx=$('eff-idx');
+  if(effIdx){effIdx.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.idx=+effIdx.value||0;save(true);});effIdx.addEventListener('change',snapshot);}
+  const effTo=$('eff-to');
+  if(effTo){effTo.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.to=+effTo.value||0;save(true);});effTo.addEventListener('change',snapshot);}
+  const effFrom=$('eff-from');
+  if(effFrom){effFrom.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.from=+effFrom.value||0;save(true);});effFrom.addEventListener('change',snapshot);}
+  const effSuf=$('eff-suf');
+  if(effSuf){effSuf.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.suffix=effSuf.value;save(true);});effSuf.addEventListener('change',snapshot);}
+  const effDur=$('eff-dur');
+  if(effDur){effDur.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.dur=+effDur.value;renderProps();save(true);});effDur.addEventListener('change',snapshot);}
+  const effSlAdd=$('eff-sl-add');
+  if(effSlAdd) effSlAdd.addEventListener('click',()=>{
+    const fi=document.createElement('input');fi.type='file';fi.accept='image/*';
+    fi.onchange=()=>{
+      const f=fi.files[0];if(!f)return;
+      const r=new FileReader();
+      r.onload=()=>{if(!e.fx)e.fx={};if(!e.fx.slides)e.fx.slides=[];e.fx.slides.push(r.result);renderProps();save(true);snapshot();};
+      r.readAsDataURL(f);
+    };fi.click();
+  });
+  (e.fx&&e.fx.slides||[]).forEach((_,i)=>{
+    const d=$(`sl-del-${i}`);
+    if(d)d.addEventListener('click',()=>{e.fx.slides.splice(i,1);renderProps();save(true);snapshot();});
+  });
+  ['eff-auto','eff-arrows','eff-dots'].forEach(bid=>{
+    const b=$(bid);
+    if(b)b.addEventListener('click',()=>{
+      if(!e.fx)e.fx={};
+      const k=bid==='eff-auto'?'auto':bid==='eff-arrows'?'arrows':'dots';
+      e.fx[k]=e.fx[k]===false;
+      renderProps();save(true);snapshot();
+    });
+  });
+  const effIv=$('eff-interval');
+  if(effIv){effIv.addEventListener('input',()=>{if(!e.fx)e.fx={};e.fx.interval=+effIv.value;renderProps();save(true);});effIv.addEventListener('change',snapshot);}
 }
 function syncPosInputs(e){
   const map={'p-x':e.x,'p-y':e.y,'p-w':e.w,'p-h':e.h,'p-rot':e.rot};
