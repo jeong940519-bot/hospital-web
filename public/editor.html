@@ -131,6 +131,7 @@
     <button class="tb-btn" id="btn-undo" title="실행취소 (Ctrl+Z)">↶ 되돌리기</button>
     <button class="tb-btn" id="btn-redo" title="다시실행 (Ctrl+Y)">↷ 다시</button>
     <button class="tb-btn" id="btn-ai">✨ AI 초안</button>
+    <button class="tb-btn" id="btn-aichat" style="background:#3a2f6e;border-color:#6c7bff">💬 AI 작업</button>
     <button class="tb-btn" id="btn-save">💾 저장</button>
     <button class="tb-btn" id="btn-cloud" title="클라우드(Firestore)에 저장">☁ 클라우드</button>
     <button class="tb-btn" id="btn-login">로그인</button>
@@ -228,6 +229,22 @@
 </div>
 
 <input type="hidden" id="img-target" />
+
+<!-- AI 작업 채팅 패널 -->
+<div id="ai-chat-panel" style="display:none;position:fixed;bottom:0;right:270px;width:380px;height:480px;background:var(--panel);border:1px solid var(--border);border-bottom:none;border-radius:14px 14px 0 0;flex-direction:column;z-index:8000;box-shadow:0 -6px 40px #000a">
+  <div style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div style="font-weight:700;font-size:13px;flex:1">💬 AI 작업 어시스턴트</div>
+    <button id="ai-chat-close" style="background:none;border:none;color:var(--sub);font-size:22px;cursor:pointer;line-height:1;padding:0 2px">×</button>
+  </div>
+  <div style="font-size:11px;color:var(--sub);padding:7px 12px;border-bottom:1px solid var(--border);flex-shrink:0;line-height:1.5">
+    현재 페이지 요소를 자연어로 수정 · 추가 · 이펙트 적용
+  </div>
+  <div id="ai-chat-msgs" style="flex:1;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px;min-height:0"></div>
+  <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0">
+    <input type="text" id="ai-chat-input" placeholder="예: 제목 더 크게, 카드에 호버 효과, 배경 파란색으로…" style="flex:1;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:inherit;outline:none">
+    <button id="ai-chat-send" style="padding:8px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">전송</button>
+  </div>
+</div>
 
 <script src="site-render.js"></script>
 <script type="module">
@@ -1115,6 +1132,132 @@ document.getElementById('btn-save').onclick=()=>save();
 document.getElementById('btn-undo').onclick=undo;
 document.getElementById('btn-redo').onclick=redo;
 document.getElementById('btn-preview').onclick=preview;
+
+// ───────────────────────── AI 작업 채팅 ─────────────────────────
+let _chatHistory=[];
+
+function buildAiCtx(){
+  const p=page();
+  const rows=p.elements.map((e,i)=>{
+    let d=`[${i}] id="${e.id}" type=${e.type} pos=(${Math.round(e.x)},${Math.round(e.y)}) size=${Math.round(e.w)}×${Math.round(e.h)}`;
+    if(e.type==='text') d+=` 텍스트="${e.text.replace(/\n/g,'↵').slice(0,50)}" font=${e.fontFamily} ${e.fontSize}px w=${e.fontWeight} color=${e.color} align=${e.align}`;
+    else if(e.type==='shape') d+=` fill=${e.fill} shape=${e.shape} radius=${e.radius}`;
+    else if(e.type==='image') d+=` fit=${e.fit} clip=${e.clip}`;
+    if(e.rot) d+=` rot=${e.rot}°`;
+    if(e.fx&&e.fx.type) d+=` [fx:${e.fx.type}]`;
+    if(e.link){const lp=pageById(e.link);d+=` [링크→${lp?lp.name:e.link}]`;}
+    return d;
+  });
+  return `페이지: "${p.name}" ${p.w}×${p.h}px 배경=${p.bg}\n요소(${p.elements.length}개):\n`+rows.join('\n');
+}
+
+function applyAiActions(actions){
+  let changed=false;
+  for(const a of actions){
+    if(a.type==='update_element'){
+      const e=el(a.id); if(!e) continue;
+      Object.assign(e, a.props||{});
+      if('fx' in a){ if(a.fx&&a.fx.type) e.fx=a.fx; else delete e.fx; }
+      changed=true;
+    } else if(a.type==='add_element'){
+      const defs=a.element.type==='text'
+        ? {fontFamily:'Noto Sans KR',fontWeight:700,fontSize:32,color:'#333333',align:'center',lineHeight:1.3,letterSpacing:0,italic:false,underline:false,text:'텍스트'}
+        : a.element.type==='shape'
+        ? {shape:'rect',fill:'#6c7bff',radius:0,borderW:0,borderColor:'#333333'}
+        : {src:PHOTO,fit:'cover',clip:'none',radius:0,borderW:0,borderColor:'#333333'};
+      const ne=Object.assign({id:uid(),rot:0,w:300,h:80,x:100,y:200},defs,a.element);
+      page().elements.push(ne); selId=ne.id; changed=true;
+    } else if(a.type==='delete_element'){
+      page().elements=page().elements.filter(x=>x.id!==a.id);
+      if(selId===a.id) selId=null; changed=true;
+    } else if(a.type==='update_page'){
+      const props=a.props||{};
+      if(props.bg) page().bg=props.bg;
+      if(props.h) page().h=parseInt(props.h);
+      if(props.name) page().name=props.name;
+      changed=true;
+    } else if(a.type==='reorder_element'){
+      const arr=page().elements,i=arr.findIndex(x=>x.id===a.id);
+      if(i>=0){if(a.to==='front')arr.push(arr.splice(i,1)[0]);else arr.unshift(arr.splice(i,1)[0]);changed=true;}
+    }
+  }
+  return changed;
+}
+
+function chatMsg(role, text, highlight){
+  const box=document.getElementById('ai-chat-msgs');
+  const d=document.createElement('div');
+  const isUser=role==='user';
+  d.style.cssText=`padding:8px 12px;border-radius:${isUser?'14px 14px 4px 14px':'14px 14px 14px 4px'};background:${isUser?'var(--accent)':'var(--panel2)'};color:${isUser?'#fff':'var(--text)'};font-size:12px;line-height:1.6;align-self:${isUser?'flex-end':'flex-start'};max-width:92%;white-space:pre-wrap;word-break:break-word`;
+  if(highlight) d.style.borderLeft='3px solid #4caf50';
+  d.textContent=text; box.appendChild(d); box.scrollTop=box.scrollHeight;
+  return d;
+}
+
+async function sendChat(){
+  if(!isAdmin){toast('로그인이 필요합니다');openLogin();return;}
+  const inp=document.getElementById('ai-chat-input');
+  const msg=inp.value.trim(); if(!msg) return;
+  inp.value='';
+  chatMsg('user',msg);
+  _chatHistory.push({role:'user',content:msg});
+
+  const sys=`너는 캔버스 에디터 AI 어시스턴트다. 사용자 자연어 지시를 받아 캔버스 요소를 직접 수정한다.
+
+현재 페이지 상태:
+${buildAiCtx()}
+
+수행 가능한 액션:
+1. {"type":"update_element","id":"요소ID","props":{변경할속성},"fx":{이펙트 또는 null로제거}}
+2. {"type":"add_element","element":{type:"text"|"shape"|"image",x,y,w,h,rot:0,...속성}}
+3. {"type":"delete_element","id":"요소ID"}
+4. {"type":"update_page","props":{bg:"#hex",h:숫자,name:"문자열"}}
+5. {"type":"reorder_element","id":"요소ID","to":"front"|"back"}
+
+속성 참고:
+텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right), lineHeight(0.8~2.5), letterSpacing, italic(bool), underline(bool)
+도형: fill(#hex), shape(rect|circle), radius, borderW, borderColor(#hex)
+이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor
+이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
+사용가능 폰트: ${FONTS.map(f=>f[0]).join(', ')}
+캔버스 크기: ${page().w}×${page().h}px (좌상단=0,0)
+
+반드시 JSON만 응답: {"reply":"한국어설명","actions":[...]}`;
+
+  const thinking=chatMsg('assistant','생각 중…');
+  const sendBtn=document.getElementById('ai-chat-send');
+  sendBtn.disabled=true; sendBtn.textContent='…';
+  try{
+    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:2500,system:sys,messages:_chatHistory.slice(-8)}});
+    const raw=res.data?.content?.[0]?.text||'{}';
+    const m=raw.match(/\{[\s\S]*\}/);
+    if(!m) throw new Error('JSON 파싱 실패');
+    const parsed=JSON.parse(m[0]);
+    thinking.remove();
+    _chatHistory.push({role:'assistant',content:raw});
+    const acts=Array.isArray(parsed.actions)?parsed.actions:[];
+    const changed=acts.length>0?applyAiActions(acts):false;
+    if(changed) afterMutate();
+    chatMsg('assistant',(parsed.reply||'완료')+(acts.length?`\n✅ ${acts.length}개 작업 완료`:''), acts.length>0);
+  }catch(e){
+    thinking.remove();
+    const msg2=e.message||String(e);
+    chatMsg('assistant','오류: '+(msg2.includes('unauthenticated')?'로그인이 필요합니다':msg2.includes('resource-exhausted')||msg2.includes('크레딧')?'AI 크레딧 소진':msg2));
+  }finally{sendBtn.disabled=false;sendBtn.textContent='전송';}
+}
+
+document.getElementById('btn-aichat').onclick=()=>{
+  const p=document.getElementById('ai-chat-panel');
+  const show=p.style.display==='none'||p.style.display==='';
+  p.style.display=show?'flex':'none';
+  if(show&&!p.dataset.init){
+    p.dataset.init='1';
+    chatMsg('assistant','안녕하세요! 현재 페이지 요소를 자연어로 수정할 수 있어요.\n\n예시:\n• "제목 폰트 크기 72로 키워줘"\n• "파란 버튼 하나 추가해줘"\n• "카드 3개에 호버 펼침 효과 넣어줘"\n• "배경색을 연한 하늘색으로 바꿔줘"\n• "진료예약 버튼을 맨 앞으로"\n• "헤더 텍스트 굵게, 가운데 정렬"');
+  }
+};
+document.getElementById('ai-chat-close').onclick=()=>{document.getElementById('ai-chat-panel').style.display='none';};
+document.getElementById('ai-chat-send').onclick=sendChat;
+document.getElementById('ai-chat-input').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendChat();}});
 window.addEventListener('keydown',ev=>{
   if(document.querySelector('.el.editing')) return;
   const tag=document.activeElement.tagName;
