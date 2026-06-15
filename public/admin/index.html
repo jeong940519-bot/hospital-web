@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>관리자 에디터 — 병원 홈페이지</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #1a6fad;
+      --sidebar: #1e2535;
+      --sidebar-active: #2d3650;
+      --bg: #f0f2f5;
+      --white: #fff;
+      --border: #e0e4ec;
+      --text: #222;
+      --sub: #666;
+    }
+    body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); display: flex; height: 100vh; overflow: hidden; }
+
+    /* 로그인 화면 */
+    #login-screen {
+      position: fixed; inset: 0; background: var(--primary);
+      display: flex; align-items: center; justify-content: center; z-index: 999;
+    }
+    .login-box {
+      background: var(--white); border-radius: 16px; padding: 48px 40px;
+      width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .login-box h1 { font-size: 22px; font-weight: 700; margin-bottom: 8px; color: var(--primary); }
+    .login-box p { color: var(--sub); font-size: 13px; margin-bottom: 28px; }
+    .login-box input {
+      width: 100%; padding: 12px 16px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 15px; margin-bottom: 12px;
+      font-family: inherit; outline: none;
+    }
+    .login-box input:focus { border-color: var(--primary); }
+    .login-box button {
+      width: 100%; padding: 13px; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 4px;
+    }
+    .login-box button:hover { background: #145a8e; }
+    #login-error { color: #e53935; font-size: 13px; margin-top: 10px; display: none; }
+
+    /* 사이드바 */
+    .sidebar {
+      width: 240px; background: var(--sidebar); color: #fff;
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .sidebar-logo {
+      padding: 24px 20px 20px;
+      font-size: 16px; font-weight: 700; color: #fff;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+    .sidebar-logo span { font-size: 11px; color: rgba(255,255,255,0.4); display: block; margin-top: 2px; }
+    .sidebar-menu { flex: 1; padding: 12px 0; overflow-y: auto; }
+    .menu-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px; cursor: pointer; font-size: 14px;
+      color: rgba(255,255,255,0.7); transition: background 0.15s, color 0.15s;
+    }
+    .menu-item:hover { background: var(--sidebar-active); color: #fff; }
+    .menu-item.active { background: var(--sidebar-active); color: #fff; border-left: 3px solid var(--primary); }
+    .menu-item .icon { font-size: 16px; width: 20px; text-align: center; }
+    .sidebar-bottom { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+    .btn-logout {
+      width: 100%; padding: 9px; background: rgba(255,255,255,0.08);
+      color: rgba(255,255,255,0.6); border: none; border-radius: 8px;
+      font-size: 13px; cursor: pointer; font-family: inherit;
+    }
+    .btn-logout:hover { background: rgba(255,255,255,0.15); color: #fff; }
+
+    /* 메인 */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar {
+      background: var(--white); border-bottom: 1px solid var(--border);
+      padding: 0 28px; height: 56px; display: flex; align-items: center;
+      justify-content: space-between; flex-shrink: 0;
+    }
+    .topbar h2 { font-size: 16px; font-weight: 700; }
+    .topbar-actions { display: flex; gap: 10px; align-items: center; }
+    .btn-preview {
+      padding: 7px 16px; border: 1px solid var(--border); border-radius: 8px;
+      background: var(--white); font-size: 13px; cursor: pointer; font-family: inherit;
+      text-decoration: none; color: var(--text);
+    }
+    .btn-save {
+      padding: 7px 20px; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .btn-save:hover { background: #145a8e; }
+    .btn-deploy {
+      padding: 7px 20px; background: #27ae60; color: #fff;
+      border: none; border-radius: 8px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+
+    .content { flex: 1; overflow-y: auto; padding: 28px; }
+
+    /* 패널 */
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .card {
+      background: var(--white); border-radius: 12px;
+      padding: 24px 28px; margin-bottom: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card h3 { font-size: 15px; font-weight: 700; margin-bottom: 18px; color: var(--text); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 6px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--primary); }
+    .form-group textarea { min-height: 100px; resize: vertical; }
+    .color-row { display: flex; align-items: center; gap: 10px; }
+    .color-row input[type="color"] { width: 44px; height: 38px; padding: 2px; border-radius: 6px; cursor: pointer; }
+    .color-row input[type="text"] { flex: 1; }
+
+    /* 미디어 업로드 */
+    .upload-area {
+      border: 2px dashed var(--border); border-radius: 10px;
+      padding: 32px; text-align: center; cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .upload-area:hover { border-color: var(--primary); background: #f0f7ff; }
+    .upload-area input { display: none; }
+    .upload-area .upload-icon { font-size: 32px; margin-bottom: 8px; }
+    .upload-area p { font-size: 13px; color: var(--sub); }
+    .upload-area strong { color: var(--primary); }
+    .media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-top: 16px; }
+    .media-item { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: var(--bg); }
+    .media-item img, .media-item video { width: 100%; height: 100%; object-fit: cover; }
+    .media-item .media-del {
+      position: absolute; top: 4px; right: 4px; background: rgba(0,0,0,0.6);
+      color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px;
+      font-size: 13px; cursor: pointer; display: none;
+    }
+    .media-item:hover .media-del { display: block; }
+    .media-item .media-url {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.5); color: #fff; font-size: 10px;
+      padding: 4px 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer;
+    }
+
+    /* AI 어시스턴트 */
+    .ai-chat { display: flex; flex-direction: column; height: 500px; }
+    .ai-messages {
+      flex: 1; overflow-y: auto; padding: 16px;
+      background: #f8f9fb; border-radius: 10px; margin-bottom: 12px;
+    }
+    .msg { margin-bottom: 14px; }
+    .msg .role { font-size: 11px; font-weight: 700; margin-bottom: 4px; color: var(--sub); }
+    .msg .bubble {
+      display: inline-block; padding: 10px 14px; border-radius: 10px;
+      font-size: 14px; line-height: 1.6; max-width: 90%;
+    }
+    .msg.user .bubble { background: var(--primary); color: #fff; }
+    .msg.ai .bubble { background: var(--white); border: 1px solid var(--border); color: var(--text); }
+    .msg.ai .bubble pre { background: #1e2535; color: #e8f4fd; padding: 12px; border-radius: 8px; font-size: 12px; overflow-x: auto; margin-top: 8px; white-space: pre-wrap; }
+    .ai-input-row { display: flex; gap: 8px; }
+    .ai-input-row textarea {
+      flex: 1; padding: 10px 14px; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      resize: none; outline: none; min-height: 44px; max-height: 120px;
+    }
+    .ai-input-row textarea:focus { border-color: var(--primary); }
+    .btn-ai-send {
+      padding: 10px 20px; background: var(--primary); color: #fff;
+      border: none; border-radius: 8px; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit; align-self: flex-end;
+    }
+    .ai-key-row { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+    .ai-key-row input { flex: 1; }
+    .ai-key-row span { font-size: 12px; color: var(--sub); white-space: nowrap; }
+    .ai-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+    .chip {
+      padding: 5px 12px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 20px; font-size: 12px; cursor: pointer; color: var(--text);
+      transition: background 0.15s;
+    }
+    .chip:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+    /* SEO */
+    .seo-preview {
+      background: #fff; border: 1px solid var(--border); border-radius: 10px;
+      padding: 16px; margin-bottom: 16px;
+    }
+    .seo-preview .seo-title { color: #1a0dab; font-size: 18px; font-weight: 400; margin-bottom: 2px; }
+    .seo-preview .seo-url { color: #006621; font-size: 13px; margin-bottom: 4px; }
+    .seo-preview .seo-desc { color: #545454; font-size: 13px; line-height: 1.5; }
+
+    /* 토스트 */
+    #toast {
+      position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%);
+      background: #222; color: #fff; padding: 11px 24px; border-radius: 24px;
+      font-size: 14px; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 9999;
+    }
+    #toast.show { opacity: 1; }
+
+    .saving-indicator { font-size: 12px; color: var(--sub); }
+  </style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="login-screen">
+  <div class="login-box">
+    <h1>🏥 병원 홈페이지 관리자</h1>
+    <p>관리자 계정으로 로그인하세요</p>
+    <input type="email" id="login-email" placeholder="이메일" />
+    <input type="password" id="login-pw" placeholder="비밀번호" />
+    <button id="login-btn">로그인</button>
+    <p id="login-error">이메일 또는 비밀번호가 올바르지 않습니다.</p>
+  </div>
+</div>
+
+<!-- 사이드바 -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    병원 홈페이지 관리자
+    <span>NewWorld Hospital CMS</span>
+  </div>
+  <div class="sidebar-menu">
+    <div class="menu-item active" data-panel="basic"><span class="icon">🏠</span> 기본 정보</div>
+    <div class="menu-item" data-panel="hero"><span class="icon">🖼️</span> 히어로 섹션</div>
+    <div class="menu-item" data-panel="departments"><span class="icon">🏥</span> 진료과목</div>
+    <div class="menu-item" data-panel="doctors"><span class="icon">👨‍⚕️</span> 의료진</div>
+    <div class="menu-item" data-panel="hours"><span class="icon">🕐</span> 진료시간</div>
+    <div class="menu-item" data-panel="media"><span class="icon">📷</span> 미디어 관리</div>
+    <div class="menu-item" data-panel="design"><span class="icon">🎨</span> 디자인·폰트</div>
+    <div class="menu-item" data-panel="seo"><span class="icon">🔍</span> SEO</div>
+    <div class="menu-item" data-panel="ai"><span class="icon">🤖</span> AI 어시스턴트</div>
+  </div>
+  <div class="sidebar-bottom">
+    <button class="btn-logout" id="logout-btn">로그아웃</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="panel-title">기본 정보</h2>
+    <div class="topbar-actions">
+      <span class="saving-indicator" id="saving-indicator"></span>
+      <a class="btn-preview" href="/" target="_blank">미리보기 ↗</a>
+      <button class="btn-save" id="save-btn">저장</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- 기본 정보 -->
+    <div class="panel active" id="panel-basic">
+      <div class="card">
+        <h3>병원 기본 정보</h3>
+        <div class="form-group">
+          <label>병원명</label>
+          <input type="text" id="hospitalName" placeholder="뉴월드 병원" />
+        </div>
+        <div class="form-group">
+          <label>주소</label>
+          <input type="text" id="address" placeholder="부산광역시 OO구 OO로 123" />
+        </div>
+        <div class="form-group">
+          <label>전화번호</label>
+          <input type="text" id="phone" placeholder="051-000-0000" />
+        </div>
+        <div class="form-group">
+          <label>주차 안내</label>
+          <input type="text" id="parking" placeholder="건물 지하 1~3층 무료주차" />
+        </div>
+        <div class="form-group">
+          <label>카카오 상담 링크</label>
+          <input type="text" id="kakaoUrl" placeholder="https://pf.kakao.com/..." />
+        </div>
+        <div class="form-group">
+          <label>푸터 사업자 정보</label>
+          <input type="text" id="footerInfo" placeholder="대표: 홍길동 | 사업자번호: 000-00-00000" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 히어로 -->
+    <div class="panel" id="panel-hero">
+      <div class="card">
+        <h3>히어로 섹션</h3>
+        <div class="form-group">
+          <label>메인 제목</label>
+          <textarea id="heroTitle" placeholder="건강한 삶을 위한&#10;최선의 의료 서비스"></textarea>
+        </div>
+        <div class="form-group">
+          <label>부제목</label>
+          <input type="text" id="heroSubtitle" placeholder="뉴월드 병원은 환자 중심의 의료 서비스를 제공합니다." />
+        </div>
+        <div class="form-group">
+          <label>배경 이미지 URL (미디어 관리에서 복사)</label>
+          <input type="text" id="heroBg" placeholder="https://firebasestorage..." />
+        </div>
+        <div class="form-group">
+          <label>버튼 텍스트</label>
+          <input type="text" id="heroBtn" placeholder="진료 예약하기" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 진료과목 -->
+    <div class="panel" id="panel-departments">
+      <div class="card">
+        <h3>진료과목</h3>
+        <div id="dept-list"></div>
+        <button class="btn-save" id="add-dept-btn" style="margin-top:12px">+ 진료과목 추가</button>
+      </div>
+    </div>
+
+    <!-- 의료진 -->
+    <div class="panel" id="panel-doctors">
+      <div class="card">
+        <h3>의료진 소개</h3>
+        <div id="doctor-list"></div>
+        <button class="btn-save" id="add-doctor-btn" style="margin-top:12px">+ 의료진 추가</button>
+      </div>
+    </div>
+
+    <!-- 진료시간 -->
+    <div class="panel" id="panel-hours">
+      <div class="card">
+        <h3>진료시간</h3>
+        <div class="form-group">
+          <label>평일 진료시간</label>
+          <input type="text" id="hoursWeekday" placeholder="09:00 ~ 18:00" />
+        </div>
+        <div class="form-group">
+          <label>토요일 진료시간</label>
+          <input type="text" id="hoursSat" placeholder="09:00 ~ 13:00" />
+        </div>
+        <div class="form-group">
+          <label>점심시간</label>
+          <input type="text" id="hoursLunch" placeholder="13:00 ~ 14:00" />
+        </div>
+        <div class="form-group">
+          <label>일요일/공휴일</label>
+          <input type="text" id="hoursSun" placeholder="휴진" />
+        </div>
+      </div>
+    </div>
+
+    <!-- 미디어 관리 -->
+    <div class="panel" id="panel-media">
+      <div class="card">
+        <h3>이미지 / 영상 업로드</h3>
+        <div class="upload-area" id="upload-area">
+          <input type="file" id="file-input" accept="image/*,video/*" multiple />
+          <div class="upload-icon">📁</div>
+          <p><strong>클릭하거나 파일을 드래그</strong>하여 업로드</p>
+          <p>JPG, PNG, GIF, MP4, MOV 지원</p>
+        </div>
+        <div id="upload-progress" style="margin-top:12px;display:none">
+          <div style="background:#e0e4ec;border-radius:4px;height:6px">
+            <div id="progress-bar" style="background:var(--primary);height:6px;border-radius:4px;width:0%;transition:width 0.3s"></div>
+          </div>
+          <p style="font-size:12px;color:var(--sub);margin-top:6px" id="progress-text">업로드 중...</p>
+        </div>
+        <div class="media-grid" id="media-grid"></div>
+      </div>
+    </div>
+
+    <!-- 디자인·폰트 -->
+    <div class="panel" id="panel-design">
+      <div class="card">
+        <h3>색상 테마</h3>
+        <div class="form-group">
+          <label>메인 컬러</label>
+          <div class="color-row">
+            <input type="color" id="primaryColorPicker" value="#1a6fad" />
+            <input type="text" id="primaryColor" value="#1a6fad" placeholder="#1a6fad" />
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>폰트</h3>
+        <div class="form-group">
+          <label>Google 폰트 선택</label>
+          <select id="font">
+            <option value="Noto Sans KR">Noto Sans KR (기본)</option>
+            <option value="Nanum Gothic">나눔고딕</option>
+            <option value="Nanum Myeongjo">나눔명조</option>
+            <option value="Gothic A1">Gothic A1</option>
+            <option value="Spoqa Han Sans Neo">Spoqa Han Sans Neo</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>직접 입력 (Google Fonts 이름)</label>
+          <input type="text" id="fontCustom" placeholder="예: Black Han Sans" />
+        </div>
+      </div>
+    </div>
+
+    <!-- SEO -->
+    <div class="panel" id="panel-seo">
+      <div class="card">
+        <h3>검색엔진 미리보기</h3>
+        <div class="seo-preview">
+          <div class="seo-title" id="seo-preview-title">병원명 — 뉴월드 병원</div>
+          <div class="seo-url" id="seo-preview-url">newworld-1a1d5.web.app</div>
+          <div class="seo-desc" id="seo-preview-desc">병원 소개 및 진료 안내</div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>SEO 설정</h3>
+        <div class="form-group">
+          <label>페이지 제목 (title)</label>
+          <input type="text" id="seoTitle" placeholder="뉴월드 병원 — 부산 전문 의료 센터" />
+        </div>
+        <div class="form-group">
+          <label>메타 설명 (description, 150자 이내 권장)</label>
+          <textarea id="seoDesc" placeholder="뉴월드 병원은 최첨단 의료 장비와 전문 의료진으로..." style="min-height:80px"></textarea>
+        </div>
+        <div class="form-group">
+          <label>키워드 (쉼표로 구분)</label>
+          <input type="text" id="seoKeywords" placeholder="부산 병원, 내과, 정형외과, 뉴월드" />
+        </div>
+        <div class="form-group">
+          <label>OG 이미지 URL (SNS 공유 썸네일)</label>
+          <input type="text" id="ogImage" placeholder="https://firebasestorage..." />
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 어시스턴트 -->
+    <div class="panel" id="panel-ai">
+      <div class="card">
+        <h3>🤖 AI 어시스턴트 (Claude)</h3>
+        <div class="ai-key-row">
+          <span>API Key</span>
+          <input type="password" id="ai-api-key" placeholder="sk-ant-..." />
+        </div>
+        <div class="ai-chips">
+          <span class="chip" data-prompt="SEO를 최적화해줘. 현재 병원 정보를 바탕으로 title, description, keywords를 작성해줘.">SEO 자동 최적화</span>
+          <span class="chip" data-prompt="병원 소개 문구를 전문적이고 신뢰감 있게 다시 작성해줘.">소개 문구 개선</span>
+          <span class="chip" data-prompt="히어로 섹션 메인 카피를 환자 마음에 와닿는 문구로 3가지 제안해줘.">카피 3가지 제안</span>
+          <span class="chip" data-prompt="이 병원 홈페이지에 추가하면 좋을 기능이나 섹션을 추천해줘.">기능 추천</span>
+          <span class="chip" data-prompt="현재 홈페이지 JavaScript에 카카오맵 연동 코드를 작성해줘.">카카오맵 코드</span>
+          <span class="chip" data-prompt="온라인 예약 폼 HTML과 Firestore 저장 코드를 작성해줘.">예약 폼 코드</span>
+        </div>
+        <div class="ai-chat">
+          <div class="ai-messages" id="ai-messages">
+            <div class="msg ai">
+              <div class="role">AI 어시스턴트</div>
+              <div class="bubble">안녕하세요! 병원 홈페이지 작업을 도와드릴게요.<br>SEO 최적화, 문구 작성, JavaScript 코드 생성, 디자인 제안 등 무엇이든 물어보세요.</div>
+            </div>
+          </div>
+          <div class="ai-input-row">
+            <textarea id="ai-input" placeholder="예: SEO 최적화해줘 / 예약 버튼에 카카오 연결 코드 짜줘 / 히어로 문구 다시 써줘" rows="2"></textarea>
+            <button class="btn-ai-send" id="ai-send-btn">전송</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, listAll, deleteObject } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",
+  authDomain: "newworld-1a1d5.firebaseapp.com",
+  projectId: "newworld-1a1d5",
+  storageBucket: "newworld-1a1d5.firebasestorage.app",
+  messagingSenderId: "948363397391",
+  appId: "1:948363397391:web:5d7dee7a383f3bdec0167a"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storage = getStorage(app);
+const auth = getAuth(app);
+
+// ── 로그인 ──
+const loginScreen = document.getElementById('login-screen');
+onAuthStateChanged(auth, user => {
+  loginScreen.style.display = user ? 'none' : 'flex';
+  if (user) { loadData(); loadMedia(); }
+});
+document.getElementById('login-btn').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value;
+  const pw = document.getElementById('login-pw').value;
+  try {
+    await signInWithEmailAndPassword(auth, email, pw);
+  } catch (e) {
+    document.getElementById('login-error').style.display = 'block';
+  }
+});
+document.getElementById('login-email').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('login-btn').click(); });
+document.getElementById('login-pw').addEventListener('keydown', e => { if(e.key==='Enter') document.getElementById('login-btn').click(); });
+document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+// ── 사이드바 ──
+const panelTitles = {
+  basic:'기본 정보', hero:'히어로 섹션', departments:'진료과목',
+  doctors:'의료진', hours:'진료시간', media:'미디어 관리',
+  design:'디자인·폰트', seo:'SEO', ai:'AI 어시스턴트'
+};
+document.querySelectorAll('.menu-item').forEach(item => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    item.classList.add('active');
+    const panel = item.dataset.panel;
+    document.getElementById('panel-' + panel).classList.add('active');
+    document.getElementById('panel-title').textContent = panelTitles[panel];
+  });
+});
+
+// ── 데이터 로드 ──
+let siteData = {};
+async function loadData() {
+  try {
+    const snap = await getDoc(doc(db, 'site', 'content'));
+    if (snap.exists()) {
+      siteData = snap.data();
+      fillForm(siteData);
+    }
+  } catch(e) { console.log(e); }
+}
+
+function fillForm(d) {
+  const fields = ['hospitalName','address','phone','parking','kakaoUrl','footerInfo',
+    'heroTitle','heroSubtitle','heroBg','heroBtn',
+    'hoursWeekday','hoursSat','hoursLunch','hoursSun',
+    'primaryColor','font','fontCustom','seoTitle','seoDesc','seoKeywords','ogImage'];
+  fields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && d[id] !== undefined) el.value = d[id];
+  });
+  if (d.primaryColor) document.getElementById('primaryColorPicker').value = d.primaryColor;
+  if (d.departments) renderDepts(d.departments);
+  if (d.doctors) renderDoctors(d.doctors);
+  updateSeoPreview();
+}
+
+// ── 저장 ──
+document.getElementById('save-btn').addEventListener('click', saveData);
+async function saveData() {
+  const indicator = document.getElementById('saving-indicator');
+  indicator.textContent = '저장 중...';
+  try {
+    const font = document.getElementById('fontCustom').value || document.getElementById('font').value;
+    const data = {
+      hospitalName: v('hospitalName'), address: v('address'), phone: v('phone'),
+      parking: v('parking'), kakaoUrl: v('kakaoUrl'), footerInfo: v('footerInfo'),
+      heroTitle: v('heroTitle'), heroSubtitle: v('heroSubtitle'),
+      heroBg: v('heroBg'), heroBtn: v('heroBtn'),
+      hoursWeekday: v('hoursWeekday'), hoursSat: v('hoursSat'),
+      hoursLunch: v('hoursLunch'), hoursSun: v('hoursSun'),
+      primaryColor: v('primaryColor'), font,
+      seoTitle: v('seoTitle'), seoDesc: v('seoDesc'),
+      seoKeywords: v('seoKeywords'), ogImage: v('ogImage'),
+      departments: getDepts(), doctors: getDoctors(),
+      updatedAt: new Date().toISOString()
+    };
+    await setDoc(doc(db, 'site', 'content'), data);
+    siteData = data;
+    indicator.textContent = '✓ 저장됨';
+    toast('저장되었습니다!');
+    setTimeout(() => indicator.textContent = '', 3000);
+  } catch(e) {
+    indicator.textContent = '저장 실패';
+    toast('저장 중 오류가 발생했습니다.');
+    console.log(e);
+  }
+}
+const v = id => { const el = document.getElementById(id); return el ? el.value : ''; };
+
+// ── 색상 동기화 ──
+document.getElementById('primaryColorPicker').addEventListener('input', e => {
+  document.getElementById('primaryColor').value = e.target.value;
+});
+document.getElementById('primaryColor').addEventListener('input', e => {
+  if (/^#[0-9a-fA-F]{6}$/.test(e.target.value))
+    document.getElementById('primaryColorPicker').value = e.target.value;
+});
+
+// ── SEO 미리보기 ──
+['seoTitle','seoDesc'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateSeoPreview);
+});
+function updateSeoPreview() {
+  const t = v('seoTitle') || v('hospitalName') || '병원명';
+  const d = v('seoDesc') || '병원 소개 및 진료 안내';
+  document.getElementById('seo-preview-title').textContent = t;
+  document.getElementById('seo-preview-desc').textContent = d.slice(0, 160);
+}
+
+// ── 진료과목 ──
+let depts = [
+  { icon:'🏥', name:'내과', desc:'소화기, 호흡기, 순환기 질환 전문' },
+  { icon:'🦴', name:'정형외과', desc:'관절, 척추, 스포츠 손상 치료' },
+  { icon:'🧠', name:'신경과', desc:'두통, 어지럼증, 신경계 질환' },
+  { icon:'👁️', name:'안과', desc:'시력교정, 백내장, 녹내장 치료' }
+];
+function renderDepts(list) {
+  depts = list;
+  const el = document.getElementById('dept-list');
+  el.innerHTML = depts.map((d, i) => `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <input type="text" value="${d.icon}" style="width:52px;text-align:center" data-dept="${i}" data-field="icon" />
+      <input type="text" value="${d.name}" placeholder="과목명" style="flex:1" data-dept="${i}" data-field="name" />
+      <input type="text" value="${d.desc}" placeholder="설명" style="flex:2" data-dept="${i}" data-field="desc" />
+      <button onclick="removeDept(${i})" style="background:#fee;border:1px solid #fcc;border-radius:6px;padding:6px 10px;cursor:pointer;color:#c00;font-size:12px">삭제</button>
+    </div>
+  `).join('');
+  el.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      depts[+e.target.dataset.dept][e.target.dataset.field] = e.target.value;
+    });
+  });
+}
+window.removeDept = i => { depts.splice(i, 1); renderDepts(depts); };
+document.getElementById('add-dept-btn').addEventListener('click', () => {
+  depts.push({ icon:'🏥', name:'', desc:'' }); renderDepts(depts);
+});
+const getDepts = () => depts;
+renderDepts(depts);
+
+// ── 의료진 ──
+let doctors = [
+  { name:'김원장', dept:'내과 전문의', career:'前 서울대학교병원 전임의', photo:'' },
+  { name:'이원장', dept:'정형외과 전문의', career:'前 연세대학교병원 전임의', photo:'' }
+];
+function renderDoctors(list) {
+  doctors = list;
+  const el = document.getElementById('doctor-list');
+  el.innerHTML = doctors.map((d, i) => `
+    <div style="border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <input type="text" value="${d.name}" placeholder="이름" style="width:120px" data-doc="${i}" data-field="name" />
+        <input type="text" value="${d.dept}" placeholder="전문과목" style="flex:1;min-width:140px" data-doc="${i}" data-field="dept" />
+        <input type="text" value="${d.career}" placeholder="경력" style="flex:2;min-width:200px" data-doc="${i}" data-field="career" />
+        <input type="text" value="${d.photo}" placeholder="사진 URL (미디어 관리에서 복사)" style="width:100%;margin-top:6px" data-doc="${i}" data-field="photo" />
+        <button onclick="removeDoctor(${i})" style="background:#fee;border:1px solid #fcc;border-radius:6px;padding:6px 10px;cursor:pointer;color:#c00;font-size:12px;margin-top:4px">삭제</button>
+      </div>
+    </div>
+  `).join('');
+  el.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      doctors[+e.target.dataset.doc][e.target.dataset.field] = e.target.value;
+    });
+  });
+}
+window.removeDoctor = i => { doctors.splice(i, 1); renderDoctors(doctors); };
+document.getElementById('add-doctor-btn').addEventListener('click', () => {
+  doctors.push({ name:'', dept:'', career:'', photo:'' }); renderDoctors(doctors);
+});
+const getDoctors = () => doctors;
+renderDoctors(doctors);
+
+// ── 미디어 업로드 ──
+const uploadArea = document.getElementById('upload-area');
+const fileInput = document.getElementById('file-input');
+uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.style.borderColor = 'var(--primary)'; });
+uploadArea.addEventListener('dragleave', () => uploadArea.style.borderColor = '');
+uploadArea.addEventListener('drop', e => { e.preventDefault(); uploadArea.style.borderColor = ''; handleFiles(e.dataTransfer.files); });
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(uploadFile);
+}
+
+function uploadFile(file) {
+  const progressWrap = document.getElementById('upload-progress');
+  const progressBar = document.getElementById('progress-bar');
+  const progressText = document.getElementById('progress-text');
+  progressWrap.style.display = 'block';
+  const storageRef = ref(storage, `media/${Date.now()}_${file.name}`);
+  const task = uploadBytesResumable(storageRef, file);
+  task.on('state_changed',
+    snap => {
+      const pct = Math.round(snap.bytesTransferred / snap.totalBytes * 100);
+      progressBar.style.width = pct + '%';
+      progressText.textContent = `업로드 중... ${pct}%`;
+    },
+    err => { toast('업로드 실패: ' + err.message); progressWrap.style.display = 'none'; },
+    async () => {
+      const url = await getDownloadURL(task.snapshot.ref);
+      progressWrap.style.display = 'none';
+      progressBar.style.width = '0%';
+      toast('업로드 완료! URL을 클릭하여 복사하세요.');
+      addMediaItem(url, file.type, task.snapshot.ref.fullPath);
+    }
+  );
+}
+
+async function loadMedia() {
+  try {
+    const listRef = ref(storage, 'media');
+    const res = await listAll(listRef);
+    for (const item of res.items) {
+      const url = await getDownloadURL(item);
+      const isVideo = item.name.match(/\.(mp4|mov|webm)$/i);
+      addMediaItem(url, isVideo ? 'video' : 'image', item.fullPath);
+    }
+  } catch(e) { console.log(e); }
+}
+
+function addMediaItem(url, type, path) {
+  const grid = document.getElementById('media-grid');
+  const div = document.createElement('div');
+  div.className = 'media-item';
+  const isVideo = type.includes('video');
+  div.innerHTML = `
+    ${isVideo
+      ? `<video src="${url}" muted playsinline></video>`
+      : `<img src="${url}" alt="미디어" />`}
+    <button class="media-del" title="삭제">✕</button>
+    <div class="media-url" title="클릭하여 URL 복사">${url.split('?')[0].split('/').pop()}</div>
+  `;
+  div.querySelector('.media-url').addEventListener('click', () => {
+    navigator.clipboard.writeText(url);
+    toast('URL이 복사되었습니다!');
+  });
+  div.querySelector('.media-del').addEventListener('click', async () => {
+    if (!confirm('삭제하시겠습니까?')) return;
+    try {
+      await deleteObject(ref(storage, path));
+      div.remove();
+      toast('삭제되었습니다.');
+    } catch(e) { toast('삭제 실패'); }
+  });
+  grid.prepend(div);
+}
+
+// ── AI 어시스턴트 ──
+document.getElementById('ai-send-btn').addEventListener('click', sendAI);
+document.getElementById('ai-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAI(); }
+});
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.getElementById('ai-input').value = chip.dataset.prompt;
+    sendAI();
+  });
+});
+
+async function sendAI() {
+  const apiKey = document.getElementById('ai-api-key').value.trim();
+  const input = document.getElementById('ai-input').value.trim();
+  if (!apiKey) { toast('Claude API Key를 입력해주세요 (sk-ant-...)'); return; }
+  if (!input) return;
+
+  const messages = document.getElementById('ai-messages');
+  messages.innerHTML += `<div class="msg user"><div class="role">나</div><div class="bubble">${escHtml(input)}</div></div>`;
+  document.getElementById('ai-input').value = '';
+  messages.scrollTop = messages.scrollHeight;
+
+  const loadingId = 'ai-loading-' + Date.now();
+  messages.innerHTML += `<div class="msg ai" id="${loadingId}"><div class="role">AI 어시스턴트</div><div class="bubble">답변 생성 중...</div></div>`;
+  messages.scrollTop = messages.scrollHeight;
+
+  const context = `현재 병원 홈페이지 정보:
+병원명: ${v('hospitalName')}
+주소: ${v('address')}
+전화: ${v('phone')}
+진료시간(평일): ${v('hoursWeekday')}
+진료과목: ${depts.map(d => d.name).join(', ')}
+SEO 제목: ${v('seoTitle')}
+SEO 설명: ${v('seoDesc')}`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'anthropic-dangerous-allow-browser': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 2048,
+        system: `당신은 병원 홈페이지 전문 제작 AI입니다. 한국어로 답변하고, 코드가 필요한 경우 완성된 코드를 제공하세요.\n\n${context}`,
+        messages: [{ role: 'user', content: input }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '응답을 받지 못했습니다.';
+    const formatted = text.replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre>$2</pre>').replace(/\n/g, '<br>');
+    document.getElementById(loadingId).querySelector('.bubble').innerHTML = formatted;
+  } catch(e) {
+    document.getElementById(loadingId).querySelector('.bubble').textContent = '오류가 발생했습니다: ' + e.message;
+  }
+  messages.scrollTop = messages.scrollHeight;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── 토스트 ──
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+</script>
+</body>
+</html>
