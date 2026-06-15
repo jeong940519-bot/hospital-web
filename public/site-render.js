@@ -34,6 +34,20 @@
     'hover-expand':'(function(){document.querySelectorAll("[data-fx-expand]").forEach(function(el){var col=+(el.dataset.fxColH||60),full=+(el.dataset.fxFullH||200);el.style.height=col+"px";el.style.cursor="pointer";el.addEventListener("mouseenter",function(){el.style.height=full+"px";});el.addEventListener("mouseleave",function(){el.style.height=col+"px";});});})();'
   };
 
+  var SHAPE_CLIP={
+    'triangle':'polygon(50% 0%,0% 100%,100% 100%)',
+    'triangle-down':'polygon(0% 0%,100% 0%,50% 100%)',
+    'diamond':'polygon(50% 0%,100% 50%,50% 100%,0% 50%)',
+    'star':'polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)',
+    'pentagon':'polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%)',
+    'hexagon':'polygon(25% 0%,75% 0%,100% 50%,75% 100%,25% 100%,0% 50%)',
+    'arrow-r':'polygon(0% 20%,60% 20%,60% 0%,100% 50%,60% 100%,60% 80%,0% 80%)',
+    'arrow-l':'polygon(100% 20%,40% 20%,40% 0%,0% 50%,40% 100%,40% 80%,100% 80%)',
+    'parallelogram':'polygon(20% 0%,100% 0%,80% 100%,0% 100%)',
+    'cross':'polygon(33% 0%,67% 0%,67% 33%,100% 33%,100% 67%,67% 67%,67% 100%,33% 100%,33% 67%,0% 67%,0% 33%,33% 33%)',
+    'trapezoid':'polygon(15% 0%,85% 0%,100% 100%,0% 100%)',
+  };
+
   function renderElStatic(e){
     var fx = e.fx||{}, ft = fx.type||'';
     var base = 'left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px;'+(e.rot?'transform:rotate('+e.rot+'deg);':'');
@@ -66,7 +80,10 @@
       }
       return '<div class="el"'+lnk+ea+' style="'+s3+'"><img src="'+e.src+'" style="width:100%;height:100%;display:block;object-fit:'+e.fit+'"></div>';
     } else if(e.type==='shape'){
-      var s4=base+'background:'+e.fill+';border-radius:'+(e.shape==='circle'?'50%':e.radius+'px')+';'+(e.borderW>0?'border:'+e.borderW+'px solid '+e.borderColor+';':'');
+      var clip=SHAPE_CLIP[e.shape]||'';
+      var s4=base+'background:'+e.fill+';'
+        +(clip?'clip-path:'+clip+';':'border-radius:'+(e.shape==='circle'?'50%':e.radius+'px')+';')
+        +(e.borderW>0&&!clip?'border:'+e.borderW+'px solid '+e.borderColor+';':'');
       return '<div class="el"'+lnk+ea+' style="'+s4+'"></div>';
     }
     return '';
@@ -101,8 +118,15 @@
 
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
 
+    // 사용된 폰트만 수집 → Google Fonts URL 동적 생성
+    var _usedFonts=['Noto Sans KR'];
+    project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.fontFamily&&_usedFonts.indexOf(e.fontFamily)<0)_usedFonts.push(e.fontFamily);});});
+    var _GFW={'Noto Sans KR':'wght@300;400;500;700;900','Noto Serif KR':'wght@400;700','Nanum Gothic':'wght@400;700;800','Nanum Myeongjo':'wght@400;700;800','Gaegu':'wght@400;700','Sunflower':'wght@300;500;700','Dancing Script':'wght@400;500;700','Open Sans':'wght@300;400;500;700;800','Inter':'wght@300;400;500;700;900','Roboto':'wght@300;400;500;700;900','Lato':'wght@300;400;700;900','Montserrat':'wght@300;400;500;700;900','Poppins':'wght@300;400;500;700;900','Oswald':'wght@300;400;500;700','Raleway':'wght@300;400;500;700;900','Nunito':'wght@300;400;500;700;900','Quicksand':'wght@300;400;500;700','Playfair Display':'wght@400;500;700;900','Merriweather':'wght@300;400;700;900'};
+    var _noW=['Nanum Pen Script','Black Han Sans','Do Hyeon','Jua','Gowun Dodum','Song Myung','Cute Font','East Sea Dokdo','Pacifico','Bebas Neue'];
+    var _fontsUrl='https://fonts.googleapis.com/css2?'+_usedFonts.map(function(f){var slug=f.replace(/ /g,'+');return 'family='+slug+(_noW.indexOf(f)>=0?'':':'+(_GFW[f]||'wght@300;400;500;700;900'));}).join('&')+'&display=swap';
+
     return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'
-      +'<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Nanum+Gothic:wght@400;700;800&family=Nanum+Myeongjo:wght@400;700;800&family=Black+Han+Sans&family=Do+Hyeon&family=Jua&family=Gowun+Dodum&family=Gaegu:wght@400;700&family=Song+Myung&display=swap" rel="stylesheet">'
+      +'<link href="'+_fontsUrl+'" rel="stylesheet">'
       +'<style>*{margin:0;box-sizing:border-box}body{background:#eee;font-family:\'Noto Sans KR\',sans-serif}'
       +'nav{position:sticky;top:0;z-index:100;background:#fff;box-shadow:0 1px 8px #0002;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:12px}'
       +'nav a{color:#1a2b5c;text-decoration:none;font-weight:700;font-size:15px;padding:7px 16px;border-radius:22px;transition:.15s;cursor:pointer}'
