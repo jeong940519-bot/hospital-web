@@ -336,7 +336,7 @@
         <label>참고 이미지 <span style="color:var(--sub);font-weight:400;text-transform:none">(선택)</span></label>
         <div class="attach-row" id="ai-img-pick">
           <span class="attach-icon">📷</span>
-          <span class="attach-label">클릭해서 이미지 첨부</span>
+          <span class="attach-label">클릭 또는 스크린샷 붙여넣기(Ctrl+V)</span>
           <span class="attach-name" id="ai-img-name"></span>
         </div>
       </div>
@@ -432,7 +432,7 @@
     <button id="ai-chat-img-clear" style="margin-left:auto;background:none;border:none;color:var(--sub);cursor:pointer;font-size:14px">✕</button>
   </div>
   <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-shrink:0">
-    <button id="ai-chat-img-btn" title="이미지 첨부" style="padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;flex-shrink:0">📷</button>
+    <button id="ai-chat-img-btn" title="이미지 첨부 (또는 Ctrl+V 붙여넣기)" style="padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;cursor:pointer;flex-shrink:0">📷</button>
     <input type="file" id="ai-chat-img-file" accept="image/*" style="display:none">
     <input type="text" id="ai-chat-input" placeholder="예: 제목 더 크게, 카드에 호버 효과, 배경 파란색으로…" style="flex:1;padding:8px 10px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:12px;font-family:inherit;outline:none">
     <button id="ai-chat-send" style="padding:8px 14px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0">전송</button>
@@ -2042,6 +2042,35 @@ document.getElementById('ai-chat-img-file').addEventListener('change',async e=>{
 });
 function clearChatImg(){ _chatImg=null; document.getElementById('ai-chat-imgbar').style.display='none'; }
 document.getElementById('ai-chat-img-clear').onclick=clearChatImg;
+
+// ── 스크린샷/이미지 붙여넣기 (Ctrl+V) ──
+function clipboardImageFile(e){
+  const cb = e.clipboardData || window.clipboardData;
+  if(!cb || !cb.items) return null;
+  for(const it of cb.items){ if(it.type && it.type.indexOf('image')===0) return it.getAsFile(); }
+  return null;
+}
+// AI 초안 모달: 설명칸/모달 어디에 붙여넣어도 참고 이미지로 첨부
+['ai-desc','ai-modal'].forEach(id=>{
+  const t=document.getElementById(id);
+  if(t) t.addEventListener('paste', async e=>{
+    const f=clipboardImageFile(e); if(!f) return; e.preventDefault();
+    try{ const {mediaType,data}=await downscaleToB64(f); aiRefImg={mediaType,data};
+      document.getElementById('ai-img-name').textContent='📷 붙여넣은 스크린샷'; toast('스크린샷 첨부됨 📋'); }
+    catch(err){ toast('이미지 처리 실패'); }
+  });
+});
+// AI 작업 채팅: 입력칸/패널에 붙여넣으면 첨부
+['ai-chat-input','ai-chat-panel'].forEach(id=>{
+  const t=document.getElementById(id);
+  if(t) t.addEventListener('paste', async e=>{
+    const f=clipboardImageFile(e); if(!f) return; e.preventDefault();
+    try{ const {mediaType,data}=await downscaleToB64(f); _chatImg={mediaType,data};
+      document.getElementById('ai-chat-img-name').textContent='📷 붙여넣은 스크린샷';
+      document.getElementById('ai-chat-imgbar').style.display='flex'; toast('스크린샷 첨부됨 📋'); }
+    catch(err){ toast('이미지 처리 실패'); }
+  });
+});
 
 // ── 모달 / 패널 드래그 이동 ──
 function makeDraggable(handle, target){
