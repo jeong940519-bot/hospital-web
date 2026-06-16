@@ -176,11 +176,20 @@
   .rdd-sub-wrap{position:relative}
   .rdd-sub{position:absolute;left:100%;top:-7px;margin-left:3px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;box-shadow:0 12px 40px #000b;min-width:210px;display:none;z-index:9700}
   .rdd-sub-wrap:hover>.rdd-sub{display:block}
-  /* PPT 색상 팝업 */
-  .cp-grid{display:grid;gap:3px;padding:4px 6px}
-  .cp-sw{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:1px solid rgba(0,0,0,.18)}
-  .cp-sw:hover{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
-  .cp-sw.sel{outline:2px solid var(--accent);outline-offset:1px}
+  /* PPT 색상 팝업 — 밝은(흰색) 테마, PowerPoint와 동일 양식 */
+  #fill-dd{background:#fff;border:1px solid #b9b9b9;box-shadow:0 8px 28px rgba(0,0,0,.28);color:#222}
+  #fill-dd #fill-dd-title{color:#444}
+  #fill-dd .rdd-sec{color:#666;background:none;border:none;font-weight:600}
+  #fill-dd .rdd-sep{background:#e3e3e3}
+  #fill-dd .rdd-item{color:#222}
+  #fill-dd .rdd-item:hover{background:#e9eefb;color:#111}
+  #fill-dd .rdd-item .rdi-ic{color:#555}
+  #fill-dd #cp-theme-base{margin-bottom:5px}
+  #fill-dd select,#fill-dd input[type=color]{color:#222}
+  .cp-grid{display:grid;gap:2px;padding:3px 8px}
+  .cp-sw{width:100%;aspect-ratio:1;border-radius:0;cursor:pointer;border:1px solid #d6d6d6}
+  .cp-sw:hover{outline:2px solid #2b6cff;outline-offset:0;position:relative;z-index:1}
+  .cp-sw.sel{outline:2px solid #e8820c;outline-offset:0;position:relative;z-index:1}
   .panel-cbtn{padding:3px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;height:38px;min-width:38px;gap:8px}
   .panel-cbtn:hover{border-color:var(--accent)}
   .panel-cbtn>span:first-child{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);display:block;flex-shrink:0}
@@ -734,7 +743,8 @@
 <div class="rdd" id="fill-dd" style="width:262px;padding:6px;max-height:82vh;overflow:auto">
   <div id="fill-dd-title" style="font-size:11px;color:var(--accent2);font-weight:700;padding:2px 6px 4px">도형 채우기</div>
   <div class="rdd-sec">테마 색</div>
-  <div class="cp-grid" id="cp-theme" style="grid-template-columns:repeat(10,1fr)"></div>
+  <div class="cp-grid" id="cp-theme-base" style="grid-template-columns:repeat(10,1fr)"></div>
+  <div class="cp-grid" id="cp-theme-shades" style="grid-template-columns:repeat(10,1fr);padding-top:0"></div>
   <div class="rdd-sec">표준 색</div>
   <div class="cp-grid" id="cp-standard" style="grid-template-columns:repeat(10,1fr)"></div>
   <div class="rdd-sep"></div>
@@ -3240,10 +3250,12 @@ function openColorPopup(key, btn){
   const t=CP_TARGETS[key]; if(!t) return; _cpTarget=t;
   document.getElementById('fill-dd-title').textContent=t.label;
   const cur=t.current();
-  const cols=CP_THEME.map(b=>[b,..._shades(b)]);
-  let th=''; for(let r=0;r<6;r++) for(let c=0;c<10;c++){ const col=cols[c][r]; th+=`<div class="cp-sw${cur===col?' sel':''}" data-color="${col}" title="${col}" style="background:${col}"></div>`; }
-  document.getElementById('cp-theme').innerHTML=th;
-  document.getElementById('cp-standard').innerHTML=CP_STD.map(c=>`<div class="cp-sw${cur===c?' sel':''}" data-color="${c}" title="${c}" style="background:${c}"></div>`).join('');
+  const sw=c=>`<div class="cp-sw${cur===c?' sel':''}" data-color="${c}" title="${c}" style="background:${c}"></div>`;
+  document.getElementById('cp-theme-base').innerHTML=CP_THEME.map(sw).join('');
+  const shades=CP_THEME.map(_shades);
+  let sh=''; for(let r=0;r<5;r++) for(let c=0;c<10;c++) sh+=sw(shades[c][r]);
+  document.getElementById('cp-theme-shades').innerHTML=sh;
+  document.getElementById('cp-standard').innerHTML=CP_STD.map(sw).join('');
   document.getElementById('cp-tex-grid').innerHTML=CP_TEX.map(tx=>`<div class="cp-sw" data-tex="${tx.replace(/"/g,'&quot;')}" style="background:${tx};height:30px;aspect-ratio:auto"></div>`).join('');
   const nf=document.getElementById('cp-nofill'); nf.style.display=t.noFill?'flex':'none'; if(t.noFill) nf.lastChild.textContent=t.noFillLabel||'채우기 없음';
   document.getElementById('cp-gradient').style.display=t.rich?'flex':'none';
