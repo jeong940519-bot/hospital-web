@@ -176,6 +176,13 @@
   .rdd-sub-wrap{position:relative}
   .rdd-sub{position:absolute;left:100%;top:-7px;margin-left:3px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:6px;box-shadow:0 12px 40px #000b;min-width:210px;display:none;z-index:9700}
   .rdd-sub-wrap:hover>.rdd-sub{display:block}
+  /* PPT 색상 팝업 */
+  .cp-grid{display:grid;gap:3px;padding:4px 6px}
+  .cp-sw{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:1px solid rgba(0,0,0,.18)}
+  .cp-sw:hover{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
+  .cp-sw.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .cp-nofill-sw{background:repeating-conic-gradient(#fff 0 25%,#eee 0 50%) 50%/8px 8px;position:relative}
+  .cp-nofill-sw::after{content:'';position:absolute;left:1px;right:1px;top:50%;height:2px;background:#e03131;transform:rotate(-45deg)}
   .qs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px}
   .qs-cell{height:34px;border-radius:7px;cursor:pointer;border:1px solid var(--border);display:flex;align-items:center;justify-content:center}
   .qs-cell:hover{outline:2px solid var(--accent)}
@@ -719,6 +726,37 @@
   <div class="rdd-item" data-arr="dup"><span class="rdi-ic">⧉</span>복제<span class="rdi-key">D</span></div>
   <div class="rdd-item" data-arr="del" style="color:#ff8da3"><span class="rdi-ic">🗑</span>삭제<span class="rdi-key">Del</span></div>
 </div>
+
+<!-- PPT식 색상 팝업 (도형 채우기/윤곽선) -->
+<div class="rdd" id="fill-dd" style="width:262px;padding:6px;max-height:82vh;overflow:auto">
+  <div id="fill-dd-title" style="font-size:11px;color:var(--accent2);font-weight:700;padding:2px 6px 4px">도형 채우기</div>
+  <div class="rdd-sec">테마 색</div>
+  <div class="cp-grid" id="cp-theme" style="grid-template-columns:repeat(10,1fr)"></div>
+  <div class="rdd-sec">표준 색</div>
+  <div class="cp-grid" id="cp-standard" style="grid-template-columns:repeat(10,1fr)"></div>
+  <div class="rdd-sep"></div>
+  <div class="rdd-item" id="cp-nofill"><span class="rdi-ic">▢</span>채우기 없음</div>
+  <div class="rdd-item" id="cp-more"><span class="rdi-ic">🎨</span>다른 채우기 색…</div>
+  <div class="rdd-item" id="cp-eyedrop"><span class="rdi-ic">💧</span>스포이트</div>
+  <div class="rdd-item" id="cp-gradient"><span class="rdi-ic">🌈</span>그라데이션</div>
+  <div class="rdd-item" id="cp-image"><span class="rdi-ic">🖼</span>그림…</div>
+  <div class="rdd-item" id="cp-texture"><span class="rdi-ic">🧱</span>질감</div>
+  <div id="cp-grad-panel" style="display:none;padding:8px 6px;border-top:1px solid var(--border);margin-top:6px">
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+      <input type="color" id="cp-grad-c1" value="#6c7bff" style="width:32px;height:30px;padding:2px;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+      <span style="color:var(--sub)">→</span>
+      <input type="color" id="cp-grad-c2" value="#2b6cff" style="width:32px;height:30px;padding:2px;background:var(--panel2);border:1px solid var(--border);border-radius:6px">
+      <select id="cp-grad-dir" style="flex:1;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+        <option value="90deg">→ 가로</option><option value="180deg">↓ 세로</option><option value="135deg">↘ 대각</option><option value="circle">● 방사형</option>
+      </select>
+    </div>
+    <button class="tb-btn primary" id="cp-grad-apply" style="width:100%;padding:8px;font-size:12px">그라데이션 적용</button>
+  </div>
+  <div id="cp-tex-panel" style="display:none;padding:8px 6px;border-top:1px solid var(--border);margin-top:6px">
+    <div class="cp-grid" id="cp-tex-grid" style="grid-template-columns:repeat(4,1fr);gap:6px"></div>
+  </div>
+</div>
+<input type="file" id="cp-fill-file" accept="image/*" style="display:none" />
 
 <!-- 홈탭 글꼴 드롭다운 (검색·추가) -->
 <div class="rdd" id="rb-font-dd" style="width:270px;padding:0;overflow:hidden">
@@ -1277,7 +1315,7 @@ function renderEl(e){
     tl.appendChild(inner); node.appendChild(tl);
   }
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
-  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍','hover-expand':'📂'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
+  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'sticky':'📌','scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍','hover-expand':'📂'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
   node.addEventListener('mousedown', ev=> startDrag(ev,e));
   node.addEventListener('dblclick', ev=>{ if(e.type==='text'||e.type==='shape') startEdit(node,e); });
   node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); showLinkMenu(ev.clientX, ev.clientY, e); });
@@ -1751,9 +1789,14 @@ function bindProps(e){
   if(fxHint) fxHint.addEventListener('click',()=>switchPropTab('fx'));
 }
 // ───────────────────────── 이펙트 패널 ─────────────────────────
-const FX_NAMES={'scroll-reveal':'스크롤 등장','hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
-const FX_ICONS={'scroll-reveal':'📜','hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
+const FX_NAMES={'sticky':'상단 고정','scroll-reveal':'스크롤 등장','hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
+const FX_ICONS={'sticky':'📌','scroll-reveal':'📜','hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
 const FX_DESC={
+  'sticky':{
+    result:'스크롤을 내려도 이 요소가 화면 같은 위치(상단)에 계속 붙어 따라옵니다.',
+    steps:['로고·상단 메뉴바·예약 버튼 등 고정할 요소를 선택','상단 고정 적용 — 설정값 없이 바로 적용됩니다','여러 요소(로고+메뉴)를 각각 고정하면 함께 따라옵니다'],
+    tip:'💡 상단 헤더(로고+메뉴)를 페이지 맨 위에 배치하고 모두 고정하면 항상 보이는 내비게이션이 됩니다'
+  },
   'scroll-reveal':{
     result:'방문자가 스크롤을 내리면 이 요소가 아래→위로 떠오르듯 자연스럽게 나타납니다.',
     steps:['이 요소에 스크롤 등장 적용','방향을 고릅니다 (위·왼·오·페이드)','여러 요소를 순서대로 등장시키려면 지연시간을 100ms씩 늘려 주세요'],
@@ -2931,7 +2974,7 @@ function applyToShapes(fn){ const arr=selShapeEls(); if(!arr.length) return; arr
   document.getElementById('rb-valign')?.addEventListener('click',()=>{ const order=['top','middle','bottom']; const arr=selTextEls(); if(!arr.length)return; const cur=arr[0].valign||'middle'; const nx=order[(order.indexOf(cur)+1)%3]; applyToTexts(e=>e.valign=nx); toast('세로 맞춤: '+(nx==='top'?'위':nx==='middle'?'중간':'아래')); });
   // ── 도형 스타일 ──
   const sfBtn=document.getElementById('rb-sfill-btn'),sfIn=document.getElementById('rb-sfill');
-  sfBtn?.addEventListener('click',()=>sfIn.click());
+  sfBtn?.addEventListener('click',e=>{ const dd=document.getElementById('fill-dd'); if(dd.style.display==='block'){ closeAllDD(); return; } openFillPopup(); openDD(dd, e.currentTarget); });
   sfIn?.addEventListener('input',()=>{ const v=sfIn.value; document.getElementById('rb-sfill-bar').style.background=v; applyToShapesQuiet(e=>e.fill=v); });
   sfIn?.addEventListener('change',()=>snapshot());
   const soBtn=document.getElementById('rb-soutline-btn'),soIn=document.getElementById('rb-soutline');
@@ -3059,7 +3102,7 @@ function arrDel(){ if(!selIds.size)return; page().elements=page().elements.filte
 // ── 드롭다운 공통 ──
 function closeAllDD(){ document.querySelectorAll('.rdd').forEach(d=>d.style.display='none'); }
 function openDD(dd, btn){ closeAllDD(); dd.style.display='block'; const r=btn.getBoundingClientRect(); dd.style.left=Math.min(r.left, window.innerWidth-dd.offsetWidth-8)+'px'; dd.style.top=(r.bottom+4)+'px'; }
-document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')) closeAllDD(); });
+document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')&&!e.target.closest('#rb-sfill-btn')) closeAllDD(); });
 
 // ── 정렬 드롭다운 ──
 function updateArrangeDD(){
@@ -3152,6 +3195,62 @@ function setupHomeFontPicker(){
     fileInput.click();
   });
 }
+
+// ───────────────────────── PPT식 색상 팝업 (도형 채우기) ─────────────────────────
+const CP_THEME=['#ffffff','#000000','#e7e6e6','#44546a','#5b9bd5','#ed7d31','#a5a5a5','#ffc000','#4472c4','#70ad47'];
+const CP_STD=['#c00000','#ff0000','#ffc000','#ffff00','#92d050','#00b050','#00b0f0','#0070c0','#002060','#7030a0'];
+const CP_TEX=[
+  'repeating-linear-gradient(45deg,#e2e2e2,#e2e2e2 8px,#f6f6f6 8px,#f6f6f6 16px)',
+  'repeating-linear-gradient(0deg,#dfe7f5,#dfe7f5 7px,#eef3fb 7px,#eef3fb 14px)',
+  'radial-gradient(#c3d3ff 1.6px,transparent 1.6px) 0 0/14px 14px #eef3ff',
+  'linear-gradient(135deg,#f6d365,#fda085)',
+  'linear-gradient(135deg,#a1c4fd,#c2e9fb)',
+  'linear-gradient(135deg,#d4fc79,#96e6a1)',
+  'repeating-linear-gradient(90deg,#ececec,#ececec 2px,#fff 2px,#fff 11px)',
+  'conic-gradient(from 45deg,#e6e6e6,#fafafa,#e6e6e6,#fafafa,#e6e6e6)',
+];
+function _hex2rgb(h){ h=String(h).replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
+function _rgb2hex(a){ return '#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
+function _lighten(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v+(255-v)*p)); }
+function _darken(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v*(1-p))); }
+function _shades(hex){ return [_lighten(hex,.8),_lighten(hex,.6),_lighten(hex,.4),_darken(hex,.25),_darken(hex,.5)]; }
+function cpApply(val){ if(!selShapeEls().length){ toast('도형을 선택하세요'); return; } applyToShapes(e=>e.fill=val); const bar=document.getElementById('rb-sfill-bar'); if(bar) bar.style.background=(val==='transparent'?'repeating-conic-gradient(#fff 0 25%,#ddd 0 50%) 50%/6px 6px':val); closeAllDD(); }
+function openFillPopup(){
+  const cur=(selShapeEls()[0]||{}).fill;
+  // 테마 색 (10열 × 6행: 베이스 + 음영 5)
+  const cols=CP_THEME.map(b=>[b,..._shades(b)]);
+  let th=''; for(let r=0;r<6;r++) for(let c=0;c<10;c++){ const col=cols[c][r]; th+=`<div class="cp-sw${cur===col?' sel':''}" data-color="${col}" title="${col}" style="background:${col}"></div>`; }
+  document.getElementById('cp-theme').innerHTML=th;
+  document.getElementById('cp-standard').innerHTML=CP_STD.map(c=>`<div class="cp-sw${cur===c?' sel':''}" data-color="${c}" title="${c}" style="background:${c}"></div>`).join('');
+  document.getElementById('cp-tex-grid').innerHTML=CP_TEX.map(t=>`<div class="cp-sw" data-tex="${t.replace(/"/g,'&quot;')}" style="background:${t};height:30px;aspect-ratio:auto"></div>`).join('');
+  document.getElementById('cp-grad-panel').style.display='none';
+  document.getElementById('cp-tex-panel').style.display='none';
+}
+(function(){
+  const dd=document.getElementById('fill-dd'); if(!dd) return;
+  dd.addEventListener('click',ev=>{
+    const sw=ev.target.closest('[data-color]'); if(sw){ cpApply(sw.dataset.color); return; }
+    const tx=ev.target.closest('[data-tex]'); if(tx){ cpApply(tx.dataset.tex); return; }
+  });
+  document.getElementById('cp-nofill').onclick=()=>cpApply('transparent');
+  document.getElementById('cp-more').onclick=()=>{ const inp=document.getElementById('rb-sfill'); inp.onchange=()=>snapshot(); inp.click(); };
+  document.getElementById('cp-eyedrop').onclick=async()=>{
+    if(!window.EyeDropper){ toast('이 브라우저는 스포이트를 지원하지 않습니다'); return; }
+    try{ const r=await new EyeDropper().open(); cpApply(r.sRGBHex); }catch(e){}
+  };
+  document.getElementById('cp-gradient').onclick=()=>{ const p=document.getElementById('cp-grad-panel'); p.style.display=p.style.display==='none'?'block':'none'; document.getElementById('cp-tex-panel').style.display='none'; };
+  document.getElementById('cp-grad-apply').onclick=()=>{
+    const c1=document.getElementById('cp-grad-c1').value, c2=document.getElementById('cp-grad-c2').value, dir=document.getElementById('cp-grad-dir').value;
+    cpApply(dir==='circle'?`radial-gradient(circle, ${c1}, ${c2})`:`linear-gradient(${dir}, ${c1}, ${c2})`);
+  };
+  document.getElementById('cp-texture').onclick=()=>{ const p=document.getElementById('cp-tex-panel'); p.style.display=p.style.display==='none'?'block':'none'; document.getElementById('cp-grad-panel').style.display='none'; };
+  document.getElementById('cp-image').onclick=()=>{
+    if(!selShapeEls().length){ toast('도형을 선택하세요'); return; }
+    const fi=document.getElementById('cp-fill-file');
+    fi.onchange=()=>{ const f=fi.files[0]; fi.value=''; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ cpApply(`url("${rd.result}") center/cover no-repeat`); }; rd.readAsDataURL(f); };
+    fi.click();
+  };
+})();
 
 // ── 빠른 스타일 드롭다운 ──
 (function(){
