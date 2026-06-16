@@ -616,16 +616,18 @@
         <label>참고 이미지 <span style="color:var(--sub);font-weight:400;text-transform:none">(선택)</span></label>
         <div class="attach-row" id="ai-img-pick">
           <span class="attach-icon">📷</span>
-          <span class="attach-label">클릭 또는 스크린샷 붙여넣기(Ctrl+V)</span>
+          <span class="attach-label">클릭(여러 장 선택) 또는 스크린샷 붙여넣기(Ctrl+V)</span>
           <span class="attach-name" id="ai-img-name"></span>
+          <span id="ai-img-clear" title="첨부 모두 지우기" style="display:none;cursor:pointer;color:#ff8da3;font-size:13px;padding:0 4px">✕</span>
         </div>
+        <div id="ai-img-thumbs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"></div>
       </div>
       <div class="modal-status" id="ai-status"></div>
       <button class="tb-btn primary" id="ai-go" style="width:100%;margin-top:4px">초안 생성하기</button>
     </div>
   </div>
 </div>
-<input type="file" id="ai-img-file" accept="image/*" style="display:none" />
+<input type="file" id="ai-img-file" accept="image/*" multiple style="display:none" />
 
 <!-- 우클릭 링크 메뉴 -->
 <div id="ctx-menu" class="ctx" style="display:none"></div>
@@ -2592,16 +2594,29 @@ function parseAiJson(text){
 }
 
 // ───────────────────────── AI 초안 생성 ─────────────────────────
-let aiRefImg=null;
+let aiRefImgs=[];
+const AI_IMG_MAX=8;
+function renderAiThumbs(){
+  const n=aiRefImgs.length;
+  document.getElementById('ai-img-name').textContent = n? `첨부 ${n}장` : '';
+  document.getElementById('ai-img-clear').style.display = n? 'inline' : 'none';
+  const host=document.getElementById('ai-img-thumbs');
+  host.innerHTML = aiRefImgs.map((im,i)=>`<span style="position:relative;display:inline-block"><img src="data:${im.mediaType};base64,${im.data}" style="width:46px;height:46px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"><span data-rmimg="${i}" title="제거" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;background:#000a;color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</span></span>`).join('');
+  host.querySelectorAll('[data-rmimg]').forEach(b=>b.addEventListener('click',()=>{ aiRefImgs.splice(+b.dataset.rmimg,1); renderAiThumbs(); }));
+}
+async function addAiImg(file){
+  if(aiRefImgs.length>=AI_IMG_MAX){ toast(`이미지는 최대 ${AI_IMG_MAX}장까지`); return; }
+  try{ const {mediaType,data}=await downscaleToB64(file); aiRefImgs.push({mediaType,data}); renderAiThumbs(); }
+  catch(err){ toast('이미지 처리 실패'); }
+}
 document.getElementById('btn-ai').onclick=()=>{ document.getElementById('ai-modal').style.display='flex'; };
 document.getElementById('ai-close').onclick=()=>{ document.getElementById('ai-modal').style.display='none'; };
 document.getElementById('ai-modal').addEventListener('mousedown',e=>{ if(e.target.id==='ai-modal') e.currentTarget.style.display='none'; });
 document.getElementById('ai-img-pick').onclick=()=>document.getElementById('ai-img-file').click();
+document.getElementById('ai-img-clear').onclick=e=>{ e.stopPropagation(); aiRefImgs=[]; renderAiThumbs(); };
 document.getElementById('ai-img-file').addEventListener('change', async e=>{
-  const f=e.target.files[0]; e.target.value=''; if(!f) return;
-  const {mediaType,data}=await downscaleToB64(f);
-  aiRefImg={mediaType,data};
-  document.getElementById('ai-img-name').textContent='첨부됨: '+f.name;
+  const files=[...e.target.files]; e.target.value='';
+  for(const f of files) await addAiImg(f);
 });
 function downscaleToB64(file,max=1280){
   return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>{ const img=new Image(); img.onload=()=>{ let w=img.width,h=img.height; if(w>max||h>max){ const r=Math.min(max/w,max/h); w=Math.round(w*r); h=Math.round(h*r);} const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); res({mediaType:'image/jpeg',data:c.toDataURL('image/jpeg',0.85).split(',')[1]}); }; img.onerror=rej; img.src=fr.result; }; fr.onerror=rej; fr.readAsDataURL(file); });
@@ -2628,8 +2643,8 @@ document.getElementById('ai-go').onclick=async()=>{
 베이스 페이지:
 ${JSON.stringify({name:basePage.name,w:basePage.w,bg:basePage.bg,elements:basePage.elements})}`;
   const userText = desc || '참고 사진의 구조와 색감을 따라 배치해줘. 텍스트 문구는 그대로 둬.';
-  const content = aiRefImg
-    ? [ {type:'image',source:{type:'base64',media_type:aiRefImg.mediaType,data:aiRefImg.data}}, {type:'text',text:userText} ]
+  const content = aiRefImgs.length
+    ? [ ...aiRefImgs.map(im=>({type:'image',source:{type:'base64',media_type:im.mediaType,data:im.data}})), {type:'text',text:userText} ]
     : userText;
   aiStatus('AI가 초안을 생성 중입니다…');
   document.getElementById('ai-go').disabled=true;
@@ -2649,7 +2664,7 @@ ${JSON.stringify({name:basePage.name,w:basePage.w,bg:basePage.bg,elements:basePa
       return Object.assign(base,e);
     });
     selId=null; document.getElementById('ai-modal').style.display='none';
-    aiRefImg=null; document.getElementById('ai-img-name').textContent='';
+    aiRefImgs=[]; renderAiThumbs();
     afterMutate(); toast('AI 초안이 현재 페이지에 적용되었습니다 ✨');
   }catch(e){
     const msg=e.message||String(e);
@@ -2821,9 +2836,7 @@ function clipboardImageFile(e){
   const t=document.getElementById(id);
   if(t) t.addEventListener('paste', async e=>{
     const f=clipboardImageFile(e); if(!f) return; e.preventDefault();
-    try{ const {mediaType,data}=await downscaleToB64(f); aiRefImg={mediaType,data};
-      document.getElementById('ai-img-name').textContent='📷 붙여넣은 스크린샷'; toast('스크린샷 첨부됨 📋'); }
-    catch(err){ toast('이미지 처리 실패'); }
+    await addAiImg(f); toast('스크린샷 첨부됨 📋');
   });
 });
 // AI 작업 채팅: 입력칸/패널에 붙여넣으면 첨부
