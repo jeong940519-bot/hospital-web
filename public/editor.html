@@ -483,7 +483,7 @@
         <div class="rgiv">
           <div class="rgi">
             <span style="font-size:11px;color:var(--sub)">배경색</span>
-            <input type="color" id="rb-pg-bg" class="rb-color" value="#ffffff" title="페이지 배경색">
+            <button id="rb-pgbg-btn" class="rsm" style="display:flex;align-items:center;gap:5px;cursor:pointer;padding:3px 8px" title="페이지 배경색"><span id="rb-pgbg-bar" style="width:16px;height:16px;border-radius:4px;background:#fff;border:1px solid var(--border)"></span>색</button>
           </div>
           <div class="rgi">
             <span style="font-size:11px;color:var(--sub)">높이</span>
@@ -757,6 +757,7 @@
   </div>
 </div>
 <input type="file" id="cp-fill-file" accept="image/*" style="display:none" />
+<input type="color" id="cp-more-input" style="position:fixed;left:-9999px;width:0;height:0;opacity:0" value="#000000" />
 
 <!-- 홈탭 글꼴 드롭다운 (검색·추가) -->
 <div class="rdd" id="rb-font-dd" style="width:270px;padding:0;overflow:hidden">
@@ -2883,7 +2884,7 @@ function updateRibbonState(){
   dis('rb-paste',!(_clipboard&&_clipboard.length));
   // 줌/페이지
   const rv=document.getElementById('rb-zoom-val'); if(rv) rv.textContent=Math.round(zoom*100)+'%';
-  const pgBg=document.getElementById('rb-pg-bg'); if(pgBg) pgBg.value=page().bg;
+  const pgBar=document.getElementById('rb-pgbg-bar'); if(pgBar) pgBar.style.background=page().bg;
   const pgH=document.getElementById('rb-pg-h'); if(pgH) pgH.value=page().h;
 }
 
@@ -2954,15 +2955,9 @@ function applyToShapes(fn){ const arr=selShapeEls(); if(!arr.length) return; arr
     });
   });
   // 글꼴 색 버튼 → 컬러피커
-  const fcBtn=document.getElementById('rb-fc-btn'),fcIn=document.getElementById('rb-fcolor');
-  fcBtn?.addEventListener('click',()=>fcIn.click());
-  fcIn?.addEventListener('input',()=>{ const v=fcIn.value; document.getElementById('rb-fc-bar').style.background=v; applyToTexts(e=>e.color=v,true); });
-  fcIn?.addEventListener('change',()=>snapshot());
-  // 강조 색
-  const hlBtn=document.getElementById('rb-hl-btn'),hlIn=document.getElementById('rb-hlcolor');
-  hlBtn?.addEventListener('click',()=>hlIn.click());
-  hlIn?.addEventListener('input',()=>{ const v=hlIn.value; document.getElementById('rb-hl-bar').style.background=v; applyToTexts(e=>e.highlight=v,true); });
-  hlIn?.addEventListener('change',()=>snapshot());
+  // 글꼴 색 / 강조 색 → PPT식 색상 팝업
+  document.getElementById('rb-fc-btn')?.addEventListener('click',ev=>toggleColorPopup('textColor',ev.currentTarget));
+  document.getElementById('rb-hl-btn')?.addEventListener('click',ev=>toggleColorPopup('highlight',ev.currentTarget));
   document.getElementById('rb-hl-off')?.addEventListener('click',()=>applyToTexts(e=>e.highlight=null));
   // 글머리/번호/들여쓰기/세로쓰기
   document.getElementById('rb-bullet')?.addEventListener('click',()=>{ const arr=selTextEls(); if(!arr.length)return; const on=arr[0].bullet==='disc'?'none':'disc'; applyToTexts(e=>e.bullet=on); });
@@ -2973,14 +2968,9 @@ function applyToShapes(fn){ const arr=selShapeEls(); if(!arr.length) return; arr
   // 세로 맞춤 순환 (위→중간→아래)
   document.getElementById('rb-valign')?.addEventListener('click',()=>{ const order=['top','middle','bottom']; const arr=selTextEls(); if(!arr.length)return; const cur=arr[0].valign||'middle'; const nx=order[(order.indexOf(cur)+1)%3]; applyToTexts(e=>e.valign=nx); toast('세로 맞춤: '+(nx==='top'?'위':nx==='middle'?'중간':'아래')); });
   // ── 도형 스타일 ──
-  const sfBtn=document.getElementById('rb-sfill-btn'),sfIn=document.getElementById('rb-sfill');
-  sfBtn?.addEventListener('click',e=>{ const dd=document.getElementById('fill-dd'); if(dd.style.display==='block'){ closeAllDD(); return; } openFillPopup(); openDD(dd, e.currentTarget); });
-  sfIn?.addEventListener('input',()=>{ const v=sfIn.value; document.getElementById('rb-sfill-bar').style.background=v; applyToShapesQuiet(e=>e.fill=v); });
-  sfIn?.addEventListener('change',()=>snapshot());
-  const soBtn=document.getElementById('rb-soutline-btn'),soIn=document.getElementById('rb-soutline');
-  soBtn?.addEventListener('click',()=>soIn.click());
-  soIn?.addEventListener('input',()=>{ const v=soIn.value; document.getElementById('rb-soutline-bar').style.background=v; applyToShapesQuiet(e=>{e.borderColor=v; if(!e.borderW)e.borderW=2;}); });
-  soIn?.addEventListener('change',()=>snapshot());
+  // 도형 채우기 / 윤곽선 → PPT식 색상 팝업
+  document.getElementById('rb-sfill-btn')?.addEventListener('click',ev=>toggleColorPopup('fill',ev.currentTarget));
+  document.getElementById('rb-soutline-btn')?.addEventListener('click',ev=>toggleColorPopup('outline',ev.currentTarget));
   document.getElementById('rb-sbw-up')?.addEventListener('click',()=>applyToShapes(e=>e.borderW=Math.min(30,(e.borderW||0)+1)));
   document.getElementById('rb-sbw-dn')?.addEventListener('click',()=>applyToShapes(e=>e.borderW=Math.max(0,(e.borderW||0)-1)));
   document.getElementById('rb-seffect')?.addEventListener('click',()=>{ const arr=selShapeEls().concat([...selIds].map(id=>el(id)).filter(e=>e&&e.type==='image')); if(!arr.length)return; const on=!arr[0].shadow; arr.forEach(e=>e.shadow=on); arr.forEach(liveStyleEl); snapshot(); renderProps(); updateRibbonState(); });
@@ -3102,7 +3092,7 @@ function arrDel(){ if(!selIds.size)return; page().elements=page().elements.filte
 // ── 드롭다운 공통 ──
 function closeAllDD(){ document.querySelectorAll('.rdd').forEach(d=>d.style.display='none'); }
 function openDD(dd, btn){ closeAllDD(); dd.style.display='block'; const r=btn.getBoundingClientRect(); dd.style.left=Math.min(r.left, window.innerWidth-dd.offsetWidth-8)+'px'; dd.style.top=(r.bottom+4)+'px'; }
-document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')&&!e.target.closest('#rb-sfill-btn')) closeAllDD(); });
+document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')&&!e.target.closest('#rb-sfill-btn')&&!e.target.closest('#rb-soutline-btn')&&!e.target.closest('#rb-fc-btn')&&!e.target.closest('#rb-hl-btn')&&!e.target.closest('#rb-pgbg-btn')) closeAllDD(); });
 
 // ── 정렬 드롭다운 ──
 function updateArrangeDD(){
@@ -3214,18 +3204,45 @@ function _rgb2hex(a){ return '#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))
 function _lighten(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v+(255-v)*p)); }
 function _darken(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v*(1-p))); }
 function _shades(hex){ return [_lighten(hex,.8),_lighten(hex,.6),_lighten(hex,.4),_darken(hex,.25),_darken(hex,.5)]; }
-function cpApply(val){ if(!selShapeEls().length){ toast('도형을 선택하세요'); return; } applyToShapes(e=>e.fill=val); const bar=document.getElementById('rb-sfill-bar'); if(bar) bar.style.background=(val==='transparent'?'repeating-conic-gradient(#fff 0 25%,#ddd 0 50%) 50%/6px 6px':val); closeAllDD(); }
-function openFillPopup(){
-  const cur=(selShapeEls()[0]||{}).fill;
-  // 테마 색 (10열 × 6행: 베이스 + 음영 5)
+// 색상 팝업 타겟 — 글꼴색·강조색·도형채우기·윤곽선 공용
+let _cpTarget=null;
+function _setBar(id,v){ const b=document.getElementById(id); if(b) b.style.background=(v==='transparent'?'repeating-conic-gradient(#fff 0 25%,#ddd 0 50%) 50%/6px 6px':v); }
+const CP_TARGETS={
+  fill:{ label:'도형 채우기', rich:true, noFill:true, noFillLabel:'채우기 없음',
+    current:()=>(selShapeEls()[0]||{}).fill,
+    set:v=>{ if(!selShapeEls().length){ toast('도형을 선택하세요'); return; } applyToShapesQuiet(e=>e.fill=v); _setBar('rb-sfill-bar',v); } },
+  outline:{ label:'도형 윤곽선', rich:false, noFill:true, noFillLabel:'윤곽선 없음',
+    current:()=>(selShapeEls()[0]||{}).borderColor,
+    set:v=>{ if(!selShapeEls().length){ toast('도형을 선택하세요'); return; } if(v==='transparent') applyToShapesQuiet(e=>e.borderW=0); else applyToShapesQuiet(e=>{ e.borderColor=v; if(!e.borderW)e.borderW=2; }); _setBar('rb-soutline-bar', v==='transparent'?'#333':v); } },
+  textColor:{ label:'글꼴 색', rich:false, noFill:false,
+    current:()=>(selTextEls()[0]||{}).color,
+    set:v=>{ applyToTexts(e=>e.color=v,true); _setBar('rb-fc-bar',v); } },
+  highlight:{ label:'텍스트 강조 색', rich:false, noFill:true, noFillLabel:'강조 없음',
+    current:()=>(selTextEls()[0]||{}).highlight,
+    set:v=>{ if(v==='transparent') applyToTexts(e=>e.highlight=null,true); else applyToTexts(e=>e.highlight=v,true); _setBar('rb-hl-bar', v==='transparent'?'#ffe14d':v); } },
+  pageBg:{ label:'페이지 배경', rich:true, noFill:false,
+    current:()=>page().bg,
+    set:v=>{ page().bg=(v==='transparent'?'#ffffff':v); canvas.style.background=page().bg; const b=document.getElementById('rb-pgbg-bar'); if(b)b.style.background=page().bg; renderPages(); save(true); } },
+};
+function cpApply(val){ if(!_cpTarget) return; _cpTarget.set(val); snapshot(); closeAllDD(); }
+function openColorPopup(key, btn){
+  const t=CP_TARGETS[key]; if(!t) return; _cpTarget=t;
+  document.getElementById('fill-dd-title').textContent=t.label;
+  const cur=t.current();
   const cols=CP_THEME.map(b=>[b,..._shades(b)]);
   let th=''; for(let r=0;r<6;r++) for(let c=0;c<10;c++){ const col=cols[c][r]; th+=`<div class="cp-sw${cur===col?' sel':''}" data-color="${col}" title="${col}" style="background:${col}"></div>`; }
   document.getElementById('cp-theme').innerHTML=th;
   document.getElementById('cp-standard').innerHTML=CP_STD.map(c=>`<div class="cp-sw${cur===c?' sel':''}" data-color="${c}" title="${c}" style="background:${c}"></div>`).join('');
-  document.getElementById('cp-tex-grid').innerHTML=CP_TEX.map(t=>`<div class="cp-sw" data-tex="${t.replace(/"/g,'&quot;')}" style="background:${t};height:30px;aspect-ratio:auto"></div>`).join('');
+  document.getElementById('cp-tex-grid').innerHTML=CP_TEX.map(tx=>`<div class="cp-sw" data-tex="${tx.replace(/"/g,'&quot;')}" style="background:${tx};height:30px;aspect-ratio:auto"></div>`).join('');
+  const nf=document.getElementById('cp-nofill'); nf.style.display=t.noFill?'flex':'none'; if(t.noFill) nf.lastChild.textContent=t.noFillLabel||'채우기 없음';
+  document.getElementById('cp-gradient').style.display=t.rich?'flex':'none';
+  document.getElementById('cp-image').style.display=t.rich?'flex':'none';
+  document.getElementById('cp-texture').style.display=t.rich?'flex':'none';
   document.getElementById('cp-grad-panel').style.display='none';
   document.getElementById('cp-tex-panel').style.display='none';
+  openDD(document.getElementById('fill-dd'), btn);
 }
+function toggleColorPopup(key, btn){ const dd=document.getElementById('fill-dd'); if(dd.style.display==='block'&&_cpTarget===CP_TARGETS[key]){ closeAllDD(); return; } openColorPopup(key, btn); }
 (function(){
   const dd=document.getElementById('fill-dd'); if(!dd) return;
   dd.addEventListener('click',ev=>{
@@ -3233,7 +3250,7 @@ function openFillPopup(){
     const tx=ev.target.closest('[data-tex]'); if(tx){ cpApply(tx.dataset.tex); return; }
   });
   document.getElementById('cp-nofill').onclick=()=>cpApply('transparent');
-  document.getElementById('cp-more').onclick=()=>{ const inp=document.getElementById('rb-sfill'); inp.onchange=()=>snapshot(); inp.click(); };
+  document.getElementById('cp-more').onclick=()=>{ const inp=document.getElementById('cp-more-input'); const c=_cpTarget&&_cpTarget.current(); inp.value=(typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))?c:'#000000'; inp.oninput=()=>{ if(_cpTarget) _cpTarget.set(inp.value); }; inp.onchange=()=>snapshot(); inp.click(); };
   document.getElementById('cp-eyedrop').onclick=async()=>{
     if(!window.EyeDropper){ toast('이 브라우저는 스포이트를 지원하지 않습니다'); return; }
     try{ const r=await new EyeDropper().open(); cpApply(r.sRGBHex); }catch(e){}
@@ -3306,8 +3323,7 @@ document.getElementById('tog-props')?.addEventListener('click',togglePropsPanel)
 document.getElementById('exp-props')?.addEventListener('click',togglePropsPanel);
 document.getElementById('rb-v-map')?.addEventListener('click',openMap);
 // 디자인 탭
-document.getElementById('rb-pg-bg')?.addEventListener('input',()=>{ const v=document.getElementById('rb-pg-bg').value; page().bg=v; canvas.style.background=v; renderPages(); save(true); });
-document.getElementById('rb-pg-bg')?.addEventListener('change',()=>snapshot());
+document.getElementById('rb-pgbg-btn')?.addEventListener('click',ev=>toggleColorPopup('pageBg',ev.currentTarget));
 document.getElementById('rb-pg-h')?.addEventListener('input',()=>{ const v=parseInt(document.getElementById('rb-pg-h').value)||1600; page().h=v; canvas.style.height=v+'px'; document.getElementById('pmeta').textContent=`${page().w} × ${v}`; renderPages(); save(true); });
 document.getElementById('rb-pg-h')?.addEventListener('change',()=>snapshot());
 
