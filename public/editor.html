@@ -2554,6 +2554,43 @@ document.getElementById('prj-new-btn').addEventListener('click', async()=>{
   finally{ btn.textContent='+ 새 프로젝트로 저장'; btn.disabled=false; }
 });
 
+// ───────────────────────── AI 응답 JSON 견고 파서 ─────────────────────────
+// 잘리거나 약간 깨진 JSON도 최대한 복구해서 파싱한다.
+function parseAiJson(text){
+  if(!text) return null;
+  let t=String(text).replace(/```json/gi,'').replace(/```/g,'').trim();
+  const i=t.indexOf('{'); if(i<0) return null; t=t.slice(i);
+  const tryP=s=>{ try{ return JSON.parse(s); }catch(_){ return undefined; } };
+  let r=tryP(t); if(r!==undefined) return r;
+  // 1) 트레일링 콤마 제거
+  let s=t.replace(/,(\s*[}\]])/g,'$1'); r=tryP(s); if(r!==undefined) return r;
+  // 2) 스택으로 괄호 균형 맞추고, 잘린 꼬리 보정
+  let stack=[],inStr=false,esc=false;
+  for(let k=0;k<s.length;k++){ const ch=s[k];
+    if(inStr){ if(esc)esc=false; else if(ch==='\\')esc=true; else if(ch==='"')inStr=false; continue; }
+    if(ch==='"')inStr=true; else if(ch==='{'||ch==='[')stack.push(ch==='{'?'}':']'); else if(ch==='}'||ch===']')stack.pop();
+  }
+  let fixed=s;
+  if(inStr) fixed+='"';                       // 문자열 도중 잘림
+  fixed=fixed.replace(/[\s,]*$/,'');           // 꼬리 콤마/공백
+  fixed=fixed.replace(/:\s*$/,':null');        // 콜론 직후 잘림
+  fixed=fixed.replace(/,(\s*[}\]])/g,'$1');
+  for(let k=stack.length-1;k>=0;k--) fixed+=stack[k];
+  r=tryP(fixed); if(r!==undefined) return r;
+  // 3) elements 배열의 마지막 완성 객체까지만 살리기
+  const em=s.match(/"elements"\s*:\s*\[/);
+  if(em){
+    const arrStart=em.index+em[0].length;
+    let depth=0,inS=false,es=false,lastObjEnd=-1;
+    for(let k=arrStart;k<s.length;k++){ const ch=s[k];
+      if(inS){ if(es)es=false; else if(ch==='\\')es=true; else if(ch==='"')inS=false; continue; }
+      if(ch==='"')inS=true; else if(ch==='{'||ch==='[')depth++; else if(ch==='}'||ch===']'){ depth--; if(depth===0) lastObjEnd=k; }
+    }
+    if(lastObjEnd>0){ const cand=s.slice(0,lastObjEnd+1)+']}'; r=tryP(cand); if(r!==undefined) return r; }
+  }
+  return null;
+}
+
 // ───────────────────────── AI 초안 생성 ─────────────────────────
 let aiRefImg=null;
 document.getElementById('btn-ai').onclick=()=>{ document.getElementById('ai-modal').style.display='flex'; };
@@ -2575,32 +2612,42 @@ document.getElementById('ai-go').onclick=async()=>{
   const baseKey=document.getElementById('ai-base').value;
   const desc=document.getElementById('ai-desc').value.trim();
   const basePage=buildTemplate(baseKey);
-  const sys=`너는 병원 홈페이지 페이지 디자이너다. 아래 '베이스 페이지'(요소 배열 JSON)를 사용자의 설명/참고사진에 맞게 수정해서, 동일한 스키마의 JSON으로만 응답한다.
-규칙:
-- 각 요소의 좌표(x,y,w,h)와 type은 그대로 유지한다(레이아웃 보존).
-- text 요소의 text는 사용자 설명에 맞는 실제 문구로 바꾼다(병원명/슬로건/소개 등).
-- 색상(fill, color)은 설명/사진의 분위기에 맞게 조정한다(#RRGGBB).
-- image 요소의 src는 절대 바꾸지 말고 그대로 둔다.
+  const sys=`너는 병원 홈페이지 레이아웃 디자이너다. 아래 '베이스 페이지'(요소 배열 JSON)를 골격으로 삼아, 사용자의 참고 사진/설명의 **구조(요소 배치)와 색감**을 재현한 동일 스키마 JSON으로만 응답한다.
+핵심 원칙:
+- 가장 중요한 것은 **레이아웃 구조와 색상 톤**의 재현이다. 참고 사진의 섹션 구성, 사진·버튼·제목 블록의 위치와 비율을 닮게 배치한다.
+- 위치(x,y)·크기(w,h)는 구조에 맞게 **과감히 조정**해도 된다. 요소를 추가하거나 삭제해도 된다.
+- **텍스트 내용은 사용자가 명시적으로 요청하지 않으면 바꾸지 마라.** 기존 text는 그대로 두고, 새로 만드는 텍스트는 "제목","소제목","본문" 같은 짧은 자리표시자만 넣는다. 실제 문구를 지어내지 마라.
+- 색상(fill, bg, color)은 참고 사진/설명의 분위기에 맞춘다(#RRGGBB).
+- image 요소의 src는 절대 바꾸지 마라. 사진 위치/크기/비율만 구조에 맞게 조정한다.
+- 캔버스 가로 폭은 ${basePage.w}px이다. 모든 x좌표는 0~${basePage.w} 안에 둔다.
 - fontFamily는 다음 중에서만: ${FONTS.map(f=>f[0]).join(', ')}.
-- 응답은 반드시 { "name":"페이지이름", "bg":"#hex", "elements":[...] } JSON 하나만. 다른 설명/마크다운 금지.
+출력 형식(엄격히 지킬 것):
+- 오직 JSON 객체 하나만 출력. 마크다운/설명/주석 절대 금지.
+- 형식: {"name":"페이지이름","bg":"#hex","elements":[{...}]}
+- 모든 문자열은 큰따옴표, 숫자는 단위 없이(예: 32), 트레일링 콤마 금지, 끝까지 완성된 유효한 JSON.
 베이스 페이지:
-${JSON.stringify({name:basePage.name,bg:basePage.bg,elements:basePage.elements})}`;
-  const userText = desc || '전문적이고 신뢰감 있는 병원 홈페이지로 만들어줘.';
+${JSON.stringify({name:basePage.name,w:basePage.w,bg:basePage.bg,elements:basePage.elements})}`;
+  const userText = desc || '참고 사진의 구조와 색감을 따라 배치해줘. 텍스트 문구는 그대로 둬.';
   const content = aiRefImg
     ? [ {type:'image',source:{type:'base64',media_type:aiRefImg.mediaType,data:aiRefImg.data}}, {type:'text',text:userText} ]
     : userText;
   aiStatus('AI가 초안을 생성 중입니다…');
   document.getElementById('ai-go').disabled=true;
   try{
-    const res=await aiProxy({ body:{ model:'claude-sonnet-4-6', max_tokens:4000, system:sys, messages:[{role:'user',content}] }});
+    const res=await aiProxy({ body:{ model:'claude-sonnet-4-6', max_tokens:8000, system:sys, messages:[{role:'user',content}] }});
     const text=res.data?.content?.[0]?.text||'';
-    const m=text.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('응답을 해석하지 못했습니다');
-    const spec=JSON.parse(m[0]);
+    const spec=parseAiJson(text);
+    if(!spec) throw new Error('AI 응답을 JSON으로 해석하지 못했습니다. 다시 시도해 주세요.');
     const p=page();
     if(spec.name) p.name=spec.name;
     if(spec.bg) p.bg=spec.bg;
-    if(Array.isArray(spec.elements)) p.elements=spec.elements.map(e=>Object.assign({id:uid(),rot:e.rot||0},e));
+    if(Array.isArray(spec.elements)) p.elements=spec.elements.filter(e=>e&&e.type).map(e=>{
+      const base={id:uid(),rot:e.rot||0,x:0,y:0,w:200,h:60};
+      if(e.type==='text') Object.assign(base,{text:'',fontFamily:'Noto Sans KR',fontWeight:400,fontSize:24,color:'#333333',align:'left',lineHeight:1.4,letterSpacing:0,italic:false,underline:false});
+      else if(e.type==='shape') Object.assign(base,{shape:'rect',fill:'#cccccc',radius:0,borderW:0,borderColor:'#333333'});
+      else if(e.type==='image') Object.assign(base,{src:PHOTO,fit:'cover',clip:'none',radius:0,borderW:0,borderColor:'#333333'});
+      return Object.assign(base,e);
+    });
     selId=null; document.getElementById('ai-modal').style.display='none';
     aiRefImg=null; document.getElementById('ai-img-name').textContent='';
     afterMutate(); toast('AI 초안이 현재 페이지에 적용되었습니다 ✨');
@@ -2717,11 +2764,10 @@ ${buildAiCtx()}
   const sendBtn=document.getElementById('ai-chat-send');
   sendBtn.disabled=true; sendBtn.textContent='…';
   try{
-    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:2500,system:sys,messages:_chatHistory.slice(-8)}});
+    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:4000,system:sys,messages:_chatHistory.slice(-8)}});
     const raw=res.data?.content?.[0]?.text||'{}';
-    const m=raw.match(/\{[\s\S]*\}/);
-    if(!m) throw new Error('JSON 파싱 실패');
-    const parsed=JSON.parse(m[0]);
+    const parsed=parseAiJson(raw);
+    if(!parsed) throw new Error('AI 응답 JSON 해석 실패 (다시 시도해 주세요)');
     thinking.remove();
     _chatHistory.push({role:'assistant',content:raw});
     const acts=Array.isArray(parsed.actions)?parsed.actions:[];
