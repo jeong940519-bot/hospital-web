@@ -181,6 +181,9 @@
   .cp-sw{width:100%;aspect-ratio:1;border-radius:3px;cursor:pointer;border:1px solid rgba(0,0,0,.18)}
   .cp-sw:hover{outline:2px solid var(--accent);outline-offset:1px;position:relative;z-index:1}
   .cp-sw.sel{outline:2px solid var(--accent);outline-offset:1px}
+  .panel-cbtn{padding:3px;background:var(--panel2);border:1px solid var(--border);border-radius:7px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;height:38px;min-width:38px;gap:8px}
+  .panel-cbtn:hover{border-color:var(--accent)}
+  .panel-cbtn>span:first-child{width:22px;height:22px;border-radius:4px;border:1px solid var(--border);display:block;flex-shrink:0}
   .cp-nofill-sw{background:repeating-conic-gradient(#fff 0 25%,#eee 0 50%) 50%/8px 8px;position:relative}
   .cp-nofill-sw::after{content:'';position:absolute;left:1px;right:1px;top:50%;height:2px;background:#e03131;transform:rotate(-45deg)}
   .qs-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:4px}
@@ -1583,7 +1586,7 @@ function renderProps(){
     </select></div>`;
     html += `<div class="grp"><label>크기 / 색상</label><div class="row">
       <div class="num-unit" style="flex:1"><input type="number" id="t-size" value="${e.fontSize}"></div>
-      <input type="color" id="t-color" value="${e.color}"></div></div>`;
+      <button type="button" class="panel-cbtn" id="t-color" data-cpkey="textColor" title="글자 색"><span style="background:${e.color}"></span></button></div></div>`;
     html += `<div class="grp"><label>가로 정렬</label><div class="btn-grp">
       <button data-align="left" class="${e.align==='left'?'on':''}">⬅ 왼쪽</button>
       <button data-align="center" class="${e.align==='center'?'on':''}">⬌ 가운데</button>
@@ -1603,15 +1606,15 @@ function renderProps(){
     html += `<div class="grp"><label>채움 방식</label><select id="i-fit"><option value="cover" ${e.fit==='cover'?'selected':''}>꽉 채우기</option><option value="contain" ${e.fit==='contain'?'selected':''}>전체 보이기</option></select></div>`;
     html += `<div class="grp"><label>액자 모양</label><select id="i-clip"><option value="none" ${e.clip==='none'?'selected':''}>사각형</option><option value="circle" ${e.clip==='circle'?'selected':''}>원형</option></select></div>`;
     html += `<div class="grp"><label>모서리 둥글기 ${e.radius}px</label><input type="range" id="i-radius" min="0" max="200" value="${e.radius}" ${e.clip==='circle'?'disabled':''}></div>`;
-    html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="i-bw" value="${e.borderW}"></div><input type="color" id="i-bc" value="${e.borderColor}"></div></div>`;
+    html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="i-bw" value="${e.borderW}"></div><button type="button" class="panel-cbtn" id="i-bc" data-cpkey="imgBorder" title="테두리 색"><span style="background:${e.borderColor}"></span></button></div></div>`;
   }else if(e.type==='shape'){
-    html += `<div class="grp"><label>채움색</label><input type="color" id="s-fill" value="${e.fill}"></div>`;
+    html += `<div class="grp"><label>채움색</label><button type="button" class="panel-cbtn" id="s-fill" data-cpkey="fill" title="채움색" style="width:100%;justify-content:flex-start"><span style="background:${e.fill}"></span><span style="font-size:12px;color:var(--sub)">채움색 선택 (그라데이션·그림·질감)</span></button></div>`;
     if(e.shape!=='circle') html += `<div class="grp"><label>모서리 둥글기 ${e.radius}px</label><input type="range" id="s-radius" min="0" max="300" value="${e.radius}"></div>`;
-    html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="s-bw" value="${e.borderW}"></div><input type="color" id="s-bc" value="${e.borderColor}"></div></div>`;
+    html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="s-bw" value="${e.borderW}"></div><button type="button" class="panel-cbtn" id="s-bc" data-cpkey="outline" title="테두리 색"><span style="background:${e.borderColor}"></span></button></div></div>`;
     // 도형 안 텍스트
     const _sal=e.stAlign||'center', _sva=e.stValign||'middle';
     html += `<div class="grp" style="border-top:1px solid var(--border);padding-top:12px"><label>도형 안 텍스트 <span style="color:var(--sub);font-weight:400">(더블클릭으로도 입력)</span></label><textarea id="s-text" rows="2" placeholder="도형 안에 표시할 글자">${escapeHtml(e.stext||'')}</textarea></div>`;
-    html += `<div class="grp"><label>글자 크기 / 색상</label><div class="row"><div class="num-unit" style="flex:1"><input type="number" id="s-tsize" value="${e.stSize||28}"></div><input type="color" id="s-tcolor" value="${e.stColor||'#ffffff'}"></div></div>`;
+    html += `<div class="grp"><label>글자 크기 / 색상</label><div class="row"><div class="num-unit" style="flex:1"><input type="number" id="s-tsize" value="${e.stSize||28}"></div><button type="button" class="panel-cbtn" id="s-tcolor" data-cpkey="shapeText" title="글자 색"><span style="background:${e.stColor||'#ffffff'}"></span></button></div></div>`;
     html += `<div class="grp"><label>글자 굵기</label><div class="btn-grp">
       <button data-stw="400" class="${(e.stWeight||700)<700?'on':''}">보통</button>
       <button data-stw="700" class="${(e.stWeight||700)>=700?'on':''}" style="font-weight:800">굵게</button></div></div>`;
@@ -1643,7 +1646,7 @@ function renderProps(){
 function renderPageProps(box){
   const p=page();
   box.innerHTML += `<h4 style="margin-top:24px">페이지 (메뉴 이름)</h4><div class="grp"><input type="text" id="pg-name" value="${escapeHtml(p.name||'')}" placeholder="예: 홈, 병원소개, 오시는길"></div>`;
-  box.innerHTML += `<h4>페이지 배경</h4><div class="grp"><div class="row"><input type="color" id="pg-bg" value="${p.bg}"><input type="text" id="pg-bg-t" value="${p.bg}" style="flex:1"></div></div>`;
+  box.innerHTML += `<h4>페이지 배경</h4><div class="grp"><div class="row"><button type="button" class="panel-cbtn" id="pg-bg" data-cpkey="pageBg" title="배경색"><span style="background:${p.bg}"></span></button><input type="text" id="pg-bg-t" value="${p.bg}" style="flex:1"></div></div>`;
   box.innerHTML += `<h4>페이지 높이</h4><div class="grp"><div class="num-unit"><input type="number" id="pg-h" value="${p.h}"><span>px</span></div></div>`;
   const nameI=box.querySelector('#pg-name');
   nameI.addEventListener('input',()=>{ p.name=nameI.value; renderPages(); save(true); });
@@ -1651,9 +1654,9 @@ function renderPageProps(box){
   const hI=box.querySelector('#pg-h');
   hI.addEventListener('input',()=>{ p.h=parseInt(hI.value)||PAGE_H; canvas.style.height=p.h+'px'; document.getElementById('pmeta').textContent=`${p.w} × ${p.h}`; renderPages(); save(true); });
   hI.addEventListener('change',snapshot);
-  const sync=v=>{ p.bg=v; canvas.style.background=v; renderPages(); save(true); };
-  box.querySelector('#pg-bg').addEventListener('input',e=>{ box.querySelector('#pg-bg-t').value=e.target.value; sync(e.target.value); });
-  box.querySelector('#pg-bg').addEventListener('change',()=>snapshot());
+  const sync=v=>{ p.bg=v; canvas.style.background=v; const sw=box.querySelector('#pg-bg span'); if(sw)sw.style.background=v; renderPages(); save(true); };
+  const pgT=box.querySelector('#pg-bg-t');
+  if(pgT){ pgT.addEventListener('input',()=>sync(pgT.value)); pgT.addEventListener('change',()=>snapshot()); }
 }
 
 // ───────────────────────── 속성 바인딩 ─────────────────────────
@@ -3092,7 +3095,9 @@ function arrDel(){ if(!selIds.size)return; page().elements=page().elements.filte
 // ── 드롭다운 공통 ──
 function closeAllDD(){ document.querySelectorAll('.rdd').forEach(d=>d.style.display='none'); }
 function openDD(dd, btn){ closeAllDD(); dd.style.display='block'; const r=btn.getBoundingClientRect(); dd.style.left=Math.min(r.left, window.innerWidth-dd.offsetWidth-8)+'px'; dd.style.top=(r.bottom+4)+'px'; }
-document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')&&!e.target.closest('#rb-sfill-btn')&&!e.target.closest('#rb-soutline-btn')&&!e.target.closest('#rb-fc-btn')&&!e.target.closest('#rb-hl-btn')&&!e.target.closest('#rb-pgbg-btn')) closeAllDD(); });
+document.addEventListener('mousedown',e=>{ if(!e.target.closest('.rdd')&&!e.target.closest('#rb-arrange-btn')&&!e.target.closest('#rb-qstyle-btn')&&!e.target.closest('#rb-font-btn')&&!e.target.closest('#rb-sfill-btn')&&!e.target.closest('#rb-soutline-btn')&&!e.target.closest('#rb-fc-btn')&&!e.target.closest('#rb-hl-btn')&&!e.target.closest('#rb-pgbg-btn')&&!e.target.closest('.panel-cbtn')) closeAllDD(); });
+// 속성 패널 색상칩 → PPT 색상 팝업
+document.addEventListener('click',e=>{ const b=e.target.closest('.panel-cbtn'); if(b){ e.preventDefault(); toggleColorPopup(b.dataset.cpkey, b); } });
 
 // ── 정렬 드롭다운 ──
 function updateArrangeDD(){
@@ -3222,9 +3227,15 @@ const CP_TARGETS={
     set:v=>{ if(v==='transparent') applyToTexts(e=>e.highlight=null,true); else applyToTexts(e=>e.highlight=v,true); _setBar('rb-hl-bar', v==='transparent'?'#ffe14d':v); } },
   pageBg:{ label:'페이지 배경', rich:true, noFill:false,
     current:()=>page().bg,
-    set:v=>{ page().bg=(v==='transparent'?'#ffffff':v); canvas.style.background=page().bg; const b=document.getElementById('rb-pgbg-bar'); if(b)b.style.background=page().bg; renderPages(); save(true); } },
+    set:v=>{ page().bg=(v==='transparent'?'#ffffff':v); canvas.style.background=page().bg; const b=document.getElementById('rb-pgbg-bar'); if(b)b.style.background=page().bg; const pt=document.getElementById('pg-bg-t'); if(pt)pt.value=page().bg; const pcb=document.querySelector('#pg-bg span'); if(pcb)pcb.style.background=page().bg; renderPages(); save(true); } },
+  imgBorder:{ label:'이미지 테두리', rich:false, noFill:true, noFillLabel:'테두리 없음',
+    current:()=>{ const e=selId?el(selId):null; return e&&e.borderColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; if(v==='transparent'){ e.borderW=0; } else { e.borderColor=v; if(!e.borderW)e.borderW=2; } liveStyleEl(e); } },
+  shapeText:{ label:'글자 색', rich:false, noFill:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.stColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.stColor=v; liveStyleEl(e); } },
 };
-function cpApply(val){ if(!_cpTarget) return; _cpTarget.set(val); snapshot(); closeAllDD(); }
+function cpApply(val){ if(!_cpTarget) return; _cpTarget.set(val); snapshot(); renderProps(); closeAllDD(); }
 function openColorPopup(key, btn){
   const t=CP_TARGETS[key]; if(!t) return; _cpTarget=t;
   document.getElementById('fill-dd-title').textContent=t.label;
