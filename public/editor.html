@@ -821,6 +821,27 @@
   </div>
 </div>
 
+<!-- AI 연출 요청 모달 -->
+<div class="modal-bg" id="aifx-modal" style="display:none">
+  <div class="modal" style="width:480px">
+    <div class="modal-head"><h3>🎬 AI 연출 입히기</h3><button class="sp-close" id="aifx-close">✕</button></div>
+    <div class="modal-body">
+      <div class="grp"><label>원하는 느낌·요청 (선택)</label>
+        <textarea id="aifx-desc" rows="3" placeholder="예: 차분하고 신뢰감 있게 / 역동적으로 화려하게 / 사진은 패럴랙스, 제목은 글자 등장 / 호버 효과는 빼줘"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="tb-btn" data-aifx-preset="차분하고 신뢰감 있게, 등장 효과 위주로 절제해서" style="font-size:12px;padding:6px 10px">😌 차분하게</button>
+          <button class="tb-btn" data-aifx-preset="역동적이고 화려하게, 스크럽·패럴랙스·호버를 적극적으로" style="font-size:12px;padding:6px 10px">🔥 화려하게</button>
+          <button class="tb-btn" data-aifx-preset="미니멀하게, 꼭 필요한 곳만 은은하게" style="font-size:12px;padding:6px 10px">⚪ 미니멀</button>
+          <button class="tb-btn" data-aifx-preset="제목은 글자 한 자씩 등장, 사진은 마스크로 걷히듯, 카드는 순차 등장" style="font-size:12px;padding:6px 10px">✨ 추천 세트</button>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:8px">비워두고 눌러도 됩니다 — 페이지를 보고 AI가 알아서 어울리게 배치합니다.</div>
+      </div>
+      <div class="modal-status" id="aifx-status"></div>
+      <button class="tb-btn primary" id="aifx-go" style="width:100%;margin-top:4px">연출 입히기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 찾기/바꾸기 모달 -->
 <div class="modal-bg" id="find-modal" style="display:none">
   <div class="modal" style="width:440px">
@@ -3412,36 +3433,47 @@ document.getElementById('btn-aichat').onclick=()=>{
   }
 };
 document.getElementById('ai-chat-close').onclick=()=>{document.getElementById('ai-chat-panel').style.display='none';};
-// ── AI 연출 입히기 (원클릭) ──
-document.getElementById('btn-aifx').onclick=async()=>{
+// ── AI 연출 입히기 (자연어 요청 모달) ──
+function aifxStatus(s){ const el2=document.getElementById('aifx-status'); if(el2) el2.textContent=s; }
+async function runAiFx(desc){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const p=page();
-  if(!p.elements.length){ toast('요소가 없습니다'); return; }
-  const sys=`너는 모션 디자이너다. 아래 페이지 요소 목록을 보고 각 요소에 어울리는 스크롤 연출(fx)을 입힌다.
+  if(!p.elements.length){ aifxStatus('요소가 없습니다'); return; }
+  const sys=`너는 모션 디자이너다. 아래 페이지 요소 목록을 보고 각 요소에 어울리는 연출(fx)을 입힌다.
 지침:
 - 큰 제목/슬로건(폰트 큰 text) → {"type":"char-reveal","mode":"char","stagger":40}
 - 본문·소제목 text, 카드 도형, 일반 이미지 → {"type":"scroll-reveal","dir":"up","delay":N} (같은 줄/같은 그룹은 delay를 80ms씩 늘려 순차 등장=스태거)
 - 페이지 폭의 절반 이상 큰 배경 이미지 → {"type":"parallax","speed":0.12}
 - 강조하고 싶은 핵심 이미지/카드 1~2개 → {"type":"scroll-scrub","mode":"both"}
-- 사진 등장에 변화를 주려면 {"type":"mask-wipe"} 또는 {"type":"blur-in"}, 카드엔 {"type":"bounce-in"}/{"type":"zoom-in"} 도 활용 가능
-- 버튼·카드엔 호버 효과({"type":"hover-lift"} 또는 {"type":"hover-glow"})를 곁들이면 좋다
-- 주목 버튼(예약 등) 1개엔 {"type":"pulse"}, 장식 아이콘엔 {"type":"float"} 가능
+- 사진 등장 변화: {"type":"mask-wipe"}/{"type":"blur-in"}, 카드: {"type":"bounce-in"}/{"type":"zoom-in"}
+- 버튼·카드 호버: {"type":"hover-lift"}/{"type":"hover-glow"}, 주목 버튼 1개 {"type":"pulse"}, 장식 {"type":"float"}
 - 이미 fx가 있거나 sticky 인 요소는 건드리지 않는다.
-- 과하지 않게, 모든 요소에 다 줄 필요 없음. 상단(첫 화면) 요소 위주로 자연스럽게.
+- 과하지 않게, 상단(첫 화면) 요소 위주로 자연스럽게.
+${desc?`★ 사용자 요청을 최우선으로 반영하라: "${desc}" (요청에 맞춰 효과 종류·강도·범위를 조정. 예: '차분하게'면 등장 위주 절제, '화려하게'면 스크럽·패럴랙스·호버를 적극, 특정 효과 지정/제외도 따른다)`:''}
 출력은 JSON 하나만: {"reply":"한국어 한두 문장","actions":[{"type":"update_element","id":"요소ID","fx":{...}}]}`;
-  const ctx=buildAiCtx();
-  const btn=document.getElementById('btn-aifx'); btn.disabled=true; const old=btn.textContent; btn.textContent='🎬 구성 중…';
+  const ctx=buildAiCtx()+(desc?`\n\n[사용자 요청] ${desc}`:'');
+  const go=document.getElementById('aifx-go'); if(go){ go.disabled=true; go.textContent='🎬 구성 중…'; }
+  aifxStatus('AI가 연출을 구성 중…');
   try{
     const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:4000,system:sys,messages:[{role:'user',content:ctx}]}});
     const parsed=parseAiJson(res.data?.content?.[0]?.text||'');
     if(!parsed) throw new Error('응답 해석 실패 (다시 시도)');
     const acts=Array.isArray(parsed.actions)?parsed.actions.filter(a=>a.type==='update_element'&&a.fx):[];
     const changed=acts.length?applyAiActions(acts):false;
-    if(changed){ afterMutate(); toast('🎬 '+(parsed.reply||`${acts.length}개 요소에 연출 적용됨`)); }
-    else toast('적용할 연출을 찾지 못했습니다');
-  }catch(e){ const m=e.message||String(e); toast('실패: '+(m.includes('unauthenticated')?'로그인이 필요합니다':m.includes('resource-exhausted')||m.includes('크레딧')?'AI 크레딧 소진':m)); }
-  finally{ btn.disabled=false; btn.textContent=old; }
+    if(changed){ afterMutate(); document.getElementById('aifx-modal').style.display='none'; toast('🎬 '+(parsed.reply||`${acts.length}개 요소에 연출 적용됨`)); }
+    else aifxStatus('적용할 연출을 찾지 못했습니다. 요청을 더 구체적으로 적어보세요.');
+  }catch(e){ const m=e.message||String(e); aifxStatus('실패: '+(m.includes('unauthenticated')?'로그인이 필요합니다':m.includes('resource-exhausted')||m.includes('크레딧')?'AI 크레딧 소진':m)); }
+  finally{ if(go){ go.disabled=false; go.textContent='연출 입히기'; } }
+}
+document.getElementById('btn-aifx').onclick=()=>{
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  document.getElementById('aifx-modal').style.display='flex';
+  aifxStatus(''); setTimeout(()=>document.getElementById('aifx-desc').focus(),0);
 };
+document.getElementById('aifx-close').onclick=()=>document.getElementById('aifx-modal').style.display='none';
+document.getElementById('aifx-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aifx-modal') e.currentTarget.style.display='none'; });
+document.getElementById('aifx-go').onclick=()=>runAiFx(document.getElementById('aifx-desc').value.trim());
+document.querySelectorAll('#aifx-modal [data-aifx-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aifx-desc').value=b.dataset.aifxPreset; }));
 document.getElementById('ai-chat-send').onclick=sendChat;
 document.getElementById('ai-chat-input').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendChat();}});
 
