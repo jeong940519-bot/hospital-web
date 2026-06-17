@@ -341,6 +341,7 @@
       <div class="ribbon-right">
         <button class="rsm" id="btn-ai" title="AI 초안 만들기" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">✨ AI 초안</button>
         <button class="rsm" id="btn-aichat" title="AI 작업 어시스턴트" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">💬 AI 작업</button>
+        <button class="rsm" id="btn-aifx" title="AI가 현재 페이지에 스크롤 연출을 알아서 입힙니다" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">🎬 AI 연출</button>
         <div class="rsep"></div>
         <span id="pmeta" style="font-size:11px;color:var(--sub);padding:0 6px">1200 × 1600</span>
         <button class="rsm" id="btn-undo" title="실행취소 (Ctrl+Z)">↶ 되돌리기</button>
@@ -1465,7 +1466,7 @@ function renderEl(e){
    }
   }
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
-  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent={'sticky':'📌','scroll-reveal':'📜','hover-show':'👁','hover-hide':'👁','tab-trigger':'🏷','tab-content':'🏷','counter':'🔢','slider':'🎠','hover-zoom':'🔍','hover-expand':'📂'}[e.fx.type]||'✨'; b.title='이펙트: '+e.fx.type; node.appendChild(b); }
+  if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=> startDrag(ev,e));
   node.addEventListener('dblclick', ev=>{ if(e.type==='text'||e.type==='shape') startEdit(node,e); });
   node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); showLinkMenu(ev.clientX, ev.clientY, e); });
@@ -2160,9 +2161,29 @@ function bindProps(e){
   if(fxHint) fxHint.addEventListener('click',()=>switchPropTab('fx'));
 }
 // ───────────────────────── 이펙트 패널 ─────────────────────────
-const FX_NAMES={'sticky':'상단 고정','scroll-reveal':'스크롤 등장','hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
-const FX_ICONS={'sticky':'📌','scroll-reveal':'📜','hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
+const FX_NAMES={'sticky':'상단 고정','char-reveal':'글자 등장','parallax':'패럴랙스','scroll-scrub':'스크롤 스크럽','bg-video':'배경 영상','scroll-reveal':'스크롤 등장','hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
+const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-scrub':'📈','bg-video':'🎬','scroll-reveal':'📜','hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
 const FX_DESC={
+  'char-reveal':{
+    result:'발행 후 이 글자가 한 글자(또는 한 단어)씩 아래에서 떠오르며 순서대로 나타납니다.',
+    steps:['큰 제목·슬로건 텍스트를 선택','글자 등장 적용 → 단위(글자/단어)와 속도를 설정','화면에 스크롤로 들어오는 순간 재생됩니다'],
+    tip:'💡 메인 히어로 제목에 쓰면 고급 사이트 느낌이 확 살아납니다'
+  },
+  'parallax':{
+    result:'스크롤할 때 이 요소가 본문과 다른 속도로 천천히 떠다녀 깊이감(입체감)이 생깁니다.',
+    steps:['배경 이미지·장식 요소를 선택','패럴랙스 적용 → 속도를 설정(양수=느리게 따라옴)','발행 페이지에서 스크롤하면 떠다닙니다'],
+    tip:'💡 큰 배경 사진이나 섹션 장식에 살짝(0.1~0.2) 주면 자연스러워요'
+  },
+  'scroll-scrub':{
+    result:'화면에 들어올수록 이 요소가 점점 커지고/선명해집니다. 스크롤 양에 비례해 변합니다.',
+    steps:['강조할 이미지·카드·문구를 선택','스크롤 스크럽 적용 → 모드(확대/페이드/둘다) 선택','스크롤로 올라오는 동안 점점 또렷해집니다'],
+    tip:'💡 진료과 카드·실적 이미지에 주면 시선을 끕니다'
+  },
+  'bg-video':{
+    result:'이 도형/이미지 박스의 배경에 영상이 자동 재생(무음·반복)됩니다.',
+    steps:['배경으로 쓸 도형(사각형)이나 이미지를 선택','배경 영상 적용 → mp4 주소 또는 유튜브/Vimeo 링크 입력','발행 시 영상이 박스를 꽉 채워 재생됩니다(글자 요소는 위에 따로 배치)'],
+    tip:'💡 상단 히어로 섹션 배경에 쓰면 임팩트 최고. 위에 텍스트를 따로 올리세요'
+  },
   'sticky':{
     result:'스크롤을 내려도 이 요소가 화면 같은 위치(상단)에 계속 붙어 따라옵니다.',
     steps:['로고·상단 메뉴바·예약 버튼 등 고정할 요소를 선택','상단 고정 적용 — 설정값 없이 바로 적용됩니다','여러 요소(로고+메뉴)를 각각 고정하면 함께 따라옵니다'],
@@ -2365,6 +2386,29 @@ function renderFxPanel(){
         <div style="font-size:11px;color:var(--sub);margin-top:5px">펼쳤을 때는 요소 높이(${e.h}px) 그대로 사용됩니다</div>
       </div>`;
     }
+    if(ft==='char-reveal'){
+      opts+=`<div class="grp"><label class="lbl">분해 단위</label><div class="btn-grp">
+        <button class="cr-mode${(fx.mode||'char')==='char'?' on':''}" data-crm="char">글자</button>
+        <button class="cr-mode${fx.mode==='word'?' on':''}" data-crm="word">단어</button></div></div>
+      <div class="grp"><label class="lbl">간격(속도) <span style="float:right;color:var(--accent)">${fx.stagger!=null?fx.stagger:40}ms</span></label>
+        <input type="range" id="eff-stagger" min="10" max="160" step="10" value="${fx.stagger!=null?fx.stagger:40}"></div>`;
+    }
+    if(ft==='parallax'){
+      opts+=`<div class="grp"><label class="lbl">속도 <span style="float:right;color:var(--accent)">${fx.speed!=null?fx.speed:0.15}</span></label>
+        <input type="range" id="eff-speed" min="-0.4" max="0.4" step="0.05" value="${fx.speed!=null?fx.speed:0.15}">
+        <div style="font-size:11px;color:var(--sub);margin-top:5px">양수=느리게 따라옴, 음수=먼저 올라감. 0.1~0.2 권장</div></div>`;
+    }
+    if(ft==='scroll-scrub'){
+      opts+=`<div class="grp"><label class="lbl">변하는 항목</label><div class="btn-grp">
+        <button class="ss-mode${(fx.mode||'both')==='both'?' on':''}" data-ssm="both">확대+페이드</button>
+        <button class="ss-mode${fx.mode==='scale'?' on':''}" data-ssm="scale">확대만</button>
+        <button class="ss-mode${fx.mode==='fade'?' on':''}" data-ssm="fade">페이드만</button></div></div>`;
+    }
+    if(ft==='bg-video'){
+      opts+=`<div class="grp"><label class="lbl">영상 주소 (mp4 / 유튜브 / Vimeo)</label>
+        <input type="text" id="eff-bgsrc" value="${(fx.src||'').replace(/"/g,'&quot;')}" placeholder="https://...mp4 또는 유튜브 링크">
+        <div style="font-size:11px;color:var(--sub);margin-top:5px">무음·자동반복 재생됩니다. 글자는 위에 별도 요소로 올리세요.</div></div>`;
+    }
     opts+=`</div>`;
   }
 
@@ -2441,6 +2485,10 @@ function renderFxPanel(){
   rangeSync('eff-dur',v=>{if(!e.fx)e.fx={};e.fx.dur=+v;});
   rangeSync('eff-interval',v=>{if(!e.fx)e.fx={};e.fx.interval=+v;});
   rangeSync('eff-colh',v=>{if(!e.fx)e.fx={};e.fx.collapsedH=+v;});
+  rangeSync('eff-stagger',v=>{if(!e.fx)e.fx={};e.fx.stagger=+v;});
+  rangeSync('eff-speed',v=>{if(!e.fx)e.fx={};e.fx.speed=parseFloat(v);});
+  document.querySelectorAll('.cr-mode').forEach(b=>b.addEventListener('click',()=>{if(!e.fx)e.fx={};e.fx.mode=b.dataset.crm;renderFxPanel();save(true);snapshot();}));
+  document.querySelectorAll('.ss-mode').forEach(b=>b.addEventListener('click',()=>{if(!e.fx)e.fx={};e.fx.mode=b.dataset.ssm;renderFxPanel();save(true);snapshot();}));
   function textSync(id,cb){
     const el2=document.getElementById(id); if(!el2)return;
     el2.addEventListener('input',()=>{cb(el2.value);save(true);});
@@ -2451,6 +2499,7 @@ function renderFxPanel(){
   textSync('eff-from',v=>{if(!e.fx)e.fx={};e.fx.from=+v||0;});
   textSync('eff-to',v=>{if(!e.fx)e.fx={};e.fx.to=+v||0;});
   textSync('eff-suf',v=>{if(!e.fx)e.fx={};e.fx.suffix=v;});
+  textSync('eff-bgsrc',v=>{if(!e.fx)e.fx={};e.fx.src=v.trim();e.fx.kind=/youtu/.test(v)?'youtube':/vimeo/.test(v)?'vimeo':'mp4';});
   // 슬라이더 버튼
   const effSlAdd=document.getElementById('eff-sl-add');
   if(effSlAdd) effSlAdd.addEventListener('click',()=>{
@@ -3225,7 +3274,7 @@ ${buildAiCtx()}
 텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right), lineHeight(0.8~2.5), letterSpacing, italic(bool), underline(bool)
 도형: fill(#hex), shape(rect|circle), radius, borderW, borderColor(#hex)
 이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor
-이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
+이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"char-reveal",mode:"char"|"word",stagger:40}(텍스트 전용·글자 등장) | {type:"parallax",speed:0.15}(스크롤 패럴랙스) | {type:"scroll-scrub",mode:"both"|"scale"|"fade"}(스크롤 확대/페이드) | {type:"bg-video",src:"URL",kind:"mp4"|"youtube"|"vimeo"}(도형/이미지 배경영상) | {type:"sticky"}(상단 고정) | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
 사용가능 폰트: ${FONTS.map(f=>f[0]).join(', ')}
 캔버스 크기: ${page().w}×${page().h}px (좌상단=0,0)
 
@@ -3262,6 +3311,33 @@ document.getElementById('btn-aichat').onclick=()=>{
   }
 };
 document.getElementById('ai-chat-close').onclick=()=>{document.getElementById('ai-chat-panel').style.display='none';};
+// ── AI 연출 입히기 (원클릭) ──
+document.getElementById('btn-aifx').onclick=async()=>{
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  const p=page();
+  if(!p.elements.length){ toast('요소가 없습니다'); return; }
+  const sys=`너는 모션 디자이너다. 아래 페이지 요소 목록을 보고 각 요소에 어울리는 스크롤 연출(fx)을 입힌다.
+지침:
+- 큰 제목/슬로건(폰트 큰 text) → {"type":"char-reveal","mode":"char","stagger":40}
+- 본문·소제목 text, 카드 도형, 일반 이미지 → {"type":"scroll-reveal","dir":"up","delay":N} (같은 줄/같은 그룹은 delay를 80ms씩 늘려 순차 등장=스태거)
+- 페이지 폭의 절반 이상 큰 배경 이미지 → {"type":"parallax","speed":0.12}
+- 강조하고 싶은 핵심 이미지/카드 1~2개 → {"type":"scroll-scrub","mode":"both"}
+- 이미 fx가 있거나 sticky 인 요소는 건드리지 않는다.
+- 과하지 않게, 모든 요소에 다 줄 필요 없음. 상단(첫 화면) 요소 위주로 자연스럽게.
+출력은 JSON 하나만: {"reply":"한국어 한두 문장","actions":[{"type":"update_element","id":"요소ID","fx":{...}}]}`;
+  const ctx=buildAiCtx();
+  const btn=document.getElementById('btn-aifx'); btn.disabled=true; const old=btn.textContent; btn.textContent='🎬 구성 중…';
+  try{
+    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:4000,system:sys,messages:[{role:'user',content:ctx}]}});
+    const parsed=parseAiJson(res.data?.content?.[0]?.text||'');
+    if(!parsed) throw new Error('응답 해석 실패 (다시 시도)');
+    const acts=Array.isArray(parsed.actions)?parsed.actions.filter(a=>a.type==='update_element'&&a.fx):[];
+    const changed=acts.length?applyAiActions(acts):false;
+    if(changed){ afterMutate(); toast('🎬 '+(parsed.reply||`${acts.length}개 요소에 연출 적용됨`)); }
+    else toast('적용할 연출을 찾지 못했습니다');
+  }catch(e){ const m=e.message||String(e); toast('실패: '+(m.includes('unauthenticated')?'로그인이 필요합니다':m.includes('resource-exhausted')||m.includes('크레딧')?'AI 크레딧 소진':m)); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+};
 document.getElementById('ai-chat-send').onclick=sendChat;
 document.getElementById('ai-chat-input').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendChat();}});
 
