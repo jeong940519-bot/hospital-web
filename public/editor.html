@@ -342,6 +342,8 @@
         <button class="rsm" id="btn-ai" title="AI 초안 만들기" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">✨ AI 초안</button>
         <button class="rsm" id="btn-aichat" title="AI 작업 어시스턴트" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">💬 AI 작업</button>
         <button class="rsm" id="btn-aifx" title="AI가 현재 페이지에 스크롤 연출을 알아서 입힙니다" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">🎬 AI 연출</button>
+        <button class="rsm" id="btn-aicolor" title="AI 색감 테마 추천·적용" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">🎨 AI 색감</button>
+        <button class="rsm" id="btn-aireview" title="AI 검수·개선 제안" style="background:rgba(108,123,255,.14);border-color:rgba(108,123,255,.4);color:var(--accent)">🔎 AI 검수</button>
         <div class="rsep"></div>
         <span id="pmeta" style="font-size:11px;color:var(--sub);padding:0 6px">1200 × 1600</span>
         <button class="rsm" id="btn-undo" title="실행취소 (Ctrl+Z)">↶ 되돌리기</button>
@@ -838,6 +840,42 @@
       </div>
       <div class="modal-status" id="aifx-status"></div>
       <button class="tb-btn primary" id="aifx-go" style="width:100%;margin-top:4px">연출 입히기</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 색감 모달 -->
+<div class="modal-bg" id="aicolor-modal" style="display:none">
+  <div class="modal" style="width:460px">
+    <div class="modal-head"><h3>🎨 AI 색감 테마</h3><button class="sp-close" id="aicolor-close">✕</button></div>
+    <div class="modal-body">
+      <div class="grp"><label>원하는 분위기 (선택)</label>
+        <textarea id="aicolor-desc" rows="2" placeholder="예: 따뜻하고 신뢰감 있는 / 깔끔한 화이트+블루 / 자연 친화적 그린"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="tb-btn" data-aicolor-preset="깔끔하고 신뢰감 있는 화이트+블루 톤" style="font-size:12px;padding:6px 10px">🩺 클린 블루</button>
+          <button class="tb-btn" data-aicolor-preset="따뜻하고 부드러운 베이지+그린 톤" style="font-size:12px;padding:6px 10px">🌿 내추럴</button>
+          <button class="tb-btn" data-aicolor-preset="고급스럽고 차분한 네이비+골드 톤" style="font-size:12px;padding:6px 10px">💎 프리미엄</button>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:8px">현재 페이지 요소들의 색을 일관된 팔레트로 맞춰줍니다. 비워두면 페이지를 보고 어울리게 제안.</div>
+      </div>
+      <div class="modal-status" id="aicolor-status"></div>
+      <button class="tb-btn primary" id="aicolor-go" style="width:100%;margin-top:4px">색감 적용</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI 검수 모달 -->
+<div class="modal-bg" id="aireview-modal" style="display:none">
+  <div class="modal" style="width:520px">
+    <div class="modal-head"><h3>🔎 AI 검수·개선 제안</h3><button class="sp-close" id="aireview-close">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px">현재 페이지를 대비·가독성·여백·정렬 관점에서 점검합니다.</div>
+      <div id="aireview-result" style="font-size:13px;line-height:1.7;color:var(--text);min-height:40px;white-space:pre-wrap"></div>
+      <div class="modal-status" id="aireview-status"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="tb-btn" id="aireview-run" style="flex:1">🔎 점검하기</button>
+        <button class="tb-btn primary" id="aireview-apply" style="flex:1;display:none">✓ 제안 적용</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2024,6 +2062,14 @@ function renderProps(){
     html += `<div class="grp"><label>행간 ${e.lineHeight}</label><input type="range" id="t-lh" min="0.8" max="2.5" step="0.1" value="${e.lineHeight}"></div>`;
     html += `<div class="grp"><label>자간 ${e.letterSpacing}px</label><input type="range" id="t-ls" min="-3" max="15" step="0.5" value="${e.letterSpacing}"></div>`;
     html += `<div class="grp"><label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none"><input type="checkbox" id="t-autofit" ${e.autofit?'checked':''}> 상자에 맞춰 자동 축소 (autofit)</label></div>`;
+    html += `<div class="grp" style="border-top:1px solid var(--border);padding-top:12px"><label>✨ AI 문구</label>
+      <div class="btn-grp" style="flex-wrap:wrap;gap:4px">
+        <button class="aicopy" data-aic="더 전문적이고 신뢰감 있게">전문적</button>
+        <button class="aicopy" data-aic="더 친근하고 따뜻하게">친근하게</button>
+        <button class="aicopy" data-aic="핵심만 더 짧고 임팩트 있게">짧게</button>
+        <button class="aicopy" data-aic="조금 더 자세히 풀어서">자세히</button>
+      </div>
+      <div class="row" style="margin-top:6px"><input type="text" id="aicopy-inp" placeholder="직접 지시 (예: 정형외과 30년 강조)" style="flex:1"><button class="tb-btn" id="aicopy-go">생성</button></div></div>`;
   }else if(e.type==='image'){
     html += `<div class="grp"><label>이미지</label><button class="tb-btn" id="i-replace" style="width:100%">🔄 사진 교체</button></div>`;
     html += `<div class="grp"><label>채움 방식</label><select id="i-fit"><option value="cover" ${e.fit==='cover'?'selected':''}>꽉 채우기</option><option value="contain" ${e.fit==='contain'?'selected':''}>전체 보이기</option></select></div>`;
@@ -2202,6 +2248,8 @@ function bindProps(e){
     $('t-color').addEventListener('change',snapshot);
     // data-align은 전역 위임(아래)에서 처리
     if($('t-autofit')) $('t-autofit').addEventListener('change',()=>{ e.autofit=$('t-autofit').checked; liveStyle(); applyAutofits(); snapshot(); });
+    document.querySelectorAll('.aicopy').forEach(b=>b.addEventListener('click',()=>runAiCopy(e,b.dataset.aic)));
+    if($('aicopy-go')) $('aicopy-go').addEventListener('click',()=>{ const v=$('aicopy-inp').value.trim(); runAiCopy(e, v||'자연스럽게 다듬어'); });
     $('t-italic').addEventListener('click',()=>{ e.italic=!e.italic; renderProps(); liveStyle(); snapshot(); });
     $('t-underline').addEventListener('click',()=>{ e.underline=!e.underline; renderProps(); liveStyle(); snapshot(); });
     $('t-lh').addEventListener('input',()=>{ e.lineHeight=parseFloat($('t-lh').value); liveStyle(); });
@@ -3474,6 +3522,80 @@ document.getElementById('aifx-close').onclick=()=>document.getElementById('aifx-
 document.getElementById('aifx-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aifx-modal') e.currentTarget.style.display='none'; });
 document.getElementById('aifx-go').onclick=()=>runAiFx(document.getElementById('aifx-desc').value.trim());
 document.querySelectorAll('#aifx-modal [data-aifx-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aifx-desc').value=b.dataset.aifxPreset; }));
+
+// ── 공통 AI 호출 ──
+async function aiCall(system, content, maxTokens){
+  const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:maxTokens||4000,system:system,messages:[{role:'user',content:content}]}});
+  const parsed=parseAiJson(res.data?.content?.[0]?.text||'');
+  if(!parsed) throw new Error('AI 응답 해석 실패 (다시 시도)');
+  return parsed;
+}
+function _aiErr(e){ const m=e.message||String(e); return m.includes('unauthenticated')?'로그인이 필요합니다':(m.includes('resource-exhausted')||m.includes('크레딧'))?'AI 크레딧 소진':m; }
+
+// ── AI 카피 작성/다듬기 (선택 텍스트) ──
+async function runAiCopy(e, instr){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  if(!e||e.type!=='text') return;
+  const sys=`너는 병원 홈페이지 카피라이터다. 주어진 문구를 지시에 맞게 한국어로 다시 쓴다. 줄바꿈(\\n)은 필요하면 유지. 과장·허위 의료광고 표현은 피한다. 오직 JSON: {"text":"새 문구"}`;
+  const content=`현재 문구:\n"""${e.text||'(비어있음)'}"""\n\n지시: ${instr}\n같은 자리에 쓸 자연스러운 문구로 다시 써줘. 현재 문구가 비어있으면 지시 내용으로 새로 작성.`;
+  toast('AI가 문구를 작성 중…');
+  try{ const r=await aiCall(sys,content,1200); if(r.text!=null){ e.text=String(r.text); e._caseOrig=null; liveStyleEl(e); applyAutofits(); renderProps(); snapshot(); toast('문구 적용됨 ✨'); } else toast('결과가 비어있습니다'); }
+  catch(err){ toast('실패: '+_aiErr(err)); }
+}
+
+// ── AI 색감 테마 ──
+function aicolorStatus(s){ const el2=document.getElementById('aicolor-status'); if(el2) el2.textContent=s; }
+document.getElementById('btn-aicolor').onclick=()=>{ if(!isAdmin){toast('로그인이 필요합니다');openLogin();return;} document.getElementById('aicolor-modal').style.display='flex'; aicolorStatus(''); setTimeout(()=>document.getElementById('aicolor-desc').focus(),0); };
+document.getElementById('aicolor-close').onclick=()=>document.getElementById('aicolor-modal').style.display='none';
+document.getElementById('aicolor-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aicolor-modal') e.currentTarget.style.display='none'; });
+document.querySelectorAll('#aicolor-modal [data-aicolor-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aicolor-desc').value=b.dataset.aicolorPreset; }));
+document.getElementById('aicolor-go').onclick=async()=>{
+  const p=page(); if(!p.elements.length){ aicolorStatus('요소가 없습니다'); return; }
+  const desc=document.getElementById('aicolor-desc').value.trim();
+  const sys=`너는 병원 홈페이지 컬러 디자이너다. 페이지 요소 목록과 분위기 요청을 보고 일관된 색 팔레트를 정해 적용한다.
+규칙:
+- 도형 fill, 텍스트 color, 페이지 배경(bg)을 조정해 통일감 있는 팔레트를 만든다.
+- 텍스트는 배경 대비 충분히(가독성). 본문은 어둡게, 강조/버튼은 포인트색.
+- 색은 #RRGGBB. 과하지 않게 2~3색 + 중성색 기조.
+${desc?`★ 분위기 요청 우선 반영: "${desc}"`:''}
+출력 JSON 하나만: {"reply":"한줄설명","actions":[{"type":"update_element","id":"ID","props":{"fill":"#hex"또는"color":"#hex"}},{"type":"update_page","props":{"bg":"#hex"}}]}`;
+  const go=document.getElementById('aicolor-go'); go.disabled=true; go.textContent='🎨 구성 중…'; aicolorStatus('AI가 색감을 구성 중…');
+  try{
+    const parsed=await aiCall(sys, buildAiCtx()+(desc?`\n\n[분위기] ${desc}`:''), 4000);
+    const acts=Array.isArray(parsed.actions)?parsed.actions:[];
+    const changed=acts.length?applyAiActions(acts):false;
+    if(changed){ afterMutate(); document.getElementById('aicolor-modal').style.display='none'; toast('🎨 '+(parsed.reply||'색감 적용됨')); }
+    else aicolorStatus('적용할 색 변경을 찾지 못했습니다');
+  }catch(e){ aicolorStatus('실패: '+_aiErr(e)); }
+  finally{ go.disabled=false; go.textContent='색감 적용'; }
+};
+
+// ── AI 검수·개선 제안 ──
+let _aireviewActions=[];
+function aireviewStatus(s){ const el2=document.getElementById('aireview-status'); if(el2) el2.textContent=s; }
+document.getElementById('btn-aireview').onclick=()=>{ if(!isAdmin){toast('로그인이 필요합니다');openLogin();return;} document.getElementById('aireview-modal').style.display='flex'; aireviewStatus(''); _aireviewActions=[]; document.getElementById('aireview-apply').style.display='none'; document.getElementById('aireview-result').textContent=''; };
+document.getElementById('aireview-close').onclick=()=>document.getElementById('aireview-modal').style.display='none';
+document.getElementById('aireview-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aireview-modal') e.currentTarget.style.display='none'; });
+document.getElementById('aireview-run').onclick=async()=>{
+  const p=page(); if(!p.elements.length){ aireviewStatus('요소가 없습니다'); return; }
+  const sys=`너는 병원 홈페이지 UI/UX 검수 전문가다. 현재 페이지를 점검하고 개선점을 제시한다.
+점검 항목: 텍스트-배경 대비/가독성, 글자 크기 균형, 요소 정렬·간격, 여백, 색 통일감, 빈/겹친 요소.
+출력 JSON 하나만: {"review":"발견한 문제와 제안을 항목별로 한국어로 (•머리표, 4~7줄)","actions":[{"type":"update_element","id":"ID","props":{...}} ... 자동 적용 가능한 구체 수정만, 없으면 빈 배열]}`;
+  const btn=document.getElementById('aireview-run'); btn.disabled=true; btn.textContent='🔎 점검 중…'; aireviewStatus('AI가 페이지를 점검 중…');
+  try{
+    const parsed=await aiCall(sys, buildAiCtx(), 3000);
+    document.getElementById('aireview-result').textContent=parsed.review||'특이사항을 찾지 못했습니다.';
+    _aireviewActions=Array.isArray(parsed.actions)?parsed.actions.filter(a=>a&&a.type):[];
+    document.getElementById('aireview-apply').style.display=_aireviewActions.length?'block':'none';
+    aireviewStatus(_aireviewActions.length?`${_aireviewActions.length}개 자동 수정 제안 — "제안 적용"으로 반영`:'자동 적용할 수정은 없습니다 (위 제안을 참고해 직접 조정하세요)');
+  }catch(e){ aireviewStatus('실패: '+_aiErr(e)); }
+  finally{ btn.disabled=false; btn.textContent='🔎 다시 점검'; }
+};
+document.getElementById('aireview-apply').onclick=()=>{
+  if(!_aireviewActions.length) return;
+  const changed=applyAiActions(_aireviewActions);
+  if(changed){ afterMutate(); document.getElementById('aireview-modal').style.display='none'; toast('🔎 개선 제안 적용됨'); }
+};
 document.getElementById('ai-chat-send').onclick=sendChat;
 document.getElementById('ai-chat-input').addEventListener('keydown',ev=>{if(ev.key==='Enter'&&!ev.shiftKey){ev.preventDefault();sendChat();}});
 
