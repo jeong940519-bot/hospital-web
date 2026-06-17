@@ -2230,9 +2230,38 @@ function bindProps(e){
   if(fxHint) fxHint.addEventListener('click',()=>switchPropTab('fx'));
 }
 // ───────────────────────── 이펙트 패널 ─────────────────────────
-const FX_NAMES={'sticky':'상단 고정','char-reveal':'글자 등장','parallax':'패럴랙스','scroll-scrub':'스크롤 스크럽','bg-video':'배경 영상','scroll-reveal':'스크롤 등장','hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
-const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-scrub':'📈','bg-video':'🎬','scroll-reveal':'📜','hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
+const FX_NAMES={'sticky':'상단 고정','char-reveal':'글자 등장','parallax':'패럴랙스','scroll-scrub':'스크롤 스크럽','bg-video':'배경 영상','scroll-reveal':'스크롤 등장',
+  'mask-wipe':'마스크 등장','mask-wipe-l':'마스크 등장(좌)','rotate-in':'회전 등장','blur-in':'블러 풀림','skew-in':'기울임 등장','flip-in':'플립 등장','zoom-in':'줌인 등장','zoom-out':'줌아웃 등장','bounce-in':'바운스 등장',
+  'float':'둥실(상하)','pulse':'맥박','spin':'회전(상시)','wobble':'살랑','gradient-flow':'그라데이션 흐름','marquee':'흐르는 텍스트',
+  'hover-lift':'호버 떠오름','hover-glow':'호버 발광','hover-tilt':'호버 3D틸트','hover-grow':'호버 확대','hover-sink':'호버 눌림',
+  'hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
+const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-scrub':'📈','bg-video':'🎬','scroll-reveal':'📜',
+  'mask-wipe':'🎬','mask-wipe-l':'🎬','rotate-in':'🔄','blur-in':'🌫','skew-in':'📐','flip-in':'🔃','zoom-in':'🔎','zoom-out':'🔭','bounce-in':'🏀',
+  'float':'🎈','pulse':'💓','spin':'🌀','wobble':'🍃','gradient-flow':'🌈','marquee':'📰',
+  'hover-lift':'🖐','hover-glow':'✨','hover-tilt':'🃏','hover-grow':'➕','hover-sink':'⬇',
+  'hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
+const _mkDesc=(result,tip,steps)=>({result,tip,steps:steps||['요소를 선택','이 효과를 적용 (설정값 없이 바로 적용)','화면에 들어오면 재생됩니다']});
 const FX_DESC={
+  'mask-wipe':_mkDesc('이미지/요소가 아래에서 위로 커튼 걷히듯 드러납니다.','💡 큰 사진·배너에 쓰면 고급스럽게 등장'),
+  'mask-wipe-l':_mkDesc('왼쪽에서 오른쪽으로 닦이듯 드러납니다.','💡 가로로 긴 띠·배너에 잘 어울려요'),
+  'rotate-in':_mkDesc('살짝 회전하며 또렷해집니다.','💡 카드·아이콘에 생동감'),
+  'blur-in':_mkDesc('흐릿하게 시작해 점점 선명해집니다.','💡 사진·제목에 부드러운 등장'),
+  'skew-in':_mkDesc('기울어진 채 올라오며 반듯해집니다.','💡 역동적인 섹션 도입부'),
+  'flip-in':_mkDesc('위로 젖혀졌다가 펼쳐지며 나타납니다.','💡 카드 뒤집히듯 등장'),
+  'zoom-in':_mkDesc('작게 시작해 제 크기로 커집니다.','💡 강조 요소에'),
+  'zoom-out':_mkDesc('크게 시작해 제 크기로 줄어듭니다.','💡 임팩트 있는 진입'),
+  'bounce-in':_mkDesc('통통 튀듯 탄력 있게 올라옵니다.','💡 버튼·아이콘에 경쾌함'),
+  'float':_mkDesc('항상 위아래로 둥실둥실 떠다닙니다.','💡 장식 아이콘·뱃지에',['요소를 선택','둥실 적용 — 상시 반복됩니다']),
+  'pulse':_mkDesc('심장 박동처럼 살짝 커졌다 작아지길 반복.','💡 "예약하기" 같은 주목 버튼에',['요소를 선택','맥박 적용 — 상시 반복됩니다']),
+  'spin':_mkDesc('천천히 계속 회전합니다.','💡 원형 배지·로딩 장식에',['요소를 선택','회전 적용 — 상시 반복됩니다']),
+  'wobble':_mkDesc('나뭇잎처럼 좌우로 살랑입니다.','💡 가벼운 장식 요소에',['요소를 선택','살랑 적용 — 상시 반복됩니다']),
+  'gradient-flow':_mkDesc('도형 배경의 그라데이션이 흐르듯 움직입니다.','💡 채우기를 그라데이션으로 설정한 도형에',['그라데이션으로 채운 도형을 선택','그라데이션 흐름 적용']),
+  'marquee':_mkDesc('텍스트가 띠처럼 끊임없이 옆으로 흐릅니다.','💡 공지·이벤트 문구 띠에',['텍스트 요소를 선택','흐르는 텍스트 적용']),
+  'hover-lift':_mkDesc('마우스를 올리면 떠오르며 그림자가 생깁니다.','💡 카드·버튼에 클릭 유도',['요소를 선택','호버 떠오름 적용']),
+  'hover-glow':_mkDesc('마우스를 올리면 은은하게 빛납니다.','💡 강조 버튼·이미지에',['요소를 선택','호버 발광 적용']),
+  'hover-tilt':_mkDesc('마우스를 올리면 3D로 살짝 기웁니다.','💡 의료진 사진·카드에',['요소를 선택','호버 3D틸트 적용']),
+  'hover-grow':_mkDesc('마우스를 올리면 살짝 커집니다.','💡 썸네일·아이콘에',['요소를 선택','호버 확대 적용']),
+  'hover-sink':_mkDesc('마우스를 올리면 살짝 눌립니다(버튼 느낌).','💡 버튼에 누르는 듯한 피드백',['요소를 선택','호버 눌림 적용']),
   'char-reveal':{
     result:'발행 후 이 글자가 한 글자(또는 한 단어)씩 아래에서 떠오르며 순서대로 나타납니다.',
     steps:['큰 제목·슬로건 텍스트를 선택','글자 등장 적용 → 단위(글자/단어)와 속도를 설정','화면에 스크롤로 들어오는 순간 재생됩니다'],
@@ -3344,6 +3373,9 @@ ${buildAiCtx()}
 도형: fill(#hex), shape(rect|circle), radius, borderW, borderColor(#hex)
 이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor
 이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"char-reveal",mode:"char"|"word",stagger:40}(텍스트 전용·글자 등장) | {type:"parallax",speed:0.15}(스크롤 패럴랙스) | {type:"scroll-scrub",mode:"both"|"scale"|"fade"}(스크롤 확대/페이드) | {type:"bg-video",src:"URL",kind:"mp4"|"youtube"|"vimeo"}(도형/이미지 배경영상) | {type:"sticky"}(상단 고정) | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
+진입(스크롤 시 1회): {type:"mask-wipe"|"mask-wipe-l"|"rotate-in"|"blur-in"|"skew-in"|"flip-in"|"zoom-in"|"zoom-out"|"bounce-in"} (옵션 없음)
+상시 루프: {type:"float"|"pulse"|"spin"|"wobble"} | {type:"gradient-flow"}(그라데이션 채운 도형) | {type:"marquee"}(텍스트만)
+호버: {type:"hover-lift"|"hover-glow"|"hover-tilt"|"hover-grow"|"hover-sink"}
 사용가능 폰트: ${FONTS.map(f=>f[0]).join(', ')}
 캔버스 크기: ${page().w}×${page().h}px (좌상단=0,0)
 
@@ -3391,6 +3423,9 @@ document.getElementById('btn-aifx').onclick=async()=>{
 - 본문·소제목 text, 카드 도형, 일반 이미지 → {"type":"scroll-reveal","dir":"up","delay":N} (같은 줄/같은 그룹은 delay를 80ms씩 늘려 순차 등장=스태거)
 - 페이지 폭의 절반 이상 큰 배경 이미지 → {"type":"parallax","speed":0.12}
 - 강조하고 싶은 핵심 이미지/카드 1~2개 → {"type":"scroll-scrub","mode":"both"}
+- 사진 등장에 변화를 주려면 {"type":"mask-wipe"} 또는 {"type":"blur-in"}, 카드엔 {"type":"bounce-in"}/{"type":"zoom-in"} 도 활용 가능
+- 버튼·카드엔 호버 효과({"type":"hover-lift"} 또는 {"type":"hover-glow"})를 곁들이면 좋다
+- 주목 버튼(예약 등) 1개엔 {"type":"pulse"}, 장식 아이콘엔 {"type":"float"} 가능
 - 이미 fx가 있거나 sticky 인 요소는 건드리지 않는다.
 - 과하지 않게, 모든 요소에 다 줄 필요 없음. 상단(첫 화면) 요소 위주로 자연스럽게.
 출력은 JSON 하나만: {"reply":"한국어 한두 문장","actions":[{"type":"update_element","id":"요소ID","fx":{...}}]}`;

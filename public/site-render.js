@@ -28,6 +28,40 @@
     '[data-fx-parallax]{will-change:transform}',
     '[data-fx-scrub]{will-change:transform,opacity}',
     '.fx-bgvid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:0;z-index:0;pointer-events:none}',
+    // ── 진입 애니메이션 (data-fx-anim, 관찰자가 .fx-anim-in 부여) ──
+    '[data-fx-anim]{transition:opacity .65s ease,transform .65s ease,filter .65s ease,clip-path .7s ease}',
+    '[data-fx-anim="mask"]{clip-path:inset(0 0 100% 0)}',
+    '[data-fx-anim="maskL"]{clip-path:inset(0 100% 0 0)}',
+    '[data-fx-anim="rot"]{opacity:0;transform:rotate(-8deg) scale(.92)}',
+    '[data-fx-anim="blur"]{opacity:0;filter:blur(14px)}',
+    '[data-fx-anim="skew"]{opacity:0;transform:skewY(6deg) translateY(34px)}',
+    '[data-fx-anim="flip"]{opacity:0;transform:perspective(800px) rotateX(42deg);transform-origin:top center}',
+    '[data-fx-anim="zin"]{opacity:0;transform:scale(.7)}',
+    '[data-fx-anim="zout"]{opacity:0;transform:scale(1.18)}',
+    '[data-fx-anim="bounce"]{opacity:0;transform:translateY(40px)}',
+    '[data-fx-anim].fx-anim-in{opacity:1;transform:none;filter:none;clip-path:inset(0 0 0 0)}',
+    '[data-fx-anim="bounce"].fx-anim-in{transition:opacity .5s,transform .7s cubic-bezier(.34,1.56,.64,1)}',
+    // ── 상시 루프 (data-fx-loop, 순수 CSS) ──
+    '@keyframes fx-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}',
+    '@keyframes fx-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.05)}}',
+    '@keyframes fx-spin{to{transform:rotate(360deg)}}',
+    '@keyframes fx-wobble{0%,100%{transform:rotate(-2.2deg)}50%{transform:rotate(2.2deg)}}',
+    '@keyframes fx-grad{0%{background-position:0% 50%}100%{background-position:200% 50%}}',
+    '@keyframes fx-marquee{0%{transform:translateX(70%)}100%{transform:translateX(-110%)}}',
+    '[data-fx-loop="float"]{animation:fx-float 3.2s ease-in-out infinite}',
+    '[data-fx-loop="pulse"]{animation:fx-pulse 2s ease-in-out infinite}',
+    '[data-fx-loop="spin"]{animation:fx-spin 9s linear infinite}',
+    '[data-fx-loop="wobble"]{animation:fx-wobble 2.6s ease-in-out infinite}',
+    '[data-fx-loop="grad"]{background-size:220% 220%!important;animation:fx-grad 7s linear infinite}',
+    '[data-fx-loop="marquee"]{overflow:hidden}',
+    '[data-fx-loop="marquee"]>div{white-space:nowrap!important;display:inline-block!important;animation:fx-marquee 13s linear infinite}',
+    // ── 호버 마이크로 인터랙션 (data-fx-hover, 순수 CSS) ──
+    '[data-fx-hover]{transition:transform .25s ease,box-shadow .25s ease,filter .25s ease}',
+    '[data-fx-hover="lift"]:hover{transform:translateY(-8px);box-shadow:0 16px 34px rgba(0,0,0,.20)}',
+    '[data-fx-hover="glow"]:hover{box-shadow:0 0 26px rgba(108,123,255,.6);filter:brightness(1.06)}',
+    '[data-fx-hover="tilt"]:hover{transform:perspective(600px) rotateX(6deg) rotateY(-6deg)}',
+    '[data-fx-hover="grow"]:hover{transform:scale(1.06)}',
+    '[data-fx-hover="sink"]:hover{transform:translateY(4px);filter:brightness(.94)}',
   ].join('');
 
   /* ── 효과 JS 블록 (사용된 것만 삽입) ── */
@@ -43,6 +77,11 @@
     'parallax':'(function(){var els=[].slice.call(document.querySelectorAll("[data-fx-parallax]"));if(!els.length)return;function upd(){var s=window.__pgScale||1,y=window.scrollY||window.pageYOffset||0;els.forEach(function(el){var sp=parseFloat(el.dataset.fxSpeed||0.15),b=el.getAttribute("data-fx-base-tf")||"";el.style.transform=(b?b+" ":"")+"translateY("+(y*sp/s)+"px)";});}window.addEventListener("scroll",upd,{passive:true});window.addEventListener("resize",upd);upd();})();',
     'scroll-scrub':'(function(){var els=[].slice.call(document.querySelectorAll("[data-fx-scrub]"));if(!els.length)return;function pinProg(b){var s=window.__pgScale||1,L=+b.dataset.secPinlen||600,r=b.getBoundingClientRect();return Math.max(0,Math.min(1,(-r.top)/(L*s)));}function upd(){var vh=window.innerHeight;els.forEach(function(el){var pb=el.closest?el.closest(".secblock.pinned"):null,p;if(pb){p=pinProg(pb);}else{var r=el.getBoundingClientRect();p=Math.max(0,Math.min(1,(vh-r.top)/(vh*0.7)));}var m=el.dataset.fxScrub||"both",b=el.getAttribute("data-fx-base-tf")||"";if(m==="fade"||m==="both")el.style.opacity=p;if(m==="scale"||m==="both")el.style.transform=(b?b+" ":"")+"scale("+(0.85+0.15*p)+")";});}window.addEventListener("scroll",upd,{passive:true});window.addEventListener("resize",upd);upd();})();'
   };
+  FX_JS['anim']='(function(){var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add("fx-anim-in");io.unobserve(e.target);}});},{threshold:0.15});document.querySelectorAll("[data-fx-anim]").forEach(function(el){el.style.transitionDelay=(el.dataset.fxDelay||0)+"ms";io.observe(el);});})();';
+  // 새 효과 타입 → data 속성 매핑
+  var FX_ANIM={'mask-wipe':'mask','mask-wipe-l':'maskL','rotate-in':'rot','blur-in':'blur','skew-in':'skew','flip-in':'flip','zoom-in':'zin','zoom-out':'zout','bounce-in':'bounce'};
+  var FX_LOOP={'float':'float','pulse':'pulse','spin':'spin','wobble':'wobble','gradient-flow':'grad','marquee':'marquee'};
+  var FX_HOVER={'hover-lift':'lift','hover-glow':'glow','hover-tilt':'tilt','hover-grow':'grow','hover-sink':'sink'};
   function _ytId(u){ var m=String(u).match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/); return m?m[1]:String(u); }
   function bgVideoHtml(fx){
     var src=fx.src||''; if(!src) return '';
@@ -110,6 +149,9 @@
     else if(ft==='sticky') ea=' data-fx-sticky="1" data-fx-base-tf="'+_tf.trim()+'"';
     else if(ft==='parallax') ea=' data-fx-parallax="1" data-fx-speed="'+(fx.speed!=null?fx.speed:0.15)+'" data-fx-base-tf="'+_tf.trim()+'"';
     else if(ft==='scroll-scrub') ea=' data-fx-scrub="'+(fx.mode||'both')+'" data-fx-base-tf="'+_tf.trim()+'"';
+    else if(FX_ANIM[ft]) ea=' data-fx-anim="'+FX_ANIM[ft]+'"'+(fx.delay?' data-fx-delay="'+fx.delay+'"':'');
+    else if(FX_LOOP[ft]) ea=' data-fx-loop="'+FX_LOOP[ft]+'"';
+    else if(FX_HOVER[ft]) ea=' data-fx-hover="'+FX_HOVER[ft]+'"';
 
     // 배경 영상 — 도형/이미지 요소를 영상 박스로
     if(ft==='bg-video' && (e.type==='shape'||e.type==='image')){
@@ -214,6 +256,7 @@
         if(t==='char-reveal') usedFx['char-reveal']=1;
         if(t==='parallax') usedFx['parallax']=1;
         if(t==='scroll-scrub') usedFx['scroll-scrub']=1;
+        if(FX_ANIM[t]) usedFx['anim']=1;
       });
     });
 
