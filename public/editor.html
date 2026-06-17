@@ -1357,6 +1357,47 @@ function liveStyleEl(e){
 // ───────────────────────── 렌더: 캔버스 ─────────────────────────
 const canvas = document.getElementById('canvas');
 const canvasWrap = document.getElementById('canvas-wrap');
+// ───────────────────────── 섹션 (핀 고정/스크럽용) ─────────────────────────
+function sortedSections(p){ if(!p.sections||p.sections.length<2) return []; p.sections.sort((a,b)=>a.y-b.y); p.sections[0].y=0; return p.sections; }
+function addSection(){
+  const p=page();
+  if(!p.sections||!p.sections.length) p.sections=[{id:uid(),name:'섹션 1',y:0,pin:false,pinLen:600}];
+  const s=p.sections.slice().sort((a,b)=>a.y-b.y);
+  let bi=0,bh=-1; for(let i=0;i<s.length;i++){ const top=s[i].y, bot=(s[i+1]?s[i+1].y:p.h); if(bot-top>bh){bh=bot-top;bi=i;} }
+  const top=s[bi].y, bot=(s[bi+1]?s[bi+1].y:p.h);
+  p.sections.push({id:uid(),name:'섹션 '+(p.sections.length+1),y:Math.round((top+bot)/2),pin:false,pinLen:600});
+  sortedSections(p); afterMutate();
+}
+function delSection(id){
+  const p=page(); p.sections=(p.sections||[]).filter(s=>s.id!==id);
+  if(p.sections.length){ sortedSections(p); } if(p.sections.length<2) delete p.sections;
+  afterMutate();
+}
+function drawSections(){
+  const p=page(); const secs=sortedSections(p); if(!secs.length) return;
+  secs.forEach((sec,i)=>{
+    const top=sec.y, bot=(secs[i+1]?secs[i+1].y:p.h);
+    const lab=document.createElement('div'); lab.className='sec-label';
+    lab.style.cssText=`position:absolute;left:6px;top:${top+6}px;z-index:62;background:rgba(108,123,255,.85);color:#fff;font-size:11px;padding:2px 8px;border-radius:6px;pointer-events:none;white-space:nowrap`;
+    lab.innerHTML=`${sec.pin?'📌 ':''}${escapeHtml(sec.name||('섹션 '+(i+1)))} <span style="opacity:.8">${Math.round(bot-top)}px</span>`;
+    canvas.appendChild(lab);
+    if(i>0){
+      const ln=document.createElement('div'); ln.className='sec-line';
+      ln.style.cssText=`position:absolute;left:0;top:${top}px;width:100%;height:0;border-top:2px dashed #6c7bff;z-index:61;cursor:ns-resize`;
+      ln.addEventListener('mousedown',ev=>{ ev.stopPropagation(); startSectionDrag(ev,sec); });
+      canvas.appendChild(ln);
+    }
+  });
+}
+function startSectionDrag(ev,sec){
+  ev.preventDefault(); const rect=canvas.getBoundingClientRect();
+  function mv(e2){ const p=page(); const s=p.sections.slice().sort((a,b)=>a.y-b.y); const i=s.indexOf(sec);
+    const prev=s[i-1]?s[i-1].y:0, next=s[i+1]?s[i+1].y:p.h;
+    let y=(e2.clientY-rect.top)/zoom; sec.y=Math.round(Math.max(prev+30,Math.min(next-30,y))); renderCanvas(); }
+  function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); save(true); snapshot(); }
+  window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+}
+
 function renderCanvas(){
   const p = page();
   canvas.style.width = p.w+'px';
@@ -1367,6 +1408,7 @@ function renderCanvas(){
   canvas.innerHTML = '';
   if(marqueeEl) canvas.appendChild(marqueeEl);
   p.elements.forEach(e=> canvas.appendChild(renderEl(e)));
+  drawSections();
   if(selIds.size>=2) addGroupFrame();
   else if(selId && el(selId)){
     const se=el(selId);
@@ -2017,6 +2059,30 @@ function renderPageProps(box){
   box.innerHTML += `<h4>발행 옵션 (사이트 전체)</h4><div class="grp"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="pg-smooth" ${project.smoothScroll?'checked':''}> 관성 부드러운 스크롤</label><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 페이지에서 스크롤이 미끄러지듯 따라옵니다. 모바일·접근성(動 줄이기) 사용자는 자동으로 일반 스크롤.</div></div>`;
   const smI=box.querySelector('#pg-smooth');
   if(smI) smI.addEventListener('change',()=>{ project.smoothScroll=smI.checked; save(true); snapshot(); toast(smI.checked?'부드러운 스크롤 켜짐 (발행 시 적용)':'부드러운 스크롤 꺼짐'); });
+  // ── 섹션 관리 ──
+  const secs=sortedSections(p);
+  let secHtml=`<h4>섹션 <span style="color:var(--sub);font-weight:400;text-transform:none">(핀 고정·스크럽 구간)</span></h4>`;
+  if(!secs.length){ secHtml+=`<div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.6">페이지를 세로로 나눠 "핀 고정" 구간을 만들 수 있어요. 핀 섹션은 발행 시 화면에 잠시 고정됩니다. <b>(레이아웃 적용은 다음 단계)</b></div>`; }
+  else { secs.forEach((s,i)=>{ const bot=(secs[i+1]?secs[i+1].y:p.h);
+    secHtml+=`<div class="sec-row" data-sid="${s.id}" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:9px;margin-bottom:7px">
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <input class="sec-name" value="${escapeHtml(s.name||'')}" style="flex:1;padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px" placeholder="섹션 이름">
+        <span style="font-size:11px;color:var(--sub);white-space:nowrap">${Math.round(bot-s.y)}px</span>
+        ${i>0?`<button class="sec-del" title="이 경계 제거" style="border:none;background:none;color:#ff8da3;cursor:pointer;font-size:14px">✕</button>`:'<span style="width:14px"></span>'}
+      </div>
+      <label style="display:flex;align-items:center;gap:7px;font-size:12px;color:var(--sub);cursor:pointer;text-transform:none"><input type="checkbox" class="sec-pin" ${s.pin?'checked':''}> 📌 핀 고정${s.pin?` · <input type="number" class="sec-pinlen" value="${s.pinLen||600}" style="width:64px;padding:3px 6px;background:var(--panel);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:12px"> px 동안`:''}</label>
+    </div>`;
+  }); }
+  secHtml+=`<button id="sec-add" class="tb-btn" style="width:100%;margin-top:2px">＋ 섹션 나누기</button>`;
+  box.innerHTML+=secHtml;
+  const secAdd=box.querySelector('#sec-add'); if(secAdd) secAdd.addEventListener('click',addSection);
+  box.querySelectorAll('.sec-row').forEach(row=>{
+    const sid=row.dataset.sid, sec=(p.sections||[]).find(x=>x.id===sid); if(!sec) return;
+    const nm=row.querySelector('.sec-name'); if(nm){ nm.addEventListener('input',()=>{ sec.name=nm.value; renderCanvas(); save(true); }); nm.addEventListener('change',snapshot); }
+    const pin=row.querySelector('.sec-pin'); if(pin) pin.addEventListener('change',()=>{ sec.pin=pin.checked; renderProps(); renderCanvas(); save(true); snapshot(); });
+    const pl=row.querySelector('.sec-pinlen'); if(pl){ pl.addEventListener('input',()=>{ sec.pinLen=parseInt(pl.value)||600; save(true); }); pl.addEventListener('change',snapshot); }
+    const del=row.querySelector('.sec-del'); if(del) del.addEventListener('click',()=>delSection(sid));
+  });
   const nameI=box.querySelector('#pg-name');
   nameI.addEventListener('input',()=>{ p.name=nameI.value; renderPages(); save(true); });
   nameI.addEventListener('change',snapshot);
