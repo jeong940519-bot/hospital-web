@@ -232,6 +232,8 @@
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
     var hasAf=false; project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.autofit)hasAf=true;});});
     if(hasAf) fxJs+=';(function(){function aft(){document.querySelectorAll("[data-autofit]").forEach(function(inner){var box=inner.parentNode;if(!box)return;var max=+inner.getAttribute("data-af-max")||parseFloat(getComputedStyle(inner).fontSize);var s=max;inner.style.fontSize=s+"px";var g=0;while(inner.scrollHeight>box.clientHeight+1&&s>6&&g<240){s-=1;inner.style.fontSize=s+"px";g++;}});}window.addEventListener("load",aft);window.addEventListener("resize",aft);aft();})();';
+    // 관성 부드러운 스크롤 (모바일/접근성 자동 예외)
+    if(project.smoothScroll) fxJs+=';(function(){try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;}catch(_){}if("ontouchstart" in window||navigator.maxTouchPoints>0)return;var target=window.scrollY||0,running=false;function maxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}function loop(){var cur=window.scrollY,d=target-cur;if(Math.abs(d)<0.5){running=false;return;}window.scrollTo(0,cur+d*0.09);requestAnimationFrame(loop);}window.addEventListener("wheel",function(e){if(e.ctrlKey)return;e.preventDefault();target=Math.max(0,Math.min(maxY(),(running?target:window.scrollY)+e.deltaY));if(!running){running=true;requestAnimationFrame(loop);}},{passive:false});window.addEventListener("resize",function(){target=Math.max(0,Math.min(maxY(),target));});})();';
 
     // 사용된 폰트만 수집 → Google Fonts URL 동적 생성
     var _usedFonts=['Noto Sans KR'];

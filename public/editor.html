@@ -2014,6 +2014,9 @@ function renderPageProps(box){
   box.innerHTML += `<h4 style="margin-top:24px">페이지 (메뉴 이름)</h4><div class="grp"><input type="text" id="pg-name" value="${escapeHtml(p.name||'')}" placeholder="예: 홈, 병원소개, 오시는길"></div>`;
   box.innerHTML += `<h4>페이지 배경</h4><div class="grp"><div class="row"><button type="button" class="panel-cbtn" id="pg-bg" data-cpkey="pageBg" title="배경색"><span style="background:${p.bg}"></span></button><input type="text" id="pg-bg-t" value="${p.bg}" style="flex:1"></div></div>`;
   box.innerHTML += `<h4>페이지 높이</h4><div class="grp"><div class="num-unit"><input type="number" id="pg-h" value="${p.h}"><span>px</span></div></div>`;
+  box.innerHTML += `<h4>발행 옵션 (사이트 전체)</h4><div class="grp"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="pg-smooth" ${project.smoothScroll?'checked':''}> 관성 부드러운 스크롤</label><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 페이지에서 스크롤이 미끄러지듯 따라옵니다. 모바일·접근성(動 줄이기) 사용자는 자동으로 일반 스크롤.</div></div>`;
+  const smI=box.querySelector('#pg-smooth');
+  if(smI) smI.addEventListener('change',()=>{ project.smoothScroll=smI.checked; save(true); snapshot(); toast(smI.checked?'부드러운 스크롤 켜짐 (발행 시 적용)':'부드러운 스크롤 꺼짐'); });
   const nameI=box.querySelector('#pg-name');
   nameI.addEventListener('input',()=>{ p.name=nameI.value; renderPages(); save(true); });
   nameI.addEventListener('change',snapshot);
