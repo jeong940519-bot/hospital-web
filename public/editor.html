@@ -104,6 +104,8 @@
   .handle.s{bottom:-6px;left:50%;margin-left:-5px;cursor:ns-resize}
   .handle.w{top:50%;left:-6px;margin-top:-5px;cursor:ew-resize}
   .handle.e{top:50%;right:-6px;margin-top:-5px;cursor:ew-resize}
+  .handle.adj{width:13px;height:13px;background:#ffd400;border:1.5px solid #b8920a;border-radius:2px;transform:rotate(45deg);cursor:pointer;z-index:56}
+  .handle.adj:hover{background:#ffe34d}
   .handle.rot{top:-30px;left:50%;margin-left:-7px;width:15px;height:15px;border-radius:50%;cursor:grab}
   .handle.rot::before{content:'';position:absolute;top:13px;left:6px;width:1px;height:16px;background:var(--accent)}
 
@@ -1163,6 +1165,43 @@ const SHAPE_CLIP={
   // 설명선
   'callout':'polygon(0% 0%,100% 0%,100% 72%,38% 72%,22% 100%,25% 72%,0% 72%)',
 };
+// ── 노란 조절점(adjust handle) 지원 도형: 파라미터로 clip-path 생성 ──
+const _clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function _starPoly(points,inner){
+  let p=[];
+  for(let i=0;i<points*2;i++){ const r=(i%2===0)?0.5:inner*0.5, ang=-Math.PI/2+i*Math.PI/points;
+    p.push(`${(50+r*100*Math.cos(ang)).toFixed(1)}% ${(50+r*100*Math.sin(ang)).toFixed(1)}%`); }
+  return `polygon(${p.join(',')})`;
+}
+const SHAPE_ADJ={
+  'arrow-r':{ def:{head:.4,thick:.6},
+    clip:a=>{const s=(1-a.head)*100,t0=(1-a.thick)/2*100,t1=100-t0;return `polygon(0% ${t0}%,${s}% ${t0}%,${s}% 0%,100% 50%,${s}% 100%,${s}% ${t1}%,0% ${t1}%)`;},
+    handles:[ {hx:a=>1-a.head,hy:_=>0,set:(a,lx)=>a.head=_clamp(1-lx,.05,.95)},
+              {hx:_=>0,hy:a=>(1-a.thick)/2,set:(a,lx,ly)=>a.thick=_clamp(1-2*ly,.05,.98)} ]},
+  'arrow-l':{ def:{head:.4,thick:.6},
+    clip:a=>{const s=a.head*100,t0=(1-a.thick)/2*100,t1=100-t0;return `polygon(100% ${t0}%,${s}% ${t0}%,${s}% 0%,0% 50%,${s}% 100%,${s}% ${t1}%,100% ${t1}%)`;},
+    handles:[ {hx:a=>a.head,hy:_=>0,set:(a,lx)=>a.head=_clamp(lx,.05,.95)},
+              {hx:_=>1,hy:a=>(1-a.thick)/2,set:(a,lx,ly)=>a.thick=_clamp(1-2*ly,.05,.98)} ]},
+  'arrow-u':{ def:{head:.45,thick:.44},
+    clip:a=>{const s=a.head*100,t0=(1-a.thick)/2*100,t1=100-t0;return `polygon(50% 0%,100% ${s}%,${t1}% ${s}%,${t1}% 100%,${t0}% 100%,${t0}% ${s}%,0% ${s}%)`;},
+    handles:[ {hx:_=>0,hy:a=>a.head,set:(a,lx,ly)=>a.head=_clamp(ly,.05,.95)},
+              {hx:a=>(1-a.thick)/2,hy:_=>1,set:(a,lx)=>a.thick=_clamp(1-2*lx,.05,.98)} ]},
+  'arrow-d':{ def:{head:.45,thick:.44},
+    clip:a=>{const s=(1-a.head)*100,t0=(1-a.thick)/2*100,t1=100-t0;return `polygon(${t0}% 0%,${t1}% 0%,${t1}% ${s}%,100% ${s}%,50% 100%,0% ${s}%,${t0}% ${s}%)`;},
+    handles:[ {hx:_=>1,hy:a=>1-a.head,set:(a,lx,ly)=>a.head=_clamp(1-ly,.05,.95)},
+              {hx:a=>(1-a.thick)/2,hy:_=>0,set:(a,lx)=>a.thick=_clamp(1-2*lx,.05,.98)} ]},
+  'star':{ def:{inner:.4}, clip:a=>_starPoly(5,a.inner),
+    handles:[ {hx:a=>0.5+a.inner*0.5*Math.cos(-Math.PI/2+Math.PI/5),hy:a=>0.5+a.inner*0.5*Math.sin(-Math.PI/2+Math.PI/5),
+               set:(a,lx,ly)=>a.inner=_clamp(Math.hypot(lx-.5,ly-.5)*2,.1,.9)} ]},
+  'star6':{ def:{inner:.5}, clip:a=>_starPoly(6,a.inner),
+    handles:[ {hx:a=>0.5+a.inner*0.5*Math.cos(-Math.PI/2+Math.PI/6),hy:a=>0.5+a.inner*0.5*Math.sin(-Math.PI/2+Math.PI/6),
+               set:(a,lx,ly)=>a.inner=_clamp(Math.hypot(lx-.5,ly-.5)*2,.15,.9)} ]},
+  'callout':{ def:{tx:.22,ty:1},
+    clip:a=>{const bx=a.tx*100,ty=a.ty*100,b=70;return `polygon(0% 0%,100% 0%,100% ${b}%,${Math.min(96,bx+12).toFixed(1)}% ${b}%,${bx.toFixed(1)}% ${ty.toFixed(1)}%,${Math.max(4,bx+2).toFixed(1)}% ${b}%,0% ${b}%)`;},
+    handles:[ {hx:a=>a.tx,hy:a=>a.ty,set:(a,lx,ly)=>{a.tx=_clamp(lx,0,1);a.ty=_clamp(ly,.7,1);}} ]},
+};
+function adjOf(e){ const c=SHAPE_ADJ[e.shape]; return c? Object.assign({},c.def,e.adj||{}) : null; }
+function shapeClipOf(e){ const c=SHAPE_ADJ[e.shape]; return c? c.clip(adjOf(e)) : SHAPE_CLIP[e.shape]; }
 const SHAPE_LABELS={
   'rect':'직사각형','rrect':'둥근 직사각형','circle':'타원',
   'triangle':'이등변 삼각형','right-triangle':'직각 삼각형','triangle-down':'역삼각형',
@@ -1342,6 +1381,18 @@ function renderCanvas(){
     }
     addHandles(canvas.querySelector(`[data-id="${selId}"]`), se);
   }
+  applyAutofits();
+}
+// 텍스트 autofit — 상자에 넘치면 글자 크기를 줄여 맞춤(저장값은 최대치 유지)
+function fitTextNode(node,e){
+  if(!node||e.type!=='text'||!e.autofit) return;
+  const inner=node.querySelector('.inner'); if(!inner) return;
+  const boxH=e.h-8;
+  let size=e.fontSize; inner.style.fontSize=size+'px';
+  let g=0; while(inner.scrollHeight>boxH+1 && size>6 && g<240){ size-=1; inner.style.fontSize=size+'px'; g++; }
+}
+function applyAutofits(){
+  page().elements.forEach(e=>{ if(e.type==='text'&&e.autofit){ const n=canvas.querySelector(`[data-id="${e.id}"]`); if(n) fitTextNode(n,e); } });
 }
 function elTransform(e){
   let t='';
@@ -1391,7 +1442,7 @@ function renderEl(e){
     bg.style.position='absolute'; bg.style.inset='0';
     const _fc=fillCss(e.fill, e.fillOpacity);
     bg.style.background=_fc.bg; if(_fc.layerOp!=null) bg.style.opacity=_fc.layerOp;
-    const clip=SHAPE_CLIP[e.shape];
+    const clip=shapeClipOf(e);
     if(clip){ bg.style.clipPath=clip; if(e.shadow) bg.style.filter='drop-shadow(3px 4px 6px rgba(0,0,0,.3))'; }
     else { bg.style.borderRadius=(e.shape==='circle'?'50%':(e.radius+'px')); if(e.borderW>0) bg.style.border=`${e.borderW}px solid ${e.borderColor}`; if(e.shadow) bg.style.boxShadow=SHADOW_CSS; }
     node.appendChild(bg);
@@ -1429,6 +1480,44 @@ function addHandles(node,e){
     h.addEventListener('mousedown', ev=>{ ev.stopPropagation(); if(pos==='rot') startRotate(ev,e); else startResize(ev,e,pos); });
     node.appendChild(h);
   });
+  addAdjustHandles(node,e);
+}
+function _mkYellow(){ const h=document.createElement('div'); h.className='handle adj'; return h; }
+function addAdjustHandles(node,e){
+  if(e.type!=='shape') return;
+  // 둥근 직사각형 모서리 반경
+  if(e.shape==='rrect'||e.shape==='rect'){
+    const maxR=Math.floor(Math.min(e.w,e.h)/2);
+    const r=Math.max(0,Math.min(e.radius||0,maxR));
+    const h=_mkYellow(); h.style.left=(_clamp(r,8,e.w-8)-6)+'px'; h.style.top='-6px'; h.title='모서리 둥글기';
+    h.addEventListener('mousedown',ev=>{ ev.stopPropagation(); startAdjust(ev,e,(lx)=>{ e.radius=Math.round(_clamp(lx,0,maxR)); }); });
+    node.appendChild(h);
+  }
+  const c=SHAPE_ADJ[e.shape]; if(!c) return;
+  const a=adjOf(e);
+  c.handles.forEach(hd=>{
+    const hx=hd.hx(a)*e.w, hy=hd.hy(a)*e.h;
+    const h=_mkYellow(); h.style.left=(hx-6)+'px'; h.style.top=(hy-6)+'px'; h.title='모양 조절';
+    h.addEventListener('mousedown',ev=>{ ev.stopPropagation();
+      startAdjust(ev,e,(lx,ly)=>{ e.adj=Object.assign({},adjOf(e)); hd.set(e.adj, lx/e.w, ly/e.h); });
+    });
+    node.appendChild(h);
+  });
+}
+let adjDrag=null;
+function startAdjust(ev,e,apply){
+  ev.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  adjDrag=true;
+  function mv(ev2){
+    const lx=(ev2.clientX-rect.left)/zoom - e.x, ly=(ev2.clientY-rect.top)/zoom - e.y;
+    apply(lx,ly);
+    const node=canvas.querySelector(`[data-id="${e.id}"]`);
+    if(node){ const fresh=renderEl(e); node.replaceWith(fresh); addHandles(canvas.querySelector(`[data-id="${e.id}"]`),e); }
+    renderPages(); save(true);
+  }
+  function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); adjDrag=null; snapshot(); }
+  window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
 }
 // 그룹/다중선택 전체를 감싸는 프레임 + 통째 크기조절 핸들
 function addGroupFrame(){
@@ -1870,6 +1959,7 @@ function renderProps(){
       <button id="t-underline" class="${e.underline?'on':''}" style="text-decoration:underline">U</button></div></div>`;
     html += `<div class="grp"><label>행간 ${e.lineHeight}</label><input type="range" id="t-lh" min="0.8" max="2.5" step="0.1" value="${e.lineHeight}"></div>`;
     html += `<div class="grp"><label>자간 ${e.letterSpacing}px</label><input type="range" id="t-ls" min="-3" max="15" step="0.5" value="${e.letterSpacing}"></div>`;
+    html += `<div class="grp"><label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none"><input type="checkbox" id="t-autofit" ${e.autofit?'checked':''}> 상자에 맞춰 자동 축소 (autofit)</label></div>`;
   }else if(e.type==='image'){
     html += `<div class="grp"><label>이미지</label><button class="tb-btn" id="i-replace" style="width:100%">🔄 사진 교체</button></div>`;
     html += `<div class="grp"><label>채움 방식</label><select id="i-fit"><option value="cover" ${e.fit==='cover'?'selected':''}>꽉 채우기</option><option value="contain" ${e.fit==='contain'?'selected':''}>전체 보이기</option></select></div>`;
@@ -2020,6 +2110,7 @@ function bindProps(e){
     $('t-color').addEventListener('input',()=>{ e.color=$('t-color').value; liveStyle(); });
     $('t-color').addEventListener('change',snapshot);
     // data-align은 전역 위임(아래)에서 처리
+    if($('t-autofit')) $('t-autofit').addEventListener('change',()=>{ e.autofit=$('t-autofit').checked; liveStyle(); applyAutofits(); snapshot(); });
     $('t-italic').addEventListener('click',()=>{ e.italic=!e.italic; renderProps(); liveStyle(); snapshot(); });
     $('t-underline').addEventListener('click',()=>{ e.underline=!e.underline; renderProps(); liveStyle(); snapshot(); });
     $('t-lh').addEventListener('input',()=>{ e.lineHeight=parseFloat($('t-lh').value); liveStyle(); });
