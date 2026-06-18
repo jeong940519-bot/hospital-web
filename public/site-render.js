@@ -263,7 +263,7 @@
     var title = esc((roots[0]&&roots[0].name)||(contentPages[0]&&contentPages[0].name)||'홈페이지');
     // 직접 만든 상단 바가 있으면 자동 메뉴는 숨김
     var menu = headerPage ? '' : roots.filter(function(p){return p.id!==firstId;}).map(function(p){
-      return '<a href="#" data-id="'+p.id+'">'+esc(p.name||'페이지')+'</a>';
+      return '<a href="#" data-id="'+p.id+'" data-dev="'+(p.device||'both')+'">'+esc(p.name||'페이지')+'</a>';
     }).join('');
 
     var usedFx={};
@@ -287,20 +287,21 @@
     function secsOf(p){ if(!p.sections||p.sections.length<2) return null; var s=p.sections.slice().sort(function(a,b){return a.y-b.y;}); s[0]=Object.assign({},s[0],{y:0}); return s; }
     var pagesHtml = contentPages.map(function(p){
       var disp=(p.id===firstId?'':'display:none');
+      var wattr=' data-dev="'+(p.device||'both')+'" data-root="'+(p.parentId?'0':'1')+'"';
       var secs=secsOf(p);
       if(!secs){
         var els=p.elements.map(renderElStatic).join('');
-        return '<section class="pgwrap" data-id="'+p.id+'" style="'+disp+'"><div class="pg" style="width:'+p.w+'px;height:'+p.h+'px;background:'+p.bg+'">'+els+'</div></section>';
+        return '<section class="pgwrap" data-id="'+p.id+'"'+wattr+' style="'+disp+'"><div class="pg" data-pw="'+p.w+'" style="width:'+p.w+'px;height:'+p.h+'px;background:'+p.bg+'">'+els+'</div></section>';
       }
       var blocks=secs.map(function(sec,i){
         var top=sec.y, bot=(secs[i+1]?secs[i+1].y:p.h), hh=Math.max(1,bot-top);
         var inSec=p.elements.filter(function(e){ var cy=e.y+e.h/2; return cy>=top && cy<bot; });
         var els=inSec.map(function(e){ var c={}; for(var k in e)c[k]=e[k]; c.y=e.y-top; return renderElStatic(c); }).join('');
-        var pgDiv='<div class="pg" style="width:'+p.w+'px;height:'+hh+'px;background:'+p.bg+'">'+els+'</div>';
+        var pgDiv='<div class="pg" data-pw="'+p.w+'" style="width:'+p.w+'px;height:'+hh+'px;background:'+p.bg+'">'+els+'</div>';
         if(sec.pin){ return '<div class="secblock pinned" data-sec-pinlen="'+(sec.pinLen||600)+'"><div class="pinwrap">'+pgDiv+'</div></div>'; }
         return '<div class="secblock">'+pgDiv+'</div>';
       }).join('');
-      return '<section class="pgwrap" data-id="'+p.id+'" style="'+disp+';overflow:visible">'+blocks+'</section>';
+      return '<section class="pgwrap" data-id="'+p.id+'"'+wattr+' style="'+disp+';overflow:visible">'+blocks+'</section>';
     }).join('');
     // 직접 디자인한 상단 고정 바
     var topbarHtml='', headerH=0;
@@ -353,35 +354,43 @@
       +FX_CSS
       +'</style></head>'
       +'<body>'+topbarHtml+(menu?'<nav>'+menu+'</nav>':'')+pagesHtml+footerHtml
-      +'<script>var PW='+PAGE_W+';var HEADERH='+headerH+';var FOOTERH='+footerH+';'
+      +'<script>var PW='+PAGE_W+';'
       +'function fit(){'
-        +'var s=Math.min(1,window.innerWidth/PW);window.__pgScale=s;'
-        +'var ml=Math.max(0,(window.innerWidth-PW*s)/2);'
+        +'var iw=window.innerWidth,HH=0;'
+        +'var tb=document.getElementById("topbar");'
+        +'if(tb){var tp=document.getElementById("topbar-pg");var tw=tp.offsetWidth||PW;var ts=Math.min(1,iw/tw);tp.style.transform="scale("+ts+")";tp.style.marginLeft=Math.max(0,(iw-tw*ts)/2)+"px";HH=tp.offsetHeight*ts;tb.style.height=HH+"px";document.body.style.paddingTop=HH+"px";}'
         +'document.querySelectorAll(".pgwrap").forEach(function(wr){'
           +'if(wr.style.display==="none")return;'
           +'wr.querySelectorAll(".pg").forEach(function(pg){'
+            +'var pw=+pg.getAttribute("data-pw")||PW;var s=Math.min(1,iw/pw),ml=Math.max(0,(iw-pw*s)/2);window.__pgScale=s;'
             +'pg.style.transform="scale("+s+")";pg.style.marginLeft=ml+"px";'
             +'var holder=pg.parentNode,ph=pg.offsetHeight*s;'
-            +'if(holder.className.indexOf("pinwrap")>=0){holder.style.height=ph+"px";holder.style.top=(HEADERH*s)+"px";var blk=holder.parentNode,L=+blk.dataset.secPinlen||600;blk.style.height=(ph+L*s)+"px";}'
+            +'if(holder.className.indexOf("pinwrap")>=0){holder.style.height=ph+"px";holder.style.top=HH+"px";var blk=holder.parentNode,L=+blk.dataset.secPinlen||600;blk.style.height=(ph+L*s)+"px";}'
             +'else{holder.style.height=ph+"px";}'
           +'});'
         +'});'
-        +'var tb=document.getElementById("topbar");'
-        +'if(tb){var tp=document.getElementById("topbar-pg");tp.style.transform="scale("+s+")";tp.style.marginLeft=Math.max(0,(window.innerWidth-PW*s)/2)+"px";var hh=HEADERH*s;tb.style.height=hh+"px";document.body.style.paddingTop=hh+"px";}'
         +'var fb=document.getElementById("footerbar");'
-        +'if(fb){var fp=document.getElementById("footer-pg");fp.style.transform="scale("+s+")";fp.style.marginLeft=ml+"px";fb.style.height=(FOOTERH*s)+"px";}'
+        +'if(fb){var fp=document.getElementById("footer-pg");var fw=fp.offsetWidth||PW;var fs=Math.min(1,iw/fw);fp.style.transform="scale("+fs+")";fp.style.marginLeft=Math.max(0,(iw-fw*fs)/2)+"px";fb.style.height=(fp.offsetHeight*fs)+"px";}'
       +'}'
+      +'function curDev(){return window.innerWidth<=768?"mobile":"pc";}'
+      +'function devOk(el){var x=el.getAttribute("data-dev")||"both";var d=curDev();return x==="both"||x===d;}'
       +'function show(id){'
-        +'document.querySelectorAll(".pgwrap").forEach(function(wr){'
-          +'var on=wr.getAttribute("data-id")===id;'
-          +'wr.style.display=on?"block":"none";'
-        +'});'
+        +'document.querySelectorAll(".pgwrap").forEach(function(wr){wr.style.display=(wr.getAttribute("data-id")===id)?"block":"none";});'
         +'document.querySelectorAll("nav a").forEach(function(a){a.classList.toggle("active",a.getAttribute("data-id")===id);});'
         +'fit();window.scrollTo(0,0);'
       +'}'
+      +'function applyDevice(){'
+        +'document.querySelectorAll("nav a").forEach(function(a){a.style.display=devOk(a)?"":"none";});'
+        +'var cur=null;document.querySelectorAll(".pgwrap").forEach(function(w){if(w.style.display!=="none")cur=w;});'
+        +'if(!cur||!devOk(cur)){var first=null;'
+          +'document.querySelectorAll(".pgwrap[data-root=\\"1\\"]").forEach(function(w){if(!first&&devOk(w))first=w;});'
+          +'if(!first)document.querySelectorAll(".pgwrap").forEach(function(w){if(!first&&devOk(w))first=w;});'
+          +'if(first){show(first.getAttribute("data-id"));return;}}'
+        +'fit();'
+      +'}'
       +'document.querySelectorAll("nav a").forEach(function(a){a.addEventListener("click",function(ev){ev.preventDefault();show(a.getAttribute("data-id"));});});'
       +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'
-      +'window.addEventListener("resize",fit);window.addEventListener("load",fit);fit();'
+      +'window.addEventListener("resize",applyDevice);window.addEventListener("load",applyDevice);applyDevice();'
       +fxJs
       +'<\/script></body></html>';
   }

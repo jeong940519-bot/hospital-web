@@ -549,6 +549,7 @@
   <div class="pages" id="pages-panel">
     <div class="pages-hdr">
       <h4>페이지</h4>
+      <button id="dev-toggle" class="panel-col-btn" title="PC ↔ 모바일 전환" style="width:auto;padding:0 8px;font-size:11px;white-space:nowrap">💻 PC</button>
       <button id="tog-pages" class="panel-col-btn" title="패널 접기">◀</button>
     </div>
     <div class="pages-inner">
@@ -1045,6 +1046,10 @@ function importFontFile(file, onDone){
   r.readAsDataURL(file);
 }
 const PAGE_W = 1980, PAGE_H = 1400;
+const MOBILE_W = 430, MOBILE_H = 900;   // 모바일 전용 페이지 기본 크기
+let editorDevice = 'pc';                  // 편집 중인 디바이스: 'pc' | 'mobile'
+function pageDevice(p){ return p.device || 'both'; }
+function inDevice(p, dev){ const d=pageDevice(p); return d==='both' || d===dev; }
 // 템플릿은 1200 기준 좌표 → 현재 PAGE_W로 스케일
 function scaleEls(els, s){
   els.forEach(e=>{
@@ -1979,7 +1984,10 @@ document.getElementById('stage').addEventListener('mousedown', ev=>{
 // ───────────────────────── 렌더: 페이지 사이드바 ─────────────────────────
 function renderPages(){
   const list=document.getElementById('page-list'); list.innerHTML='';
+  const dt=document.getElementById('dev-toggle'); if(dt) dt.textContent=editorDevice==='mobile'?'📱 모바일':'💻 PC';
   project.pages.forEach((p,i)=>{
+    // 바(상단/하단)는 항상 표시, 그 외엔 현재 디바이스에 해당하는 것만
+    if(!p.isHeader && !p.isFooter && !inDevice(p, editorDevice)) return;
     const t=document.createElement('div');
     t.className='page-thumb'+(i===curPage?' active':'')+(p.isHeader||p.isFooter?' is-header':'');
     const dep=pageDepth(p); if(dep>0) t.style.marginLeft=(dep*12)+'px';
@@ -2153,6 +2161,16 @@ function renderPageProps(box){
   box.innerHTML += `<h4>발행 옵션 (사이트 전체)</h4><div class="grp"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="pg-smooth" ${project.smoothScroll?'checked':''}> 관성 부드러운 스크롤</label><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 페이지에서 스크롤이 미끄러지듯 따라옵니다. 모바일·접근성(動 줄이기) 사용자는 자동으로 일반 스크롤.</div></div>`;
   const smI=box.querySelector('#pg-smooth');
   if(smI) smI.addEventListener('change',()=>{ project.smoothScroll=smI.checked; save(true); snapshot(); toast(smI.checked?'부드러운 스크롤 켜짐 (발행 시 적용)':'부드러운 스크롤 꺼짐'); });
+  if(!p.isHeader && !p.isFooter){
+    const dev=pageDevice(p);
+    box.innerHTML += `<h4>표시 기기</h4><div class="grp"><select id="pg-device">
+      <option value="both" ${dev==='both'?'selected':''}>PC·모바일 공통</option>
+      <option value="pc" ${dev==='pc'?'selected':''}>PC 전용 (넓은 화면)</option>
+      <option value="mobile" ${dev==='mobile'?'selected':''}>모바일 전용 (좁은 화면)</option>
+    </select><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 시 화면 폭으로 자동 전환(≤768px=모바일). 모바일 전용은 폭을 430 등 좁게 권장.</div></div>`;
+    const devSel=box.querySelector('#pg-device');
+    if(devSel) devSel.addEventListener('change',()=>{ p.device=devSel.value; renderPages(); save(true); snapshot(); });
+  }
   // ── 섹션 관리 ──
   const secs=sortedSections(p);
   let secHtml=`<h4>섹션 <span style="color:var(--sub);font-weight:400;text-transform:none">(핀 고정·스크럽 구간)</span></h4>`;
@@ -2812,7 +2830,25 @@ document.getElementById('zoom-fit').onclick=()=>{ fitZoom(); updateRibbonState()
 // ───────────────────────── 버튼/단축키 ─────────────────────────
 document.getElementById('add-text').onclick=addText;
 document.getElementById('add-image').onclick=addImage;
-document.getElementById('add-page').onclick=openTplModal;
+document.getElementById('add-page').onclick=()=>{
+  if(editorDevice==='mobile'){
+    const np={ id:uid(), name:'모바일 페이지', device:'mobile', parentId:null, w:MOBILE_W, h:MOBILE_H, bg:'#ffffff', elements:[] };
+    project.pages.push(np); curPage=project.pages.length-1; selId=null; selIds=new Set(); afterMutate();
+    toast('모바일 페이지 추가됨 (430px 폭)');
+  } else openTplModal();
+};
+document.getElementById('dev-toggle').onclick=()=>{
+  editorDevice = editorDevice==='pc' ? 'mobile' : 'pc';
+  // 현재 페이지가 이 디바이스에 안 보이면, 보이는 첫 페이지로 이동
+  const cur=project.pages[curPage];
+  if(!cur || (!cur.isHeader && !cur.isFooter && !inDevice(cur, editorDevice))){
+    const idx=project.pages.findIndex(p=>!p.isHeader&&!p.isFooter&&inDevice(p,editorDevice));
+    if(idx>=0) curPage=idx;
+  }
+  selId=null; selIds=new Set();
+  renderCanvas(); renderPages(); renderProps(); updateRibbonState();
+  toast(editorDevice==='mobile'?'📱 모바일 편집 모드 — ＋페이지 추가 시 430px 모바일 페이지 생성':'💻 PC 편집 모드');
+};
 document.getElementById('add-header').onclick=addHeaderBar;
 document.getElementById('add-footer').onclick=addFooterBar;
 
