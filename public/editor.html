@@ -260,7 +260,16 @@
   .page-thumb .pname{position:absolute;bottom:0;left:0;right:0;font-size:10px;color:#445;background:#fffd;padding:2px 5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;z-index:2}
   /* 이펙트 패널 */
   .fx-section-title{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin:0 0 10px;font-weight:600}
-  .fx-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:16px}
+  .fx-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px}
+  .fx-cats{margin-bottom:14px}
+  .fx-cat-hd{display:flex;align-items:center;gap:8px;padding:10px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:9px;cursor:pointer;margin-bottom:6px;font-size:12.5px;font-weight:600;color:var(--text);user-select:none}
+  .fx-cat-hd:hover{border-color:var(--accent2)}
+  .fx-cat-hd.open{background:rgba(108,123,255,.14);border-color:var(--accent)}
+  .fx-cat-hd.has .fc-nm{color:var(--accent2)}
+  .fx-cat-hd .fc-ic{font-size:15px}
+  .fx-cat-hd .fc-nm{flex:1}
+  .fx-cat-hd .fc-cnt{font-size:11px;color:var(--sub);background:var(--panel);border-radius:10px;padding:1px 7px}
+  .fx-cat-hd .fc-arr{color:var(--sub);font-size:11px}
   .fx-card{position:relative;padding:9px 8px 8px;background:var(--panel2);border:1.5px solid var(--border);border-radius:9px;cursor:pointer;transition:border-color .15s,background .15s;text-align:center}
   .fx-card:hover{border-color:var(--accent2);background:#2b3050}
   .fx-card.on{border-color:var(--accent);background:rgba(108,123,255,.18)}
@@ -546,6 +555,7 @@
       <div id="page-list"></div>
       <button class="add-page" id="add-page">＋ 페이지 추가</button>
       <button class="add-page" id="add-header" style="margin-top:6px" title="모든 페이지 상단에 고정되는 바를 직접 디자인">📌 상단 고정 바</button>
+      <button class="add-page" id="add-footer" style="margin-top:6px" title="모든 페이지 하단에 붙는 바를 직접 디자인(고정X)">📎 하단 바</button>
       <button class="add-page" id="open-tpl-lib" style="margin-top:6px" title="저장한 템플릿을 불러오거나 현재 페이지를 저장">📁 내 템플릿</button>
     </div>
     <button id="exp-pages" class="panel-exp-btn" title="페이지 패널 펼치기"><span>페이지 ▶</span></button>
@@ -1087,6 +1097,19 @@ function addHeaderBar(){
   project.pages.unshift(hp); curPage=0; selId=null; selIds=new Set();
   afterMutate();
   toast('상단 바 생성됨 — 메뉴 글자를 선택하고 속성의 🔗에서 페이지를 연결하세요');
+}
+// 하단 바(직접 디자인하는 푸터) — 발행 시 모든 페이지 하단에 붙음(고정X), 배경색은 화면 끝까지 이어짐
+function addFooterBar(){
+  let fp=project.pages.find(p=>p.isFooter);
+  if(fp){ curPage=pageIndex(fp.id); selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); toast('하단 바 편집 중 — 배경색은 발행 시 화면 끝까지 이어집니다'); return; }
+  fp={ id:uid(), name:'하단 바', isFooter:true, parentId:null, w:PAGE_W, h:280, bg:'#1a2b5c', elements:[
+    tText(48,54,520,40,'새이름 병원',{fontSize:26,fontWeight:900,color:'#ffffff',align:'left'}),
+    tText(48,108,640,120,'부산광역시 ○○구 ○○로 123\n대표전화 051-000-0000\n평일 09:00–18:00 · 토 09:00–13:00 · 일·공휴일 휴진',{fontSize:16,color:'#cdd6ee',align:'left',lineHeight:1.7}),
+    tText(PAGE_W-360,200,320,28,'© 2026 새이름 병원. All rights reserved.',{fontSize:13,color:'#9aa8cf',align:'right'}),
+  ]};
+  project.pages.push(fp); curPage=project.pages.length-1; selId=null; selIds=new Set();
+  afterMutate();
+  toast('하단 바 생성됨 — 배경색을 바꾸면 발행 시 화면 양끝까지 그 색이 이어집니다');
 }
 
 // ───────────────────────── 내장 템플릿 ─────────────────────────
@@ -1958,10 +1981,10 @@ function renderPages(){
   const list=document.getElementById('page-list'); list.innerHTML='';
   project.pages.forEach((p,i)=>{
     const t=document.createElement('div');
-    t.className='page-thumb'+(i===curPage?' active':'')+(p.isHeader?' is-header':'');
+    t.className='page-thumb'+(i===curPage?' active':'')+(p.isHeader||p.isFooter?' is-header':'');
     const dep=pageDepth(p); if(dep>0) t.style.marginLeft=(dep*12)+'px';
-    const _pn = p.isHeader ? ('📌 '+escapeHtml(p.name||'상단 바')) : ((dep>0?'↳ ':'')+escapeHtml(p.name||'페이지'));
-    t.innerHTML=`<span class="num">${p.isHeader?'바':i+1}</span><div class="mini"></div><div class="pname">${_pn}</div>`;
+    const _pn = p.isHeader ? ('📌 '+escapeHtml(p.name||'상단 바')) : p.isFooter ? ('📎 '+escapeHtml(p.name||'하단 바')) : ((dep>0?'↳ ':'')+escapeHtml(p.name||'페이지'));
+    t.innerHTML=`<span class="num">${p.isHeader||p.isFooter?'바':i+1}</span><div class="mini"></div><div class="pname">${_pn}</div>`;
     if(project.pages.length>1){
       const del=document.createElement('button'); del.className='del'; del.textContent='×';
       del.addEventListener('click',ev=>{ ev.stopPropagation(); project.pages.splice(i,1); if(curPage>=project.pages.length)curPage=project.pages.length-1; afterMutate(); });
@@ -2107,7 +2130,7 @@ function renderProps(){
       <button data-stva="bottom" class="${_sva==='bottom'?'on':''}">아래 ⤓</button></div></div>`;
   }
   // 링크 (클릭 시 이동) — 모든 요소 공통
-  const others = project.pages.filter(p=>p.id!==page().id && !p.isHeader);
+  const others = project.pages.filter(p=>p.id!==page().id && !p.isHeader && !p.isFooter);
   html += `<div class="grp"><label>🔗 클릭 시 이동 (링크)</label>
     <select id="el-link">
       <option value="">없음</option>
@@ -2319,6 +2342,15 @@ const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-s
   'hover-lift':'🖐','hover-glow':'✨','hover-tilt':'🃏','hover-grow':'➕','hover-sink':'⬇',
   'hover-rotate':'🔄','hover-bright':'🔆','hover-border':'⬜','hover-dim':'🌑','hover-float':'🎈',
   'hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
+const FX_CATS=[
+  {name:'진입 (스크롤 등장)', icon:'📥', keys:['scroll-reveal','char-reveal','fade-in','slide-down','slide-left','slide-right','pop-in','mask-wipe','mask-wipe-l','blur-in','skew-in','flip-in','flip-y','zoom-in','zoom-out','bounce-in']},
+  {name:'스크롤 연동', icon:'📈', keys:['parallax','scroll-scrub','sticky']},
+  {name:'상시 움직임 (루프)', icon:'🔁', keys:['float','pulse','spin','wobble','gradient-flow','marquee','shake','heartbeat','tada','swing','glow-loop','blink']},
+  {name:'호버 (마우스)', icon:'🖱', keys:['hover-lift','hover-glow','hover-tilt','hover-grow','hover-sink','hover-rotate','hover-bright','hover-border','hover-dim','hover-float','hover-zoom']},
+  {name:'인터랙션', icon:'🧩', keys:['hover-show','hover-hide','tab-trigger','tab-content','hover-expand']},
+  {name:'콘텐츠', icon:'🎞', keys:['counter','slider','bg-video']},
+];
+let _fxCat=null;
 const _mkDesc=(result,tip,steps)=>({result,tip,steps:steps||['요소를 선택','이 효과를 적용 (설정값 없이 바로 적용)','화면에 들어오면 재생됩니다']});
 const FX_DESC={
   'mask-wipe':_mkDesc('이미지/요소가 아래에서 위로 커튼 걷히듯 드러납니다.','💡 큰 사진·배너에 쓰면 고급스럽게 등장'),
@@ -2427,17 +2459,28 @@ function renderFxPanel(){
   const selType = _fxPending!==null ? _fxPending : ft;
   const isPending = _fxPending!==null && _fxPending!==ft;
 
-  // 효과 카드 그리드
+  // 효과 카드 — 카테고리 폴더(아코디언)
   let cards=`<p class="fx-section-title">효과 선택</p>`;
   cards+=`<button class="fx-none${selType===''?' on':''}" id="fx-none">없음 (효과 제거)</button>`;
-  cards+=`<div class="fx-grid">`;
-  for(const k in FX_NAMES){
-    cards+=`<div class="fx-card${selType===k?' on':''}" data-fx="${k}">
-      <button class="fc-info" data-fxi="${k}" title="설명 보기">ⓘ</button>
-      <span class="fc-icon">${FX_ICONS[k]}</span>
-      <span class="fc-name">${FX_NAMES[k]}</span>
-    </div>`;
-  }
+  let openCat=_fxCat;
+  if(_fxCat==null && selType){ const c=FX_CATS.find(c=>c.keys.includes(selType)); if(c) openCat=c.name; }
+  if(openCat==null) openCat=FX_CATS[0].name;
+  cards+=`<div class="fx-cats">`;
+  FX_CATS.forEach(cat=>{
+    const isOpen=cat.name===openCat, has=cat.keys.includes(selType);
+    cards+=`<div class="fx-cat-hd${isOpen?' open':''}${has?' has':''}" data-fxcat="${cat.name}"><span class="fc-ic">${cat.icon}</span><span class="fc-nm">${cat.name}</span><span class="fc-cnt">${cat.keys.length}</span><span class="fc-arr">${isOpen?'▾':'▸'}</span></div>`;
+    if(isOpen){
+      cards+=`<div class="fx-grid">`;
+      cat.keys.forEach(k=>{ if(!FX_NAMES[k]) return;
+        cards+=`<div class="fx-card${selType===k?' on':''}" data-fx="${k}">
+          <button class="fc-info" data-fxi="${k}" title="설명 보기">ⓘ</button>
+          <span class="fc-icon">${FX_ICONS[k]}</span>
+          <span class="fc-name">${FX_NAMES[k]}</span>
+        </div>`;
+      });
+      cards+=`</div>`;
+    }
+  });
   cards+=`</div>`;
   // 적용 버튼 바 (선택이 변경됐을 때만 표시)
   if(isPending || (_fxPending===''&&ft)){
@@ -2592,6 +2635,9 @@ function renderFxPanel(){
   box.innerHTML=cards+descHtml+opts;
 
   // 카드 클릭 → pending 상태로만 (즉시 적용 안 함)
+  box.querySelectorAll('.fx-cat-hd').forEach(h=>{
+    h.addEventListener('click',()=>{ _fxCat = (h.dataset.fxcat===openCat) ? '__none__' : h.dataset.fxcat; renderFxPanel(); });
+  });
   box.querySelectorAll('.fx-card').forEach(c=>{
     c.addEventListener('click',ev=>{
       if(ev.target.closest('.fc-info')) return;
@@ -2768,6 +2814,7 @@ document.getElementById('add-text').onclick=addText;
 document.getElementById('add-image').onclick=addImage;
 document.getElementById('add-page').onclick=openTplModal;
 document.getElementById('add-header').onclick=addHeaderBar;
+document.getElementById('add-footer').onclick=addFooterBar;
 
 // ── 도형 피커 (PPT식 카테고리 갤러리) ──
 function shapeIconStyle(k){

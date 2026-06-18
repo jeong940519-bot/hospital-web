@@ -39,7 +39,14 @@
     '[data-fx-anim="zin"]{opacity:0;transform:scale(.7)}',
     '[data-fx-anim="zout"]{opacity:0;transform:scale(1.18)}',
     '[data-fx-anim="bounce"]{opacity:0;transform:translateY(40px)}',
+    '[data-fx-anim="fade"]{opacity:0}',
+    '[data-fx-anim="sdown"]{opacity:0;transform:translateY(-44px)}',
+    '[data-fx-anim="sright"]{opacity:0;transform:translateX(-56px)}',
+    '[data-fx-anim="sleft"]{opacity:0;transform:translateX(56px)}',
+    '[data-fx-anim="flipy"]{opacity:0;transform:perspective(800px) rotateY(60deg);transform-origin:left center}',
+    '[data-fx-anim="pop"]{opacity:0;transform:scale(.4)}',
     '[data-fx-anim].fx-anim-in{opacity:1;transform:none;filter:none;clip-path:inset(0 0 0 0)}',
+    '[data-fx-anim="pop"].fx-anim-in{transition:opacity .45s,transform .6s cubic-bezier(.34,1.56,.64,1)}',
     '[data-fx-anim="bounce"].fx-anim-in{transition:opacity .5s,transform .7s cubic-bezier(.34,1.56,.64,1)}',
     // ── 상시 루프 (data-fx-loop, 순수 CSS) ──
     '@keyframes fx-float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}',
@@ -55,6 +62,18 @@
     '[data-fx-loop="grad"]{background-size:220% 220%!important;animation:fx-grad 7s linear infinite}',
     '[data-fx-loop="marquee"]{overflow:hidden}',
     '[data-fx-loop="marquee"]>div{white-space:nowrap!important;display:inline-block!important;animation:fx-marquee 13s linear infinite}',
+    '@keyframes fx-shake{0%,92%,100%{transform:translateX(0)}94%{transform:translateX(-6px)}96%{transform:translateX(6px)}98%{transform:translateX(-4px)}}',
+    '@keyframes fx-heart{0%,40%,100%{transform:scale(1)}10%{transform:scale(1.14)}25%{transform:scale(1.14)}}',
+    '@keyframes fx-tada{0%,100%{transform:scale(1) rotate(0)}10%,20%{transform:scale(.93) rotate(-3deg)}30%,50%,70%,90%{transform:scale(1.08) rotate(3deg)}40%,60%,80%{transform:scale(1.08) rotate(-3deg)}}',
+    '@keyframes fx-swing{0%,100%{transform:rotate(0)}20%{transform:rotate(9deg)}40%{transform:rotate(-7deg)}60%{transform:rotate(5deg)}80%{transform:rotate(-3deg)}}',
+    '@keyframes fx-glow{0%,100%{box-shadow:0 0 6px rgba(108,123,255,.35)}50%{box-shadow:0 0 26px rgba(108,123,255,.85)}}',
+    '@keyframes fx-blink{0%,100%{opacity:1}50%{opacity:.35}}',
+    '[data-fx-loop="shake"]{animation:fx-shake 3.6s ease-in-out infinite}',
+    '[data-fx-loop="heart"]{animation:fx-heart 2.2s ease-in-out infinite}',
+    '[data-fx-loop="tada"]{animation:fx-tada 3.4s ease-in-out infinite}',
+    '[data-fx-loop="swing"]{transform-origin:top center;animation:fx-swing 3s ease-in-out infinite}',
+    '[data-fx-loop="glowloop"]{animation:fx-glow 2.2s ease-in-out infinite}',
+    '[data-fx-loop="blink"]{animation:fx-blink 1.6s ease-in-out infinite}',
     // ── 호버 마이크로 인터랙션 (data-fx-hover, 순수 CSS) ──
     '[data-fx-hover]{transition:transform .25s ease,box-shadow .25s ease,filter .25s ease}',
     '[data-fx-hover="lift"]:hover{transform:translateY(-8px);box-shadow:0 16px 34px rgba(0,0,0,.20)}',
@@ -62,6 +81,11 @@
     '[data-fx-hover="tilt"]:hover{transform:perspective(600px) rotateX(6deg) rotateY(-6deg)}',
     '[data-fx-hover="grow"]:hover{transform:scale(1.06)}',
     '[data-fx-hover="sink"]:hover{transform:translateY(4px);filter:brightness(.94)}',
+    '[data-fx-hover="rotate"]:hover{transform:rotate(4deg) scale(1.03)}',
+    '[data-fx-hover="bright"]:hover{filter:brightness(1.15)}',
+    '[data-fx-hover="border"]:hover{box-shadow:0 0 0 3px #6c7bff}',
+    '[data-fx-hover="dim"]:hover{filter:brightness(.8)}',
+    '[data-fx-hover="float-h"]:hover{transform:translateY(-8px) scale(1.03);box-shadow:0 18px 36px rgba(0,0,0,.22)}',
   ].join('');
 
   /* ── 효과 JS 블록 (사용된 것만 삽입) ── */
@@ -79,9 +103,9 @@
   };
   FX_JS['anim']='(function(){var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add("fx-anim-in");io.unobserve(e.target);}});},{threshold:0.15});document.querySelectorAll("[data-fx-anim]").forEach(function(el){el.style.transitionDelay=(el.dataset.fxDelay||0)+"ms";io.observe(el);});})();';
   // 새 효과 타입 → data 속성 매핑
-  var FX_ANIM={'mask-wipe':'mask','mask-wipe-l':'maskL','rotate-in':'rot','blur-in':'blur','skew-in':'skew','flip-in':'flip','zoom-in':'zin','zoom-out':'zout','bounce-in':'bounce'};
-  var FX_LOOP={'float':'float','pulse':'pulse','spin':'spin','wobble':'wobble','gradient-flow':'grad','marquee':'marquee'};
-  var FX_HOVER={'hover-lift':'lift','hover-glow':'glow','hover-tilt':'tilt','hover-grow':'grow','hover-sink':'sink'};
+  var FX_ANIM={'mask-wipe':'mask','mask-wipe-l':'maskL','rotate-in':'rot','blur-in':'blur','skew-in':'skew','flip-in':'flip','zoom-in':'zin','zoom-out':'zout','bounce-in':'bounce','fade-in':'fade','slide-down':'sdown','slide-right':'sright','slide-left':'sleft','flip-y':'flipy','pop-in':'pop'};
+  var FX_LOOP={'float':'float','pulse':'pulse','spin':'spin','wobble':'wobble','gradient-flow':'grad','marquee':'marquee','shake':'shake','heartbeat':'heart','tada':'tada','swing':'swing','glow-loop':'glowloop','blink':'blink'};
+  var FX_HOVER={'hover-lift':'lift','hover-glow':'glow','hover-tilt':'tilt','hover-grow':'grow','hover-sink':'sink','hover-rotate':'rotate','hover-bright':'bright','hover-border':'border','hover-dim':'dim','hover-float':'float-h'};
   function _ytId(u){ var m=String(u).match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/); return m?m[1]:String(u); }
   function bgVideoHtml(fx){
     var src=fx.src||''; if(!src) return '';
@@ -232,8 +256,8 @@
   function buildSiteHtml(project, PAGE_W){
     PAGE_W = PAGE_W||(project.pages[0]&&project.pages[0].w)||1200;
     // 상단 고정 바(직접 디자인한 헤더) 분리
-    var headerPage = null, contentPages = [];
-    project.pages.forEach(function(p){ if(p.isHeader && !headerPage) headerPage=p; else contentPages.push(p); });
+    var headerPage = null, footerPage = null, contentPages = [];
+    project.pages.forEach(function(p){ if(p.isHeader && !headerPage) headerPage=p; else if(p.isFooter && !footerPage) footerPage=p; else contentPages.push(p); });
     var firstId = contentPages[0]?contentPages[0].id:'';
     var roots = contentPages.filter(function(p){return !p.parentId;});
     var title = esc((roots[0]&&roots[0].name)||(contentPages[0]&&contentPages[0].name)||'홈페이지');
@@ -285,6 +309,13 @@
       var hEls=headerPage.elements.map(renderElStatic).join('');
       topbarHtml='<div id="topbar" style="position:fixed;top:0;left:0;width:100%;z-index:300;overflow:hidden;background:'+headerPage.bg+';box-shadow:0 1px 10px rgba(0,0,0,.12)"><div class="pg" id="topbar-pg" style="width:'+headerPage.w+'px;height:'+headerH+'px;background:'+headerPage.bg+';transform-origin:top left">'+hEls+'</div></div>';
     }
+    // 하단 바 — 모든 페이지 하단(고정X). 배경색은 화면 끝까지 이어짐(full-width)
+    var footerHtml='', footerH=0;
+    if(footerPage){
+      footerH=footerPage.h;
+      var fEls=footerPage.elements.map(renderElStatic).join('');
+      footerHtml='<div id="footerbar" style="width:100%;overflow:hidden;background:'+footerPage.bg+'"><div class="pg" id="footer-pg" style="width:'+footerPage.w+'px;height:'+footerH+'px;background:'+footerPage.bg+';transform-origin:top left">'+fEls+'</div></div>';
+    }
 
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
     var hasAf=false; project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.autofit)hasAf=true;});});
@@ -321,8 +352,8 @@
       +'.el{position:absolute}'
       +FX_CSS
       +'</style></head>'
-      +'<body>'+topbarHtml+(menu?'<nav>'+menu+'</nav>':'')+pagesHtml
-      +'<script>var PW='+PAGE_W+';var HEADERH='+headerH+';'
+      +'<body>'+topbarHtml+(menu?'<nav>'+menu+'</nav>':'')+pagesHtml+footerHtml
+      +'<script>var PW='+PAGE_W+';var HEADERH='+headerH+';var FOOTERH='+footerH+';'
       +'function fit(){'
         +'var s=Math.min(1,window.innerWidth/PW);window.__pgScale=s;'
         +'var ml=Math.max(0,(window.innerWidth-PW*s)/2);'
@@ -337,6 +368,8 @@
         +'});'
         +'var tb=document.getElementById("topbar");'
         +'if(tb){var tp=document.getElementById("topbar-pg");tp.style.transform="scale("+s+")";tp.style.marginLeft=Math.max(0,(window.innerWidth-PW*s)/2)+"px";var hh=HEADERH*s;tb.style.height=hh+"px";document.body.style.paddingTop=hh+"px";}'
+        +'var fb=document.getElementById("footerbar");'
+        +'if(fb){var fp=document.getElementById("footer-pg");fp.style.transform="scale("+s+")";fp.style.marginLeft=ml+"px";fb.style.height=(FOOTERH*s)+"px";}'
       +'}'
       +'function show(id){'
         +'document.querySelectorAll(".pgwrap").forEach(function(wr){'
