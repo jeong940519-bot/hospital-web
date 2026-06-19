@@ -3622,7 +3622,7 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 - 한 요소에 fx 1개(루프 중복 금지). 진입+호버는 함께 OK. 사용자가 "과하게/화려하게" 안 했으면 절제(병원=차분/신뢰).
 - "효과 다 넣어줘" 같은 요청도 무분별하게 전부 넣지 말고 위 규칙대로 의미 있는 곳에만.
 
-반드시 JSON만 응답: {"reply":"한국어설명","actions":[...]}`;
+반드시 JSON만 응답: {"reply":"한국어설명","actions":[...]}`+deviceHint();
 
   const thinking=chatMsg('assistant','생각 중…');
   const sendBtn=document.getElementById('ai-chat-send');
@@ -3698,7 +3698,7 @@ async function runAiFx(desc){
  {"type":"update_element","id":"b1","fx":{"type":"pulse"}}
 ]}
 ${desc?`★ 사용자 요청 최우선 반영: "${desc}" (요청 톤·지정/제외 효과를 우선)`:'요청이 없으면 위 "차분/신뢰" 프리셋을 기본으로.'}
-출력은 JSON 하나만: {"reply":"한국어 한두 문장","actions":[{"type":"update_element","id":"요소ID","fx":{...}}]}`;
+출력은 JSON 하나만: {"reply":"한국어 한두 문장","actions":[{"type":"update_element","id":"요소ID","fx":{...}}]}`+deviceHint();
   const scope = selIds.size ? new Set(selIds) : null;
   const sysScoped = scope ? sys + '\n\n★중요: 위 컨텍스트의 ★선택된 섹션★ 요소들에만 fx를 적용하라. 그 외 요소는 actions에 절대 포함하지 마라.' : sys;
   const ctx=buildAiCtx(scope)+(desc?`\n\n[사용자 요청] ${desc}`:'');
@@ -3736,12 +3736,21 @@ async function aiCall(system, content, maxTokens){
   return parsed;
 }
 function _aiErr(e){ const m=e.message||String(e); return m.includes('unauthenticated')?'로그인이 필요합니다':(m.includes('resource-exhausted')||m.includes('크레딧'))?'AI 크레딧 소진':m; }
+// 현재 페이지가 모바일이면 AI 프롬프트에 붙일 컨텍스트
+function deviceHint(){
+  const p=page();
+  if(pageDevice(p)==='mobile' || (!p.isHeader && !p.isFooter && p.w<=560)){
+    const cw=p.w-48;
+    return `\n[중요·모바일 페이지] 이 페이지는 모바일 화면(폭 ${p.w}px)이다. 다음을 반드시 지켜라:\n- 요소는 세로 1열로 쌓는다(가로 나란히 배치 금지). 좌우 여백 24px → 콘텐츠 폭 약 ${cw}px.\n- 텍스트·버튼·카드·이미지는 대체로 풀폭(x≈24, w≈${cw}).\n- 글자 크기는 모바일 가독성: 큰 제목 28~40, 소제목 20~26, 본문 16~18.\n- 터치 버튼 높이는 ≥44px. 좌표·크기는 0~${p.w} 안.\n- 새 요소를 추가하거나 위치를 정할 때 이 규칙을 적용한다.`;
+  }
+  return '';
+}
 
 // ── AI 카피 작성/다듬기 (선택 텍스트) ──
 async function runAiCopy(e, instr){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   if(!e||e.type!=='text') return;
-  const sys=`너는 병원 홈페이지 카피라이터다. 주어진 문구를 지시에 맞게 한국어로 다시 쓴다. 줄바꿈(\\n)은 필요하면 유지. 과장·허위 의료광고 표현은 피한다. 오직 JSON: {"text":"새 문구"}`;
+  const sys=`너는 병원 홈페이지 카피라이터다. 주어진 문구를 지시에 맞게 한국어로 다시 쓴다. 줄바꿈(\\n)은 필요하면 유지. 과장·허위 의료광고 표현은 피한다. 오직 JSON: {"text":"새 문구"}`+deviceHint();
   const content=`현재 문구:\n"""${e.text||'(비어있음)'}"""\n\n지시: ${instr}\n같은 자리에 쓸 자연스러운 문구로 다시 써줘. 현재 문구가 비어있으면 지시 내용으로 새로 작성.`;
   toast('AI가 문구를 작성 중…');
   try{ const r=await aiCall(sys,content,1200); if(r.text!=null){ e.text=String(r.text); e._caseOrig=null; liveStyleEl(e); applyAutofits(); renderProps(); snapshot(); toast('문구 적용됨 ✨'); } else toast('결과가 비어있습니다'); }
@@ -3763,7 +3772,7 @@ document.getElementById('aicolor-go').onclick=async()=>{
 - 텍스트는 배경 대비 충분히(가독성). 본문은 어둡게, 강조/버튼은 포인트색.
 - 색은 #RRGGBB. 과하지 않게 2~3색 + 중성색 기조.
 ${desc?`★ 분위기 요청 우선 반영: "${desc}"`:''}
-출력 JSON 하나만: {"reply":"한줄설명","actions":[{"type":"update_element","id":"ID","props":{"fill":"#hex"또는"color":"#hex"}},{"type":"update_page","props":{"bg":"#hex"}}]}`;
+출력 JSON 하나만: {"reply":"한줄설명","actions":[{"type":"update_element","id":"ID","props":{"fill":"#hex"또는"color":"#hex"}},{"type":"update_page","props":{"bg":"#hex"}}]}`+deviceHint();
   const go=document.getElementById('aicolor-go'); go.disabled=true; go.textContent='🎨 구성 중…'; aicolorStatus('AI가 색감을 구성 중…');
   try{
     const parsed=await aiCall(sys, buildAiCtx()+(desc?`\n\n[분위기] ${desc}`:''), 4000);
@@ -3785,7 +3794,7 @@ document.getElementById('aireview-run').onclick=async()=>{
   const p=page(); if(!p.elements.length){ aireviewStatus('요소가 없습니다'); return; }
   const sys=`너는 병원 홈페이지 UI/UX 검수 전문가다. 현재 페이지를 점검하고 개선점을 제시한다.
 점검 항목: 텍스트-배경 대비/가독성, 글자 크기 균형, 요소 정렬·간격, 여백, 색 통일감, 빈/겹친 요소.
-출력 JSON 하나만: {"review":"발견한 문제와 제안을 항목별로 한국어로 (•머리표, 4~7줄)","actions":[{"type":"update_element","id":"ID","props":{...}} ... 자동 적용 가능한 구체 수정만, 없으면 빈 배열]}`;
+출력 JSON 하나만: {"review":"발견한 문제와 제안을 항목별로 한국어로 (•머리표, 4~7줄)","actions":[{"type":"update_element","id":"ID","props":{...}} ... 자동 적용 가능한 구체 수정만, 없으면 빈 배열]}`+deviceHint();
   const btn=document.getElementById('aireview-run'); btn.disabled=true; btn.textContent='🔎 점검 중…'; aireviewStatus('AI가 페이지를 점검 중…');
   try{
     const parsed=await aiCall(sys, buildAiCtx(), 3000);
