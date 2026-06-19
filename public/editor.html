@@ -1591,6 +1591,66 @@ function renderCanvas(){
     addHandles(canvas.querySelector(`[data-id="${selId}"]`), se);
   }
   applyAutofits();
+  renderHambOnCanvas();
+}
+// ── 햄버거 메뉴: 캔버스에서 보면서 편집 (상단 바 페이지에서) ──
+let _hambOpen=false;
+function renderHambOnCanvas(){
+  const old=document.getElementById('hamb-menu'); if(old) old.remove();
+  const p=page(); if(!p.isHeader){ _hambOpen=false; return; }
+  const cfg=hamburgerCfg();
+  const btn=document.createElement('div'); btn.id='hamb-btn';
+  const sz=Math.min(40, p.h-12);
+  btn.style.cssText=`position:absolute;top:${Math.round((p.h-sz)/2)}px;right:16px;width:${sz+10}px;height:${sz}px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 9px;cursor:pointer;z-index:80;border-radius:8px;box-sizing:border-box${_hambOpen?';outline:2px solid var(--accent)':''}`;
+  const bc=cfg.btnColor||'#1a2b5c';
+  btn.innerHTML=`<span style="height:3px;background:${bc};border-radius:2px"></span><span style="height:3px;background:${bc};border-radius:2px"></span><span style="height:3px;background:${bc};border-radius:2px"></span>`;
+  btn.title='클릭: 햄버거 메뉴 편집';
+  btn.addEventListener('mousedown',ev=>ev.stopPropagation());
+  btn.addEventListener('click',ev=>{ ev.stopPropagation(); _hambOpen=!_hambOpen; renderCanvas(); });
+  canvas.appendChild(btn);
+  if(_hambOpen) canvasWrap.appendChild(buildHambMenu());
+}
+function buildHambMenu(){
+  const p=page(), cfg=hamburgerCfg(), items=hamburgerMaterialize(), roots=hamburgerRootPages();
+  const pw=Math.min(360,p.w-16);
+  const panel=document.createElement('div'); panel.id='hamb-menu';
+  panel.style.cssText=`position:absolute;top:${p.h+6}px;left:${Math.max(0,p.w-pw-8)}px;width:${pw}px;max-height:520px;overflow:auto;background:${cfg.bg||'#ffffff'};box-shadow:0 16px 40px rgba(0,0,0,.3);border-radius:12px;z-index:81;padding:12px;box-sizing:border-box`;
+  panel.addEventListener('mousedown',ev=>ev.stopPropagation());
+  panel.addEventListener('click',ev=>ev.stopPropagation());
+  let html=`<div style="display:flex;align-items:center;margin-bottom:10px"><b style="flex:1;color:${cfg.color||'#1a2b5c'};font-size:14px">☰ 메뉴 항목</b><button id="hmx-close" style="border:none;background:none;font-size:18px;cursor:pointer;color:#888;line-height:1">✕</button></div>`;
+  items.forEach((it,idx)=>{
+    html+=`<div class="hmx-item" data-idx="${idx}" style="border:1px solid #e6e6ee;border-radius:9px;padding:8px;margin-bottom:7px;background:#fff">
+      <div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">
+        <span style="cursor:default;color:#bbb;font-size:13px">≡</span>
+        <input class="hmx-name" value="${escapeHtml(it.name||'')}" placeholder="메뉴 이름" style="flex:1;padding:6px 9px;border:1px solid #ddd;border-radius:6px;font-size:13px;color:#222">
+        <button class="hmx-up" title="위로" style="border:1px solid #ddd;background:#fff;border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▲</button>
+        <button class="hmx-down" title="아래로" style="border:1px solid #ddd;background:#fff;border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▼</button>
+        <button class="hmx-del" title="삭제" style="border:none;background:none;color:#e05a7a;cursor:pointer;font-size:14px">✕</button>
+      </div>
+      <select class="hmx-link" style="width:100%;padding:6px 9px;border:1px solid #ddd;border-radius:6px;font-size:12px;color:#444">
+        ${roots.map(r=>`<option value="${r.id}" ${it.link===r.id?'selected':''}>→ ${escapeHtml(r.name||'페이지')}</option>`).join('')}
+      </select>
+    </div>`;
+  });
+  html+=`<button id="hmx-add" style="width:100%;padding:9px;border:1px dashed #c9c9d6;background:#fafaff;border-radius:8px;cursor:pointer;color:#556;font-size:13px;margin-bottom:8px">＋ 메뉴 항목 추가</button>`;
+  html+=`<div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888"><span>색상</span>
+    <button type="button" class="panel-cbtn" data-cpkey="hmBtn" title="☰ 버튼 색"><span style="background:${cfg.btnColor||'#1a2b5c'}"></span></button>
+    <button type="button" class="panel-cbtn" data-cpkey="hmBg" title="메뉴 배경"><span style="background:${cfg.bg||'#ffffff'}"></span></button>
+    <button type="button" class="panel-cbtn" data-cpkey="hmColor" title="메뉴 글자색"><span style="background:${cfg.color||'#1a2b5c'}"></span></button>
+  </div>`;
+  panel.innerHTML=html;
+  panel.querySelector('#hmx-close').addEventListener('click',()=>{ _hambOpen=false; renderCanvas(); });
+  panel.querySelectorAll('.hmx-item').forEach(row=>{
+    const idx=+row.dataset.idx;
+    row.querySelector('.hmx-name').addEventListener('input',e2=>{ hamburgerMaterialize()[idx].name=e2.target.value; save(true); });
+    row.querySelector('.hmx-name').addEventListener('change',snapshot);
+    row.querySelector('.hmx-link').addEventListener('change',e2=>{ hamburgerMaterialize()[idx].link=e2.target.value; save(true); snapshot(); });
+    row.querySelector('.hmx-up').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx>0){ [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; save(true); snapshot(); renderCanvas(); } });
+    row.querySelector('.hmx-down').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx<a.length-1){ [a[idx+1],a[idx]]=[a[idx],a[idx+1]]; save(true); snapshot(); renderCanvas(); } });
+    row.querySelector('.hmx-del').addEventListener('click',()=>{ const a=hamburgerMaterialize(); a.splice(idx,1); save(true); snapshot(); renderCanvas(); });
+  });
+  panel.querySelector('#hmx-add').addEventListener('click',()=>{ const a=hamburgerMaterialize(); const r=roots[0]; a.push({name:r?r.name:'새 메뉴', link:r?r.id:''}); save(true); snapshot(); renderCanvas(); });
+  return panel;
 }
 // 텍스트 autofit — 상자에 넘치면 글자 크기를 줄여 맞춤(저장값은 최대치 유지)
 function fitTextNode(node,e){
@@ -2015,6 +2075,7 @@ function startEdit(node,e){
 // 캔버스 빈 곳 클릭/드래그 → 마퀴 선택
 canvas.addEventListener('mousedown', ev=>{
   if(ev.button!==0) return;
+  if(_hambOpen){ _hambOpen=false; renderCanvas(); }
   if(ev.target !== canvas && ev.target.id !== 'marquee') return; // 요소 위면 무시
   ev.preventDefault();
   if(!ev.ctrlKey&&!ev.metaKey&&!ev.shiftKey){
@@ -2058,6 +2119,14 @@ document.getElementById('stage').addEventListener('mousedown', ev=>{
 
 // ───────────────────────── 렌더: 페이지 사이드바 ─────────────────────────
 let _dragPage=null;
+// 콘텐츠 페이지를 '하단 바(isFooter)' 위에 삽입 (없으면 끝). curPage도 그 페이지로.
+function addContentPage(pg){
+  let fi=project.pages.findIndex(p=>p.isFooter);
+  if(fi<0) fi=project.pages.length;
+  project.pages.splice(fi,0,pg);
+  curPage=project.pages.indexOf(pg); selId=null; selIds=new Set();
+  return pg;
+}
 function reorderPage(fromId, toId){
   if(!fromId || fromId===toId) return;
   const fi=project.pages.findIndex(p=>p.id===fromId); if(fi<0) return;
@@ -2068,12 +2137,20 @@ function reorderPage(fromId, toId){
   if(curId) curPage=project.pages.findIndex(p=>p.id===curId);
   afterMutate();
 }
+// 현재 디바이스에 표시할 바(상단/하단) 1개 선택 — 발행 pickBar와 동일 우선순위(기기전용 > 공통 > 아무거나)
+function barForDevice(isFooterFlag, dev){
+  const bars=project.pages.filter(p=> isFooterFlag?p.isFooter:p.isHeader);
+  return bars.find(p=>p.device===dev) || bars.find(p=>(p.device||'both')==='both') || bars[0] || null;
+}
 function renderPages(){
   const list=document.getElementById('page-list'); list.innerHTML='';
   const dt=document.getElementById('dev-toggle'); if(dt) dt.textContent=editorDevice==='mobile'?'📱 모바일':'💻 PC';
+  const hdrShown=barForDevice(false, editorDevice), ftrShown=barForDevice(true, editorDevice);
   project.pages.forEach((p,i)=>{
-    // 현재 디바이스에 해당하는 페이지/바만 표시 (바도 device 플래그로 거름)
-    if(!inDevice(p, editorDevice)) return;
+    // 바는 현재 디바이스에 맞는 1개만, 일반 페이지는 device로 거름
+    if(p.isHeader){ if(p!==hdrShown) return; }
+    else if(p.isFooter){ if(p!==ftrShown) return; }
+    else if(!inDevice(p, editorDevice)) return;
     const t=document.createElement('div');
     t.className='page-thumb'+(i===curPage?' active':'')+(p.isHeader||p.isFooter?' is-header':'');
     const dep=pageDepth(p); if(dep>0) t.style.marginLeft=(dep*12)+'px';
@@ -2091,6 +2168,17 @@ function renderPages(){
     const scale = _thumbW/p.w; mini.style.transform=`scale(${scale})`;
     p.elements.forEach(e=>{ const n=renderEl({...e,id:'_'+e.id}); n.style.pointerEvents='none'; n.classList.remove('selected'); mini.appendChild(n); });
     t.addEventListener('click',()=>{ curPage=i; selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); });
+    // 더블클릭 → 이름 인라인 편집
+    const pnameEl=t.querySelector('.pname'); pnameEl.title='더블클릭하면 이름 변경';
+    pnameEl.addEventListener('dblclick',ev=>{
+      ev.stopPropagation();
+      t.draggable=false;
+      pnameEl.textContent=p.name||'페이지'; pnameEl.contentEditable=true; pnameEl.style.cursor='text'; pnameEl.style.background='var(--panel)'; pnameEl.style.outline='1px solid var(--accent)';
+      const r=document.createRange(); r.selectNodeContents(pnameEl); const s=window.getSelection(); s.removeAllRanges(); s.addRange(r); pnameEl.focus();
+      const finish=()=>{ pnameEl.contentEditable=false; t.draggable=true; const nm=pnameEl.textContent.trim()||'페이지'; pnameEl.removeEventListener('blur',finish); pnameEl.removeEventListener('keydown',onKey); p.name=nm; save(true); renderPages(); renderProps(); };
+      const onKey=e2=>{ if(e2.key==='Enter'){ e2.preventDefault(); pnameEl.blur(); } else if(e2.key==='Escape'){ pnameEl.removeEventListener('blur',finish); pnameEl.removeEventListener('keydown',onKey); pnameEl.contentEditable=false; t.draggable=true; renderPages(); } };
+      pnameEl.addEventListener('blur',finish); pnameEl.addEventListener('keydown',onKey);
+    });
     // 드래그앤드롭 순서 변경
     t.draggable=true;
     t.addEventListener('dragstart',ev=>{ _dragPage=p.id; ev.dataTransfer.effectAllowed='move'; setTimeout(()=>t.style.opacity='.35',0); });
@@ -2265,39 +2353,11 @@ function renderPageProps(box){
     if(devSel) devSel.addEventListener('change',()=>{ p.device=devSel.value; renderPages(); save(true); snapshot(); });
   }
   if(p.isHeader){
-    const cfg=hamburgerCfg(), items=hamburgerItems(), roots=hamburgerRootPages();
-    let h=`<h4>☰ 햄버거 메뉴 (모바일)</h4><div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">모바일에서 좌측상단 ☰로 열리는 메뉴입니다. 항목 순서·이름·연결 페이지·색을 편집하세요.</div>`;
-    items.forEach((it,idx)=>{
-      h+=`<div class="hm-item" data-idx="${idx}" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">
-        <div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">
-          <input class="hm-name" value="${escapeHtml(it.name||'')}" placeholder="메뉴 이름" style="flex:1;padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
-          <button class="hm-up" title="위로" style="border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▲</button>
-          <button class="hm-down" title="아래로" style="border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▼</button>
-          <button class="hm-del" title="삭제" style="border:none;background:none;color:#ff8da3;cursor:pointer;font-size:13px">✕</button>
-        </div>
-        <select class="hm-link" style="width:100%;padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
-          ${roots.map(r=>`<option value="${r.id}" ${it.link===r.id?'selected':''}>${escapeHtml(r.name||'페이지')}</option>`).join('')}
-        </select>
-      </div>`;
-    });
-    h+=`<button id="hm-add" class="tb-btn" style="width:100%;margin-bottom:10px">＋ 메뉴 항목 추가</button>`;
-    h+=`<label style="display:block;font-size:12px;color:var(--sub);margin-bottom:6px">색상</label><div class="row" style="gap:10px">
-      <button type="button" class="panel-cbtn" data-cpkey="hmBtn" title="버튼 색"><span id="hm-btn-bar" style="background:${cfg.btnColor||'#1a2b5c'}"></span></button>
-      <button type="button" class="panel-cbtn" data-cpkey="hmBg" title="메뉴 배경"><span id="hm-bg-bar" style="background:${cfg.bg||'#ffffff'}"></span></button>
-      <button type="button" class="panel-cbtn" data-cpkey="hmColor" title="메뉴 글자색"><span id="hm-color-bar" style="background:${cfg.color||'#1a2b5c'}"></span></button>
-    </div><div style="font-size:10px;color:var(--sub);margin-top:4px">☰ 버튼 · 메뉴 배경 · 메뉴 글자</div>`;
-    box.innerHTML += h;
-    box.querySelectorAll('.hm-item').forEach(row=>{
-      const idx=+row.dataset.idx;
-      row.querySelector('.hm-name').addEventListener('input',e2=>{ hamburgerMaterialize()[idx].name=e2.target.value; save(true); });
-      row.querySelector('.hm-name').addEventListener('change',snapshot);
-      row.querySelector('.hm-link').addEventListener('change',e2=>{ hamburgerMaterialize()[idx].link=e2.target.value; save(true); snapshot(); });
-      row.querySelector('.hm-up').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx>0){ [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; renderProps(); save(true); snapshot(); } });
-      row.querySelector('.hm-down').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx<a.length-1){ [a[idx+1],a[idx]]=[a[idx],a[idx+1]]; renderProps(); save(true); snapshot(); } });
-      row.querySelector('.hm-del').addEventListener('click',()=>{ const a=hamburgerMaterialize(); a.splice(idx,1); renderProps(); save(true); snapshot(); });
-    });
-    const hmAdd=box.querySelector('#hm-add');
-    if(hmAdd) hmAdd.addEventListener('click',()=>{ const a=hamburgerMaterialize(); const r=roots[0]; a.push({name:r?r.name:'새 메뉴', link:r?r.id:''}); renderProps(); save(true); snapshot(); });
+    box.innerHTML += `<h4>☰ 햄버거 메뉴 (모바일)</h4>
+      <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.6">캔버스 상단 바의 <b style="color:var(--accent2)">☰ 버튼</b>을 클릭하면 메뉴를 <b>보면서</b> 항목·이름·연결·색을 편집할 수 있어요.</div>
+      <button id="hm-open-canvas" class="tb-btn primary" style="width:100%">☰ 캔버스에서 메뉴 편집 열기</button>`;
+    const ob=box.querySelector('#hm-open-canvas');
+    if(ob) ob.addEventListener('click',()=>{ _hambOpen=true; renderCanvas(); });
   }
   // ── 섹션 관리 ──
   const secs=sortedSections(p);
@@ -2961,7 +3021,7 @@ document.getElementById('add-image').onclick=addImage;
 document.getElementById('add-page').onclick=()=>{
   if(editorDevice==='mobile'){
     const np={ id:uid(), name:'모바일 페이지', device:'mobile', parentId:null, w:MOBILE_W, h:MOBILE_H, bg:'#ffffff', elements:[] };
-    project.pages.push(np); curPage=project.pages.length-1; selId=null; selIds=new Set(); afterMutate();
+    addContentPage(np); afterMutate();
     toast('모바일 페이지 추가됨 (430px 폭)');
   } else openTplModal();
 };
@@ -3104,7 +3164,7 @@ function openTplModal(){
     mini.style.width=tp.w+'px'; mini.style.height=tp.h+'px'; mini.style.background=tp.bg;
     const sc=326/tp.w; mini.style.transform=`scale(${sc})`;
     tp.elements.forEach(e=>{ const n=renderEl({...e,id:'_p'+e.id}); n.style.pointerEvents='none'; mini.appendChild(n); });
-    card.addEventListener('click',()=>{ project.pages.push(buildTemplate(t.key)); curPage=project.pages.length-1; selId=null; closeTplModal(); afterMutate(); toast(`'${t.name}' 페이지 추가됨`); });
+    card.addEventListener('click',()=>{ addContentPage(buildTemplate(t.key)); closeTplModal(); afterMutate(); toast(`'${t.name}' 페이지 추가됨`); });
     grid.appendChild(card);
   });
   document.getElementById('tpl-modal').style.display='flex';
@@ -3627,7 +3687,7 @@ function applyTemplate(t, asNew){
   const els=(src.elements||[]).map(e=>Object.assign(JSON.parse(JSON.stringify(e)),{id:uid()}));
   if(asNew){
     const np=newPage(src.name||t.name); np.w=src.w||PAGE_W; np.h=src.h||PAGE_H; np.bg=src.bg||'#ffffff'; np.elements=els;
-    project.pages.push(np); curPage=project.pages.length-1;
+    addContentPage(np);
   }else{
     const pg=page(); if(src.name)pg.name=src.name; if(src.bg)pg.bg=src.bg; if(src.h)pg.h=src.h; pg.elements=els;
   }
