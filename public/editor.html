@@ -1600,8 +1600,10 @@ function renderHambOnCanvas(){
   const p=page(); if(!p.isHeader){ _hambOpen=false; return; }
   const cfg=hamburgerCfg();
   const btn=document.createElement('div'); btn.id='hamb-btn';
-  const sz=Math.min(40, p.h-12);
-  btn.style.cssText=`position:absolute;top:${Math.round((p.h-sz)/2)}px;right:16px;width:${sz+10}px;height:${sz}px;display:flex;flex-direction:column;justify-content:center;gap:5px;padding:0 9px;cursor:pointer;z-index:80;border-radius:8px;box-sizing:border-box${_hambOpen?';outline:2px solid var(--accent)':''}`;
+  const sz=Math.min(cfg.size||40, p.h-8);
+  const posLeft=(cfg.pos||'left')==='left';
+  const gap=Math.max(3,Math.round(sz*0.13));
+  btn.style.cssText=`position:absolute;top:${Math.round((p.h-sz)/2)}px;${posLeft?'left':'right'}:16px;width:${sz+10}px;height:${sz}px;display:flex;flex-direction:column;justify-content:center;gap:${gap}px;padding:0 9px;cursor:pointer;z-index:80;border-radius:8px;box-sizing:border-box${_hambOpen?';outline:2px solid var(--accent)':''}`;
   const bc=cfg.btnColor||'#1a2b5c';
   btn.innerHTML=`<span style="height:3px;background:${bc};border-radius:2px"></span><span style="height:3px;background:${bc};border-radius:2px"></span><span style="height:3px;background:${bc};border-radius:2px"></span>`;
   btn.title='클릭: 햄버거 메뉴 편집';
@@ -1633,12 +1635,25 @@ function buildHambMenu(){
     </div>`;
   });
   html+=`<button id="hmx-add" style="width:100%;padding:9px;border:1px dashed #c9c9d6;background:#fafaff;border-radius:8px;cursor:pointer;color:#556;font-size:13px;margin-bottom:8px">＋ 메뉴 항목 추가</button>`;
-  html+=`<div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888"><span>색상</span>
+  html+=`<div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888;margin-bottom:8px"><span>색상</span>
     <button type="button" class="panel-cbtn" data-cpkey="hmBtn" title="☰ 버튼 색"><span style="background:${cfg.btnColor||'#1a2b5c'}"></span></button>
     <button type="button" class="panel-cbtn" data-cpkey="hmBg" title="메뉴 배경"><span style="background:${cfg.bg||'#ffffff'}"></span></button>
     <button type="button" class="panel-cbtn" data-cpkey="hmColor" title="메뉴 글자색"><span style="background:${cfg.color||'#1a2b5c'}"></span></button>
   </div>`;
+  const hpos=cfg.pos||'left', hsz=cfg.size||40;
+  html+=`<div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888;margin-bottom:6px">
+    <span>☰ 위치</span>
+    <button class="hmx-pos" data-pos="left" style="border:1px solid #ddd;background:${hpos==='left'?'#6c7bff':'#fff'};color:${hpos==='left'?'#fff':'#444'};border-radius:5px;cursor:pointer;font-size:11px;padding:4px 9px">왼쪽</button>
+    <button class="hmx-pos" data-pos="right" style="border:1px solid #ddd;background:${hpos==='right'?'#6c7bff':'#fff'};color:${hpos==='right'?'#fff':'#444'};border-radius:5px;cursor:pointer;font-size:11px;padding:4px 9px">오른쪽</button>
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888">
+    <span>☰ 크기 <b id="hmx-size-val" style="color:#555">${hsz}</b></span>
+    <input id="hmx-size" type="range" min="28" max="64" value="${hsz}" style="flex:1">
+  </div>`;
   panel.innerHTML=html;
+  panel.querySelectorAll('.panel-cbtn').forEach(b=>b.addEventListener('click',ev=>{ ev.stopPropagation(); toggleColorPopup(b.dataset.cpkey, b); }));
+  panel.querySelectorAll('.hmx-pos').forEach(b=>b.addEventListener('click',()=>{ hamburgerCfg().pos=b.dataset.pos; save(true); snapshot(); renderCanvas(); }));
+  const szI=panel.querySelector('#hmx-size'); if(szI){ szI.addEventListener('input',()=>{ const v=parseInt(szI.value)||40; hamburgerCfg().size=v; save(true); const sv=panel.querySelector('#hmx-size-val'); if(sv)sv.textContent=v; const hb=document.getElementById('hamb-btn'); if(hb){ const pp=page(); const g=Math.max(3,Math.round(v*0.13)); hb.style.width=(v+10)+'px'; hb.style.height=v+'px'; hb.style.top=Math.round((pp.h-v)/2)+'px'; hb.style.gap=g+'px'; } }); szI.addEventListener('change',()=>{ renderCanvas(); snapshot(); }); }
   panel.querySelector('#hmx-close').addEventListener('click',()=>{ _hambOpen=false; renderCanvas(); });
   panel.querySelectorAll('.hmx-item').forEach(row=>{
     const idx=+row.dataset.idx;
@@ -4644,11 +4659,11 @@ const CP_TARGETS={
     current:()=>{ const e=selId?el(selId):null; return e&&e.stColor; },
     set:v=>{ const e=selId?el(selId):null; if(!e)return; e.stColor=v; liveStyleEl(e); } },
   hmBtn:{ label:'햄버거 버튼 색', rich:false, current:()=>hamburgerCfg().btnColor||'#1a2b5c',
-    set:v=>{ hamburgerCfg().btnColor=v; const b=document.getElementById('hm-btn-bar'); if(b)b.style.background=v; save(true); } },
+    set:v=>{ hamburgerCfg().btnColor=v; save(true); renderCanvas(); } },
   hmBg:{ label:'메뉴 배경', rich:false, current:()=>hamburgerCfg().bg||'#ffffff',
-    set:v=>{ hamburgerCfg().bg=v; const b=document.getElementById('hm-bg-bar'); if(b)b.style.background=v; save(true); } },
+    set:v=>{ hamburgerCfg().bg=v; save(true); renderCanvas(); } },
   hmColor:{ label:'메뉴 글자색', rich:false, current:()=>hamburgerCfg().color||'#1a2b5c',
-    set:v=>{ hamburgerCfg().color=v; const b=document.getElementById('hm-color-bar'); if(b)b.style.background=v; save(true); } },
+    set:v=>{ hamburgerCfg().color=v; save(true); renderCanvas(); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){

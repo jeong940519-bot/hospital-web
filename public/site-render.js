@@ -319,8 +319,10 @@
     var pageMap = {}; project.pages.forEach(function(p){ pageMap[p.id]=p; });
     var hmItems = (hm.items && hm.items.length) ? hm.items : roots.map(function(p){ return {name:p.name, link:p.id}; });
     var hmBg = hm.bg||'#ffffff', hmColor = hm.color||'#1a2b5c', hmBtnC = hm.btnColor||'#1a2b5c';
+    var hmSize = hm.size||46, hmPos = hm.pos||'left';
+    var hmBtnStyle = 'color:'+hmBtnC+';width:'+hmSize+'px;height:'+hmSize+'px;font-size:'+Math.round(hmSize*0.55)+'px;'+(hmPos==='right'?'right:10px;left:auto;':'left:10px;right:auto;');
     var drawerLinks = hmItems.map(function(it){ var pg=pageMap[it.link]; return '<a href="#" data-id="'+(it.link||'')+'" data-dev="'+((pg&&pg.device)||'both')+'">'+esc(it.name||'')+'</a>'; }).join('');
-    var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴" style="color:'+hmBtnC+'">☰</button><div id="hmoverlay"></div><nav id="hmdrawer" style="background:'+hmBg+';color:'+hmColor+'">'+drawerLinks+'</nav>';
+    var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴" style="'+hmBtnStyle+'">☰</button><div id="hmoverlay"></div><nav id="hmdrawer" style="background:'+hmBg+';color:'+hmColor+'">'+drawerLinks+'</nav>';
 
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
     var hasAf=false; project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.autofit)hasAf=true;});});
