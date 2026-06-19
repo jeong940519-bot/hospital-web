@@ -860,6 +860,26 @@
   </div>
 </div>
 
+<!-- AI 모바일 변환/수정 모달 -->
+<div class="modal-bg" id="aimob-modal" style="display:none">
+  <div class="modal" style="width:480px">
+    <div class="modal-head"><h3 id="aimob-title">🤖 AI 모바일 변환</h3><button class="sp-close" id="aimob-close">✕</button></div>
+    <div class="modal-body">
+      <div class="grp"><label id="aimob-label">모바일 배치 요청 (선택)</label>
+        <textarea id="aimob-desc" rows="3" placeholder="예: 여백을 더 넉넉히 / 이미지는 작게 / 예약 버튼 크고 눈에 띄게 / 글씨 더 크게"></textarea>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+          <button class="tb-btn" data-aimob-preset="요소 사이 간격을 넉넉하게, 섹션 사이는 더 크게" style="font-size:12px;padding:6px 10px">🌿 여백 넉넉</button>
+          <button class="tb-btn" data-aimob-preset="컴팩트하게, 한 화면에 많이 보이도록 간격을 좁게" style="font-size:12px;padding:6px 10px">📦 컴팩트</button>
+          <button class="tb-btn" data-aimob-preset="제목과 버튼을 크고 강조, 본문은 간결하게" style="font-size:12px;padding:6px 10px">🔠 큰 글씨·강조</button>
+        </div>
+        <div id="aimob-hint" style="font-size:11px;color:var(--sub);margin-top:8px"></div>
+      </div>
+      <div class="modal-status" id="aimob-status"></div>
+      <button class="tb-btn primary" id="aimob-go" style="width:100%;margin-top:4px">변환 실행</button>
+    </div>
+  </div>
+</div>
+
 <!-- AI 색감 모달 -->
 <div class="modal-bg" id="aicolor-modal" style="display:none">
   <div class="modal" style="width:460px">
@@ -2852,46 +2872,79 @@ document.getElementById('dev-toggle').onclick=()=>{
 };
 document.getElementById('add-header').onclick=addHeaderBar;
 document.getElementById('add-footer').onclick=addFooterBar;
-document.getElementById('ai-mobile-convert').onclick=runMobileConvert;
-async function runMobileConvert(){
+function aimobStatus(s){ const el2=document.getElementById('aimob-status'); if(el2) el2.textContent=s; }
+document.getElementById('ai-mobile-convert').onclick=()=>{
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const src=page();
   if(src.isHeader||src.isFooter){ toast('상단/하단 바는 변환 대상이 아닙니다'); return; }
-  if(pageDevice(src)==='mobile'){ toast('이미 모바일 페이지입니다'); return; }
   if(!src.elements.length){ toast('변환할 요소가 없습니다'); return; }
+  const isAdjust = pageDevice(src)==='mobile';
+  document.getElementById('aimob-title').textContent = isAdjust ? '🤖 AI 모바일 레이아웃 수정' : '🤖 AI 모바일 변환';
+  document.getElementById('aimob-label').textContent = isAdjust ? '수정 요청' : '모바일 배치 요청 (선택)';
+  document.getElementById('aimob-go').textContent = isAdjust ? '수정 실행' : '변환 실행';
+  document.getElementById('aimob-hint').textContent = isAdjust
+    ? '현재 모바일 페이지를 요청대로 다시 배치합니다(내용은 유지). 비워두면 전반적으로 정돈.'
+    : 'PC 페이지를 모바일(430px)로 변환해 새 모바일 페이지를 만듭니다. 원본은 PC 전용이 됩니다.';
+  aimobStatus(''); document.getElementById('aimob-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('aimob-desc').focus(),0);
+};
+document.getElementById('aimob-close').onclick=()=>document.getElementById('aimob-modal').style.display='none';
+document.getElementById('aimob-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aimob-modal') e.currentTarget.style.display='none'; });
+document.querySelectorAll('#aimob-modal [data-aimob-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aimob-desc').value=b.dataset.aimobPreset; }));
+document.getElementById('aimob-go').onclick=()=>runMobileConvert(document.getElementById('aimob-desc').value.trim());
+
+async function runMobileConvert(desc){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  const src=page();
+  if(src.isHeader||src.isFooter||!src.elements.length) return;
+  const isAdjust = pageDevice(src)==='mobile';
+  const targetW = isAdjust ? src.w : MOBILE_W, cw = targetW-48;
   const payload=src.elements.map((e,i)=>{
     const o={i,type:e.type,x:Math.round(e.x),y:Math.round(e.y),w:Math.round(e.w),h:Math.round(e.h)};
     if(e.type==='text'){ o.text=(e.text||'').replace(/\n/g,' ').slice(0,80); o.fontSize=e.fontSize; o.weight=e.fontWeight; o.align=e.align; }
     if(e.type==='shape'){ o.shape=e.shape; }
     return o;
   });
-  const sys=`너는 반응형 웹 디자이너다. 아래는 PC(폭 ${src.w}px) 페이지 요소 목록(JSON)이다. 이를 모바일(폭 430px) 세로 레이아웃으로 재배치하라.
+  const sys=`너는 반응형 웹 디자이너다. 아래는 ${isAdjust?`모바일(폭 ${targetW}px) 페이지`:`PC(폭 ${src.w}px) 페이지`} 요소 목록(JSON)이다. 이를 모바일(폭 ${targetW}px) 세로 레이아웃으로 ${isAdjust?'다시 배치':'재배치'}하라.
 규칙:
-- 좌우 여백 24px → 콘텐츠 폭 382px 기준. 대부분 요소는 x=24, w=382(풀폭). 작은 버튼/아이콘은 가운데 정렬해도 됨.
-- 원래 순서(위→아래 흐름)대로 세로 1열로 쌓는다. 같은 줄에 나란히 있던 카드/이미지도 세로로 쌓아라.
-- 텍스트 폰트 크기는 모바일 가독성에 맞게: 큰 제목 30~40, 소제목 22~26, 본문 16~18 (fontSize로 지정).
+- 좌우 여백 24px → 콘텐츠 폭 ${cw}px 기준. 대부분 요소는 x=24, w=${cw}(풀폭). 작은 버튼/아이콘은 가운데 정렬 가능.
+- 원래 순서(위→아래)대로 세로 1열로 쌓는다. 나란히 있던 카드/이미지도 세로로 쌓아라.
+- 텍스트 글자 크기: 큰 제목 30~40, 소제목 22~26, 본문 16~18 (fontSize로 지정).
 - 요소 사이 간격 16~40px, 섹션 사이는 더 넉넉히. 맨 위는 y≥24.
-- 모바일에 불필요한 장식 요소는 생략 가능(els에서 빼면 됨).
-- 위치·크기·(텍스트)글자크기만 정하라. 색·폰트·문구·이미지·링크·효과는 그대로 유지되니 신경쓰지 마라.
+- 위치·크기·(텍스트)글자크기만 정하라. 색·폰트·문구·이미지·링크·효과는 유지된다.
+${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
 출력 JSON 하나만: {"h":전체페이지높이, "els":[{"i":원본인덱스,"x":,"y":,"w":,"h":,"fontSize":(텍스트만)} ...]}`;
-  const btn=document.getElementById('ai-mobile-convert'); btn.disabled=true; const old=btn.textContent; btn.textContent='🤖 변환 중…';
-  toast('AI가 모바일 레이아웃을 구성 중…');
+  const go=document.getElementById('aimob-go'); go.disabled=true; const ot=go.textContent; go.textContent='🤖 처리 중…';
+  aimobStatus('AI가 모바일 레이아웃을 구성 중…');
   try{
     const parsed=await aiCall(sys, JSON.stringify(payload), 6000);
     const els=Array.isArray(parsed.els)?parsed.els:[];
-    if(!els.length) throw new Error('변환 결과가 비었습니다 (다시 시도)');
-    const srcEls=src.elements;
-    const newEls=els.filter(o=>o&&srcEls[o.i]).map(o=>{ const s=JSON.parse(JSON.stringify(srcEls[o.i])); s.id=uid();
-      s.x=Math.round(o.x)||0; s.y=Math.round(o.y)||0; s.w=Math.max(8,Math.round(o.w)||382); s.h=Math.max(8,Math.round(o.h)||40);
-      if(o.fontSize&&s.type==='text') s.fontSize=Math.round(o.fontSize); return s; });
-    if(!newEls.length) throw new Error('변환 결과가 비었습니다');
-    const ph=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+40);
-    const mp={ id:uid(), name:(src.name||'페이지')+' (모바일)', device:'mobile', parentId:null, w:MOBILE_W, h:Math.max(MOBILE_H,ph), bg:src.bg, elements:newEls };
-    src.device='pc'; // 원본은 PC 전용으로 → 모바일에선 새 페이지가 대체
-    project.pages.push(mp); curPage=project.pages.length-1; editorDevice='mobile'; selId=null; selIds=new Set();
-    afterMutate(); toast('📱 모바일 페이지 생성됨 — 원본은 PC 전용으로 설정됨');
-  }catch(e){ toast('실패: '+_aiErr(e)); }
-  finally{ btn.disabled=false; btn.textContent=old; }
+    if(!els.length) throw new Error('결과가 비었습니다 (다시 시도)');
+    if(isAdjust){
+      // 현재 모바일 페이지를 제자리 재배치 (요소 유지, 위치/크기만 갱신)
+      const byI={}; els.forEach(o=>{ if(o&&o.i!=null) byI[o.i]=o; });
+      src.elements.forEach((e,i)=>{ const o=byI[i]; if(!o)return;
+        if(o.x!=null)e.x=Math.round(o.x); if(o.y!=null)e.y=Math.round(o.y);
+        if(o.w!=null)e.w=Math.max(8,Math.round(o.w)); if(o.h!=null)e.h=Math.max(8,Math.round(o.h));
+        if(o.fontSize&&e.type==='text')e.fontSize=Math.round(o.fontSize); });
+      if(parsed.h) src.h=Math.max(MOBILE_H,Math.round(parsed.h));
+      selId=null; selIds=new Set(); afterMutate(); document.getElementById('aimob-modal').style.display='none';
+      toast('📱 모바일 레이아웃 수정됨');
+    } else {
+      const srcEls=src.elements;
+      const newEls=els.filter(o=>o&&srcEls[o.i]).map(o=>{ const s=JSON.parse(JSON.stringify(srcEls[o.i])); s.id=uid();
+        s.x=Math.round(o.x)||0; s.y=Math.round(o.y)||0; s.w=Math.max(8,Math.round(o.w)||cw); s.h=Math.max(8,Math.round(o.h)||40);
+        if(o.fontSize&&s.type==='text') s.fontSize=Math.round(o.fontSize); return s; });
+      if(!newEls.length) throw new Error('결과가 비었습니다');
+      const ph=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+40);
+      const mp={ id:uid(), name:(src.name||'페이지')+' (모바일)', device:'mobile', parentId:null, w:MOBILE_W, h:Math.max(MOBILE_H,ph), bg:src.bg, elements:newEls };
+      src.device='pc';
+      project.pages.push(mp); curPage=project.pages.length-1; editorDevice='mobile'; selId=null; selIds=new Set();
+      afterMutate(); document.getElementById('aimob-modal').style.display='none';
+      toast('📱 모바일 페이지 생성됨 — 원본은 PC 전용으로 설정됨');
+    }
+  }catch(e){ aimobStatus('실패: '+_aiErr(e)); }
+  finally{ go.disabled=false; go.textContent=ot; }
 }
 
 // ── 도형 피커 (PPT식 카테고리 갤러리) ──
