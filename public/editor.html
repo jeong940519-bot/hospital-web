@@ -1135,6 +1135,34 @@ function addHeaderBar(){
   }
 }
 // 하단 바(직접 디자인하는 푸터) — 발행 시 모든 페이지 하단에 붙음(고정X), 배경색은 화면 끝까지 이어짐
+// AI 모바일 변환 시 상단/하단 바도 모바일 전용으로 자동 생성 (로고만 크게, 탭은 햄버거로)
+function ensureMobileBars(){
+  // 상단 바
+  const pcH = project.pages.find(p=>p.isHeader && p.device!=='mobile');
+  const mH = project.pages.find(p=>p.isHeader && p.device==='mobile');
+  if(pcH && !mH){
+    const texts=pcH.elements.filter(e=>e.type==='text');
+    const logo=texts.slice().sort((a,b)=>(b.fontSize||0)-(a.fontSize||0))[0];
+    const hp={ id:uid(), name:'상단 바(모바일)', isHeader:true, device:'mobile', parentId:null, w:MOBILE_W, h:64, bg:pcH.bg||'#ffffff', elements:[
+      tText(76,14,300,36, logo?logo.text:'병원 로고', {fontSize:26,fontWeight:900,color:(logo&&logo.color)||'#1a2b5c',align:'left'})
+    ]};
+    project.pages.unshift(hp);
+  }
+  // 하단 바
+  const pcF = project.pages.find(p=>p.isFooter && p.device!=='mobile');
+  const mF = project.pages.find(p=>p.isFooter && p.device==='mobile');
+  if(pcF && !mF){
+    let y=28; const els=[]; const ftxt=pcF.elements.filter(e=>e.type==='text');
+    ftxt.forEach((t,idx)=>{
+      const isCopy=/©|copyright|rights/i.test(t.text||'');
+      const fs= idx===0?22:(isCopy?13:16);
+      const h= Math.max(28, t.text.split('\n').length*Math.round(fs*1.8));
+      els.push(tText(24,y,382,h, t.text, {fontSize:fs,fontWeight:idx===0?900:400,color:t.color||'#cdd6ee',align:'center',lineHeight:1.8}));
+      y+=h+14;
+    });
+    if(els.length){ const fp={ id:uid(), name:'하단 바(모바일)', isFooter:true, device:'mobile', parentId:null, w:MOBILE_W, h:y+12, bg:pcF.bg||'#1a2b5c', elements:els }; project.pages.push(fp); }
+  }
+}
 function addFooterBar(){
   const wantMobile = editorDevice==='mobile';
   let fp = wantMobile ? project.pages.find(p=>p.isFooter&&p.device==='mobile')
@@ -2960,9 +2988,9 @@ ${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
       const ph=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+40);
       const mp={ id:uid(), name:(src.name||'페이지')+' (모바일)', device:'mobile', parentId:null, w:MOBILE_W, h:Math.max(MOBILE_H,ph), bg:src.bg, elements:newEls };
       src.device='pc';
-      project.pages.push(mp); curPage=project.pages.length-1; editorDevice='mobile'; selId=null; selIds=new Set();
+      project.pages.push(mp); ensureMobileBars(); curPage=pageIndex(mp.id); editorDevice='mobile'; selId=null; selIds=new Set();
       afterMutate(); document.getElementById('aimob-modal').style.display='none';
-      toast('📱 모바일 페이지 생성됨 — 원본은 PC 전용으로 설정됨');
+      toast('📱 모바일 페이지 + 모바일 상단/하단 바 생성됨 — 원본은 PC 전용');
     }
   }catch(e){ aimobStatus('실패: '+_aiErr(e)); }
   finally{ go.disabled=false; go.textContent=ot; }
