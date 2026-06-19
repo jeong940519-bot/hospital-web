@@ -314,9 +314,13 @@
       var fEls=fp.elements.map(renderElStatic).join('');
       return '<div class="footerbar" data-dev="'+(fp.device||'both')+'" style="display:none;background:'+fp.bg+'"><div class="pg footer-pg" data-pw="'+fp.w+'" style="width:'+fp.w+'px;height:'+fp.h+'px;background:'+fp.bg+';transform-origin:top left">'+fEls+'</div></div>';
     }).join('');
-    // 모바일 햄버거 메뉴 (좌측상단) — 루트 페이지 목록 드로어. 모바일에서만 표시.
-    var drawerLinks = roots.map(function(p){ return '<a href="#" data-id="'+p.id+'" data-dev="'+(p.device||'both')+'">'+esc(p.name||'페이지')+'</a>'; }).join('');
-    var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴">☰</button><div id="hmoverlay"></div><nav id="hmdrawer">'+drawerLinks+'</nav>';
+    // 모바일 햄버거 메뉴 (좌측상단) — 편집 가능한 설정(항목·순서·색). 모바일에서만 표시.
+    var hm = project.hamburger || {};
+    var pageMap = {}; project.pages.forEach(function(p){ pageMap[p.id]=p; });
+    var hmItems = (hm.items && hm.items.length) ? hm.items : roots.map(function(p){ return {name:p.name, link:p.id}; });
+    var hmBg = hm.bg||'#ffffff', hmColor = hm.color||'#1a2b5c', hmBtnC = hm.btnColor||'#1a2b5c';
+    var drawerLinks = hmItems.map(function(it){ var pg=pageMap[it.link]; return '<a href="#" data-id="'+(it.link||'')+'" data-dev="'+((pg&&pg.device)||'both')+'">'+esc(it.name||'')+'</a>'; }).join('');
+    var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴" style="color:'+hmBtnC+'">☰</button><div id="hmoverlay"></div><nav id="hmdrawer" style="background:'+hmBg+';color:'+hmColor+'">'+drawerLinks+'</nav>';
 
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
     var hasAf=false; project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.autofit)hasAf=true;});});
@@ -356,7 +360,7 @@
       +'#hmbtn:active{background:rgba(0,0,0,.06)}'
       +'#hmdrawer{position:fixed;top:0;left:0;height:100%;width:74%;max-width:300px;background:#fff;z-index:420;transform:translateX(-100%);transition:transform .28s;box-shadow:2px 0 18px rgba(0,0,0,.25);padding:60px 0 20px;overflow-y:auto}'
       +'#hmdrawer.open{transform:none}'
-      +'#hmdrawer a{display:block;padding:15px 24px;color:#1a2b5c;text-decoration:none;font-weight:700;font-size:17px;border-bottom:1px solid #eef}'
+      +'#hmdrawer a{display:block;padding:15px 24px;color:inherit;text-decoration:none;font-weight:700;font-size:17px;border-bottom:1px solid rgba(0,0,0,.06)}'
       +'#hmdrawer a:active{background:#eef3ff}'
       +'#hmoverlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:410;opacity:0;pointer-events:none;transition:opacity .28s}'
       +'#hmoverlay.open{opacity:1;pointer-events:auto}'

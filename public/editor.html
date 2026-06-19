@@ -1072,6 +1072,11 @@ const MOBILE_W = 430, MOBILE_H = 900;   // 모바일 전용 페이지 기본 크
 let editorDevice = 'pc';                  // 편집 중인 디바이스: 'pc' | 'mobile'
 function pageDevice(p){ return p.device || 'both'; }
 function inDevice(p, dev){ const d=pageDevice(p); return d==='both' || d===dev; }
+// 모바일 햄버거 메뉴 설정 (프로젝트 단위)
+function hamburgerCfg(){ if(!project.hamburger) project.hamburger={}; return project.hamburger; }
+function hamburgerRootPages(){ return project.pages.filter(p=>!p.parentId && !p.isHeader && !p.isFooter); }
+function hamburgerItems(){ const c=hamburgerCfg(); if(c.items&&c.items.length) return c.items; return hamburgerRootPages().map(p=>({name:p.name||'페이지', link:p.id})); }
+function hamburgerMaterialize(){ const c=hamburgerCfg(); if(!c.items||!c.items.length) c.items=hamburgerItems().map(it=>({name:it.name,link:it.link})); return c.items; }
 // 템플릿은 1200 기준 좌표 → 현재 PAGE_W로 스케일
 function scaleEls(els, s){
   els.forEach(e=>{
@@ -2052,6 +2057,17 @@ document.getElementById('stage').addEventListener('mousedown', ev=>{
 });
 
 // ───────────────────────── 렌더: 페이지 사이드바 ─────────────────────────
+let _dragPage=null;
+function reorderPage(fromId, toId){
+  if(!fromId || fromId===toId) return;
+  const fi=project.pages.findIndex(p=>p.id===fromId); if(fi<0) return;
+  const curId=project.pages[curPage] && project.pages[curPage].id;
+  const [moved]=project.pages.splice(fi,1);
+  let ti=project.pages.findIndex(p=>p.id===toId); if(ti<0) ti=project.pages.length;
+  project.pages.splice(ti,0,moved);  // 대상 앞에 삽입
+  if(curId) curPage=project.pages.findIndex(p=>p.id===curId);
+  afterMutate();
+}
 function renderPages(){
   const list=document.getElementById('page-list'); list.innerHTML='';
   const dt=document.getElementById('dev-toggle'); if(dt) dt.textContent=editorDevice==='mobile'?'📱 모바일':'💻 PC';
@@ -2075,6 +2091,13 @@ function renderPages(){
     const scale = _thumbW/p.w; mini.style.transform=`scale(${scale})`;
     p.elements.forEach(e=>{ const n=renderEl({...e,id:'_'+e.id}); n.style.pointerEvents='none'; n.classList.remove('selected'); mini.appendChild(n); });
     t.addEventListener('click',()=>{ curPage=i; selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); });
+    // 드래그앤드롭 순서 변경
+    t.draggable=true;
+    t.addEventListener('dragstart',ev=>{ _dragPage=p.id; ev.dataTransfer.effectAllowed='move'; setTimeout(()=>t.style.opacity='.35',0); });
+    t.addEventListener('dragend',()=>{ t.style.opacity=''; document.querySelectorAll('.page-thumb').forEach(x=>x.style.boxShadow=''); });
+    t.addEventListener('dragover',ev=>{ ev.preventDefault(); ev.dataTransfer.dropEffect='move'; if(_dragPage&&_dragPage!==p.id) t.style.boxShadow='0 -3px 0 var(--accent) inset'; });
+    t.addEventListener('dragleave',()=>{ t.style.boxShadow=''; });
+    t.addEventListener('drop',ev=>{ ev.preventDefault(); t.style.boxShadow=''; reorderPage(_dragPage, p.id); _dragPage=null; });
     list.appendChild(t);
   });
 }
@@ -2240,6 +2263,41 @@ function renderPageProps(box){
     </select><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 시 화면 폭으로 자동 전환(≤768px=모바일).${p.isHeader||p.isFooter?' 모바일 전용 바는 폭 430·큰 글자 권장. 모바일에선 좌측상단 햄버거 메뉴가 자동 추가됩니다.':' 모바일 전용은 폭을 430 등 좁게 권장.'}</div></div>`;
     const devSel=box.querySelector('#pg-device');
     if(devSel) devSel.addEventListener('change',()=>{ p.device=devSel.value; renderPages(); save(true); snapshot(); });
+  }
+  if(p.isHeader){
+    const cfg=hamburgerCfg(), items=hamburgerItems(), roots=hamburgerRootPages();
+    let h=`<h4>☰ 햄버거 메뉴 (모바일)</h4><div style="font-size:11px;color:var(--sub);margin-bottom:8px;line-height:1.6">모바일에서 좌측상단 ☰로 열리는 메뉴입니다. 항목 순서·이름·연결 페이지·색을 편집하세요.</div>`;
+    items.forEach((it,idx)=>{
+      h+=`<div class="hm-item" data-idx="${idx}" style="background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:6px">
+        <div style="display:flex;gap:5px;align-items:center;margin-bottom:5px">
+          <input class="hm-name" value="${escapeHtml(it.name||'')}" placeholder="메뉴 이름" style="flex:1;padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+          <button class="hm-up" title="위로" style="border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▲</button>
+          <button class="hm-down" title="아래로" style="border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:5px;cursor:pointer;font-size:11px;padding:3px 6px">▼</button>
+          <button class="hm-del" title="삭제" style="border:none;background:none;color:#ff8da3;cursor:pointer;font-size:13px">✕</button>
+        </div>
+        <select class="hm-link" style="width:100%;padding:5px 8px;background:var(--panel);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+          ${roots.map(r=>`<option value="${r.id}" ${it.link===r.id?'selected':''}>${escapeHtml(r.name||'페이지')}</option>`).join('')}
+        </select>
+      </div>`;
+    });
+    h+=`<button id="hm-add" class="tb-btn" style="width:100%;margin-bottom:10px">＋ 메뉴 항목 추가</button>`;
+    h+=`<label style="display:block;font-size:12px;color:var(--sub);margin-bottom:6px">색상</label><div class="row" style="gap:10px">
+      <button type="button" class="panel-cbtn" data-cpkey="hmBtn" title="버튼 색"><span id="hm-btn-bar" style="background:${cfg.btnColor||'#1a2b5c'}"></span></button>
+      <button type="button" class="panel-cbtn" data-cpkey="hmBg" title="메뉴 배경"><span id="hm-bg-bar" style="background:${cfg.bg||'#ffffff'}"></span></button>
+      <button type="button" class="panel-cbtn" data-cpkey="hmColor" title="메뉴 글자색"><span id="hm-color-bar" style="background:${cfg.color||'#1a2b5c'}"></span></button>
+    </div><div style="font-size:10px;color:var(--sub);margin-top:4px">☰ 버튼 · 메뉴 배경 · 메뉴 글자</div>`;
+    box.innerHTML += h;
+    box.querySelectorAll('.hm-item').forEach(row=>{
+      const idx=+row.dataset.idx;
+      row.querySelector('.hm-name').addEventListener('input',e2=>{ hamburgerMaterialize()[idx].name=e2.target.value; save(true); });
+      row.querySelector('.hm-name').addEventListener('change',snapshot);
+      row.querySelector('.hm-link').addEventListener('change',e2=>{ hamburgerMaterialize()[idx].link=e2.target.value; save(true); snapshot(); });
+      row.querySelector('.hm-up').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx>0){ [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; renderProps(); save(true); snapshot(); } });
+      row.querySelector('.hm-down').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx<a.length-1){ [a[idx+1],a[idx]]=[a[idx],a[idx+1]]; renderProps(); save(true); snapshot(); } });
+      row.querySelector('.hm-del').addEventListener('click',()=>{ const a=hamburgerMaterialize(); a.splice(idx,1); renderProps(); save(true); snapshot(); });
+    });
+    const hmAdd=box.querySelector('#hm-add');
+    if(hmAdd) hmAdd.addEventListener('click',()=>{ const a=hamburgerMaterialize(); const r=roots[0]; a.push({name:r?r.name:'새 메뉴', link:r?r.id:''}); renderProps(); save(true); snapshot(); });
   }
   // ── 섹션 관리 ──
   const secs=sortedSections(p);
@@ -4525,6 +4583,12 @@ const CP_TARGETS={
   shapeText:{ label:'글자 색', rich:false, noFill:true, noFillLabel:'글자색 없음(투명)',
     current:()=>{ const e=selId?el(selId):null; return e&&e.stColor; },
     set:v=>{ const e=selId?el(selId):null; if(!e)return; e.stColor=v; liveStyleEl(e); } },
+  hmBtn:{ label:'햄버거 버튼 색', rich:false, current:()=>hamburgerCfg().btnColor||'#1a2b5c',
+    set:v=>{ hamburgerCfg().btnColor=v; const b=document.getElementById('hm-btn-bar'); if(b)b.style.background=v; save(true); } },
+  hmBg:{ label:'메뉴 배경', rich:false, current:()=>hamburgerCfg().bg||'#ffffff',
+    set:v=>{ hamburgerCfg().bg=v; const b=document.getElementById('hm-bg-bar'); if(b)b.style.background=v; save(true); } },
+  hmColor:{ label:'메뉴 글자색', rich:false, current:()=>hamburgerCfg().color||'#1a2b5c',
+    set:v=>{ hamburgerCfg().color=v; const b=document.getElementById('hm-color-bar'); if(b)b.style.background=v; save(true); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){
