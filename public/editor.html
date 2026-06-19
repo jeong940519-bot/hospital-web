@@ -2925,14 +2925,16 @@ function aimobStatus(s){ const el2=document.getElementById('aimob-status'); if(e
 document.getElementById('ai-mobile-convert').onclick=()=>{
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const src=page();
-  if(src.isHeader||src.isFooter){ toast('상단/하단 바는 변환 대상이 아닙니다'); return; }
   if(!src.elements.length){ toast('변환할 요소가 없습니다'); return; }
   const isAdjust = pageDevice(src)==='mobile';
-  document.getElementById('aimob-title').textContent = isAdjust ? '🤖 AI 모바일 레이아웃 수정' : '🤖 AI 모바일 변환';
+  const barLabel = src.isHeader?'상단 바':src.isFooter?'하단 바':'';
+  document.getElementById('aimob-title').textContent = isAdjust ? `🤖 AI 모바일 ${barLabel||'레이아웃'} 수정` : `🤖 AI 모바일 ${barLabel?barLabel+' ':''}변환`;
   document.getElementById('aimob-label').textContent = isAdjust ? '수정 요청' : '모바일 배치 요청 (선택)';
   document.getElementById('aimob-go').textContent = isAdjust ? '수정 실행' : '변환 실행';
   document.getElementById('aimob-hint').textContent = isAdjust
-    ? '현재 모바일 페이지를 요청대로 다시 배치합니다(내용은 유지). 비워두면 전반적으로 정돈.'
+    ? '현재 모바일을 요청대로 다시 배치합니다(내용은 유지).'
+    : src.isHeader ? '상단 바를 모바일 형식으로 — 로고만 크게 남기고 메뉴 탭은 햄버거(☰)로 이동합니다.'
+    : src.isFooter ? '하단 바를 모바일 형식으로 — 글자를 가운데·크게 세로로 배치합니다.'
     : 'PC 페이지를 모바일(430px)로 변환해 새 모바일 페이지를 만듭니다. 원본은 PC 전용이 됩니다.';
   aimobStatus(''); document.getElementById('aimob-modal').style.display='flex';
   setTimeout(()=>document.getElementById('aimob-desc').focus(),0);
@@ -2945,8 +2947,9 @@ document.getElementById('aimob-go').onclick=()=>runMobileConvert(document.getEle
 async function runMobileConvert(desc){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const src=page();
-  if(src.isHeader||src.isFooter||!src.elements.length) return;
+  if(!src.elements.length) return;
   const isAdjust = pageDevice(src)==='mobile';
+  const isHeader=!!src.isHeader, isFooter=!!src.isFooter, isBar=isHeader||isFooter;
   const targetW = isAdjust ? src.w : MOBILE_W, cw = targetW-48;
   const payload=src.elements.map((e,i)=>{
     const o={i,type:e.type,x:Math.round(e.x),y:Math.round(e.y),w:Math.round(e.w),h:Math.round(e.h)};
@@ -2961,6 +2964,7 @@ async function runMobileConvert(desc){
 - 텍스트 글자 크기: 큰 제목 30~40, 소제목 22~26, 본문 16~18 (fontSize로 지정).
 - 요소 사이 간격 16~40px, 섹션 사이는 더 넉넉히. 맨 위는 y≥24.
 - 위치·크기·(텍스트)글자크기만 정하라. 색·폰트·문구·이미지·링크·효과는 유지된다.
+${isHeader?`\n★이것은 상단 바(헤더)다: 로고로 보이는 "가장 큰 글자" 1개만 남기고 x=76(좌측 햄버거 메뉴 자리)·세로 가운데에 두고 fontSize 24~28. 네비게이션 탭(병원소개/진료안내/오시는길 등 작은 글자)은 els에서 모두 빼라(햄버거로 대체됨). 전체 높이 h는 56~72.`:''}${isFooter?`\n★이것은 하단 바(푸터)다: 모든 글자를 가운데 정렬(x=24,w=${cw})로 세로로 쌓아라. 큰글자/회사명 22, 본문 16, 저작권 13. 충분한 높이.`:''}
 ${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
 출력 JSON 하나만: {"h":전체페이지높이, "els":[{"i":원본인덱스,"x":,"y":,"w":,"h":,"fontSize":(텍스트만)} ...]}`;
   const go=document.getElementById('aimob-go'); go.disabled=true; const ot=go.textContent; go.textContent='🤖 처리 중…';
@@ -2985,12 +2989,14 @@ ${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
         s.x=Math.round(o.x)||0; s.y=Math.round(o.y)||0; s.w=Math.max(8,Math.round(o.w)||cw); s.h=Math.max(8,Math.round(o.h)||40);
         if(o.fontSize&&s.type==='text') s.fontSize=Math.round(o.fontSize); return s; });
       if(!newEls.length) throw new Error('결과가 비었습니다');
-      const ph=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+40);
-      const mp={ id:uid(), name:(src.name||'페이지')+' (모바일)', device:'mobile', parentId:null, w:MOBILE_W, h:Math.max(MOBILE_H,ph), bg:src.bg, elements:newEls };
+      const rawH=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+(isHeader?12:40));
+      const ph = isHeader ? Math.min(120,Math.max(48,rawH)) : isFooter ? Math.max(120,rawH) : Math.max(MOBILE_H,rawH);
+      const mp={ id:uid(), name:(src.name||'페이지').replace(/\s*\(모바일\)$/,'')+(isBar?'(모바일)':' (모바일)'), device:'mobile', parentId:null, w:MOBILE_W, h:ph, bg:src.bg, elements:newEls };
+      if(isHeader) mp.isHeader=true; if(isFooter) mp.isFooter=true;
       src.device='pc';
-      project.pages.push(mp); ensureMobileBars(); curPage=pageIndex(mp.id); editorDevice='mobile'; selId=null; selIds=new Set();
+      project.pages.push(mp); if(!isBar) ensureMobileBars(); curPage=pageIndex(mp.id); editorDevice='mobile'; selId=null; selIds=new Set();
       afterMutate(); document.getElementById('aimob-modal').style.display='none';
-      toast('📱 모바일 페이지 + 모바일 상단/하단 바 생성됨 — 원본은 PC 전용');
+      toast(isBar?`📱 모바일 ${isHeader?'상단':'하단'} 바 생성됨 — 원본은 PC 전용`:'📱 모바일 페이지 + 모바일 상단/하단 바 생성됨 — 원본은 PC 전용');
     }
   }catch(e){ aimobStatus('실패: '+_aiErr(e)); }
   finally{ go.disabled=false; go.textContent=ot; }
