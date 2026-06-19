@@ -1113,30 +1113,50 @@ function pageById(id){ return project.pages.find(p=>p.id===id); }
 function pageIndex(id){ return project.pages.findIndex(p=>p.id===id); }
 // 상단 고정 바(직접 디자인하는 헤더) — 발행 시 모든 페이지 상단에 고정
 function addHeaderBar(){
-  let hp=project.pages.find(p=>p.isHeader);
-  if(hp){ curPage=pageIndex(hp.id); selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); toast('상단 바 편집 중 — 글자 더블클릭으로 수정, 속성의 🔗으로 페이지 연결'); return; }
-  hp={ id:uid(), name:'상단 바', isHeader:true, parentId:null, w:PAGE_W, h:96, bg:'#ffffff', elements:[
-    tText(48,28,360,44,'병원 로고',{fontSize:32,fontWeight:900,color:'#1a2b5c',align:'left'}),
-    tText(PAGE_W-540,34,150,30,'병원 소개',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
-    tText(PAGE_W-380,34,150,30,'진료 안내',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
-    tText(PAGE_W-220,34,150,30,'오시는 길',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
-  ]};
-  project.pages.unshift(hp); curPage=0; selId=null; selIds=new Set();
-  afterMutate();
-  toast('상단 바 생성됨 — 메뉴 글자를 선택하고 속성의 🔗에서 페이지를 연결하세요');
+  const wantMobile = editorDevice==='mobile';
+  let hp = wantMobile ? project.pages.find(p=>p.isHeader&&p.device==='mobile')
+                      : project.pages.find(p=>p.isHeader&&p.device!=='mobile');
+  if(hp){ curPage=pageIndex(hp.id); selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); toast((wantMobile?'모바일 ':'')+'상단 바 편집 중'); return; }
+  if(wantMobile){
+    hp={ id:uid(), name:'상단 바(모바일)', isHeader:true, device:'mobile', parentId:null, w:MOBILE_W, h:64, bg:'#ffffff', elements:[
+      tText(74,14,260,36,'병원 로고',{fontSize:24,fontWeight:900,color:'#1a2b5c',align:'left'}),
+    ]};
+    project.pages.unshift(hp); curPage=0; selId=null; selIds=new Set(); afterMutate();
+    toast('모바일 상단 바 생성됨 — 로고만 두세요. 발행 시 좌측상단 햄버거 메뉴가 자동으로 붙습니다');
+  }else{
+    hp={ id:uid(), name:'상단 바', isHeader:true, device:'both', parentId:null, w:PAGE_W, h:96, bg:'#ffffff', elements:[
+      tText(48,28,360,44,'병원 로고',{fontSize:32,fontWeight:900,color:'#1a2b5c',align:'left'}),
+      tText(PAGE_W-540,34,150,30,'병원 소개',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
+      tText(PAGE_W-380,34,150,30,'진료 안내',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
+      tText(PAGE_W-220,34,150,30,'오시는 길',{fontSize:19,fontWeight:700,color:'#1a2b5c',align:'center'}),
+    ]};
+    project.pages.unshift(hp); curPage=0; selId=null; selIds=new Set(); afterMutate();
+    toast('상단 바 생성됨 — 메뉴 글자를 선택하고 속성의 🔗에서 페이지를 연결하세요');
+  }
 }
 // 하단 바(직접 디자인하는 푸터) — 발행 시 모든 페이지 하단에 붙음(고정X), 배경색은 화면 끝까지 이어짐
 function addFooterBar(){
-  let fp=project.pages.find(p=>p.isFooter);
-  if(fp){ curPage=pageIndex(fp.id); selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); toast('하단 바 편집 중 — 배경색은 발행 시 화면 끝까지 이어집니다'); return; }
-  fp={ id:uid(), name:'하단 바', isFooter:true, parentId:null, w:PAGE_W, h:280, bg:'#1a2b5c', elements:[
-    tText(48,54,520,40,'새이름 병원',{fontSize:26,fontWeight:900,color:'#ffffff',align:'left'}),
-    tText(48,108,640,120,'부산광역시 ○○구 ○○로 123\n대표전화 051-000-0000\n평일 09:00–18:00 · 토 09:00–13:00 · 일·공휴일 휴진',{fontSize:16,color:'#cdd6ee',align:'left',lineHeight:1.7}),
-    tText(PAGE_W-360,200,320,28,'© 2026 새이름 병원. All rights reserved.',{fontSize:13,color:'#9aa8cf',align:'right'}),
-  ]};
-  project.pages.push(fp); curPage=project.pages.length-1; selId=null; selIds=new Set();
-  afterMutate();
-  toast('하단 바 생성됨 — 배경색을 바꾸면 발행 시 화면 양끝까지 그 색이 이어집니다');
+  const wantMobile = editorDevice==='mobile';
+  let fp = wantMobile ? project.pages.find(p=>p.isFooter&&p.device==='mobile')
+                      : project.pages.find(p=>p.isFooter&&p.device!=='mobile');
+  if(fp){ curPage=pageIndex(fp.id); selId=null; selIds=new Set(); renderCanvas(); renderPages(); renderProps(); updateRibbonState(); toast((wantMobile?'모바일 ':'')+'하단 바 편집 중 — 배경색은 화면 끝까지 이어집니다'); return; }
+  if(wantMobile){
+    fp={ id:uid(), name:'하단 바(모바일)', isFooter:true, device:'mobile', parentId:null, w:MOBILE_W, h:300, bg:'#1a2b5c', elements:[
+      tText(24,32,382,34,'새이름 병원',{fontSize:22,fontWeight:900,color:'#ffffff',align:'center'}),
+      tText(24,82,382,150,'부산광역시 ○○구 ○○로 123\n대표전화 051-000-0000\n평일 09:00–18:00\n토 09:00–13:00 · 일·공휴일 휴진',{fontSize:16,color:'#cdd6ee',align:'center',lineHeight:1.8}),
+      tText(24,246,382,26,'© 2026 새이름 병원',{fontSize:13,color:'#9aa8cf',align:'center'}),
+    ]};
+    project.pages.push(fp); curPage=project.pages.length-1; selId=null; selIds=new Set(); afterMutate();
+    toast('모바일 하단 바 생성됨 — 글자를 가운데·크게 배치했습니다');
+  }else{
+    fp={ id:uid(), name:'하단 바', isFooter:true, device:'both', parentId:null, w:PAGE_W, h:280, bg:'#1a2b5c', elements:[
+      tText(48,54,520,40,'새이름 병원',{fontSize:26,fontWeight:900,color:'#ffffff',align:'left'}),
+      tText(48,108,640,120,'부산광역시 ○○구 ○○로 123\n대표전화 051-000-0000\n평일 09:00–18:00 · 토 09:00–13:00 · 일·공휴일 휴진',{fontSize:16,color:'#cdd6ee',align:'left',lineHeight:1.7}),
+      tText(PAGE_W-360,200,320,28,'© 2026 새이름 병원',{fontSize:13,color:'#9aa8cf',align:'right'}),
+    ]};
+    project.pages.push(fp); curPage=project.pages.length-1; selId=null; selIds=new Set(); afterMutate();
+    toast('하단 바 생성됨 — 배경색을 바꾸면 발행 시 화면 양끝까지 그 색이 이어집니다');
+  }
 }
 
 // ───────────────────────── 내장 템플릿 ─────────────────────────
@@ -2008,8 +2028,8 @@ function renderPages(){
   const list=document.getElementById('page-list'); list.innerHTML='';
   const dt=document.getElementById('dev-toggle'); if(dt) dt.textContent=editorDevice==='mobile'?'📱 모바일':'💻 PC';
   project.pages.forEach((p,i)=>{
-    // 바(상단/하단)는 항상 표시, 그 외엔 현재 디바이스에 해당하는 것만
-    if(!p.isHeader && !p.isFooter && !inDevice(p, editorDevice)) return;
+    // 현재 디바이스에 해당하는 페이지/바만 표시 (바도 device 플래그로 거름)
+    if(!inDevice(p, editorDevice)) return;
     const t=document.createElement('div');
     t.className='page-thumb'+(i===curPage?' active':'')+(p.isHeader||p.isFooter?' is-header':'');
     const dep=pageDepth(p); if(dep>0) t.style.marginLeft=(dep*12)+'px';
@@ -2183,13 +2203,13 @@ function renderPageProps(box){
   box.innerHTML += `<h4>발행 옵션 (사이트 전체)</h4><div class="grp"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;text-transform:none"><input type="checkbox" id="pg-smooth" ${project.smoothScroll?'checked':''}> 관성 부드러운 스크롤</label><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 페이지에서 스크롤이 미끄러지듯 따라옵니다. 모바일·접근성(動 줄이기) 사용자는 자동으로 일반 스크롤.</div></div>`;
   const smI=box.querySelector('#pg-smooth');
   if(smI) smI.addEventListener('change',()=>{ project.smoothScroll=smI.checked; save(true); snapshot(); toast(smI.checked?'부드러운 스크롤 켜짐 (발행 시 적용)':'부드러운 스크롤 꺼짐'); });
-  if(!p.isHeader && !p.isFooter){
+  {
     const dev=pageDevice(p);
     box.innerHTML += `<h4>표시 기기</h4><div class="grp"><select id="pg-device">
       <option value="both" ${dev==='both'?'selected':''}>PC·모바일 공통</option>
       <option value="pc" ${dev==='pc'?'selected':''}>PC 전용 (넓은 화면)</option>
       <option value="mobile" ${dev==='mobile'?'selected':''}>모바일 전용 (좁은 화면)</option>
-    </select><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 시 화면 폭으로 자동 전환(≤768px=모바일). 모바일 전용은 폭을 430 등 좁게 권장.</div></div>`;
+    </select><div style="font-size:11px;color:var(--sub);margin-top:5px">발행 시 화면 폭으로 자동 전환(≤768px=모바일).${p.isHeader||p.isFooter?' 모바일 전용 바는 폭 430·큰 글자 권장. 모바일에선 좌측상단 햄버거 메뉴가 자동 추가됩니다.':' 모바일 전용은 폭을 430 등 좁게 권장.'}</div></div>`;
     const devSel=box.querySelector('#pg-device');
     if(devSel) devSel.addEventListener('change',()=>{ p.device=devSel.value; renderPages(); save(true); snapshot(); });
   }
