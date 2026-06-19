@@ -557,6 +557,7 @@
       <button class="add-page" id="add-page">＋ 페이지 추가</button>
       <button class="add-page" id="add-header" style="margin-top:6px" title="모든 페이지 상단에 고정되는 바를 직접 디자인">📌 상단 고정 바</button>
       <button class="add-page" id="add-footer" style="margin-top:6px" title="모든 페이지 하단에 붙는 바를 직접 디자인(고정X)">📎 하단 바</button>
+      <button class="add-page" id="ai-mobile-convert" style="margin-top:6px;border-color:rgba(108,123,255,.5);color:var(--accent)" title="현재 PC 페이지를 AI가 모바일(430px) 세로 레이아웃으로 재배치">🤖 AI 모바일 변환</button>
       <button class="add-page" id="open-tpl-lib" style="margin-top:6px" title="저장한 템플릿을 불러오거나 현재 페이지를 저장">📁 내 템플릿</button>
     </div>
     <button id="exp-pages" class="panel-exp-btn" title="페이지 패널 펼치기"><span>페이지 ▶</span></button>
@@ -2851,6 +2852,47 @@ document.getElementById('dev-toggle').onclick=()=>{
 };
 document.getElementById('add-header').onclick=addHeaderBar;
 document.getElementById('add-footer').onclick=addFooterBar;
+document.getElementById('ai-mobile-convert').onclick=runMobileConvert;
+async function runMobileConvert(){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  const src=page();
+  if(src.isHeader||src.isFooter){ toast('상단/하단 바는 변환 대상이 아닙니다'); return; }
+  if(pageDevice(src)==='mobile'){ toast('이미 모바일 페이지입니다'); return; }
+  if(!src.elements.length){ toast('변환할 요소가 없습니다'); return; }
+  const payload=src.elements.map((e,i)=>{
+    const o={i,type:e.type,x:Math.round(e.x),y:Math.round(e.y),w:Math.round(e.w),h:Math.round(e.h)};
+    if(e.type==='text'){ o.text=(e.text||'').replace(/\n/g,' ').slice(0,80); o.fontSize=e.fontSize; o.weight=e.fontWeight; o.align=e.align; }
+    if(e.type==='shape'){ o.shape=e.shape; }
+    return o;
+  });
+  const sys=`너는 반응형 웹 디자이너다. 아래는 PC(폭 ${src.w}px) 페이지 요소 목록(JSON)이다. 이를 모바일(폭 430px) 세로 레이아웃으로 재배치하라.
+규칙:
+- 좌우 여백 24px → 콘텐츠 폭 382px 기준. 대부분 요소는 x=24, w=382(풀폭). 작은 버튼/아이콘은 가운데 정렬해도 됨.
+- 원래 순서(위→아래 흐름)대로 세로 1열로 쌓는다. 같은 줄에 나란히 있던 카드/이미지도 세로로 쌓아라.
+- 텍스트 폰트 크기는 모바일 가독성에 맞게: 큰 제목 30~40, 소제목 22~26, 본문 16~18 (fontSize로 지정).
+- 요소 사이 간격 16~40px, 섹션 사이는 더 넉넉히. 맨 위는 y≥24.
+- 모바일에 불필요한 장식 요소는 생략 가능(els에서 빼면 됨).
+- 위치·크기·(텍스트)글자크기만 정하라. 색·폰트·문구·이미지·링크·효과는 그대로 유지되니 신경쓰지 마라.
+출력 JSON 하나만: {"h":전체페이지높이, "els":[{"i":원본인덱스,"x":,"y":,"w":,"h":,"fontSize":(텍스트만)} ...]}`;
+  const btn=document.getElementById('ai-mobile-convert'); btn.disabled=true; const old=btn.textContent; btn.textContent='🤖 변환 중…';
+  toast('AI가 모바일 레이아웃을 구성 중…');
+  try{
+    const parsed=await aiCall(sys, JSON.stringify(payload), 6000);
+    const els=Array.isArray(parsed.els)?parsed.els:[];
+    if(!els.length) throw new Error('변환 결과가 비었습니다 (다시 시도)');
+    const srcEls=src.elements;
+    const newEls=els.filter(o=>o&&srcEls[o.i]).map(o=>{ const s=JSON.parse(JSON.stringify(srcEls[o.i])); s.id=uid();
+      s.x=Math.round(o.x)||0; s.y=Math.round(o.y)||0; s.w=Math.max(8,Math.round(o.w)||382); s.h=Math.max(8,Math.round(o.h)||40);
+      if(o.fontSize&&s.type==='text') s.fontSize=Math.round(o.fontSize); return s; });
+    if(!newEls.length) throw new Error('변환 결과가 비었습니다');
+    const ph=Math.round(parsed.h)|| (Math.max(...newEls.map(e=>e.y+e.h))+40);
+    const mp={ id:uid(), name:(src.name||'페이지')+' (모바일)', device:'mobile', parentId:null, w:MOBILE_W, h:Math.max(MOBILE_H,ph), bg:src.bg, elements:newEls };
+    src.device='pc'; // 원본은 PC 전용으로 → 모바일에선 새 페이지가 대체
+    project.pages.push(mp); curPage=project.pages.length-1; editorDevice='mobile'; selId=null; selIds=new Set();
+    afterMutate(); toast('📱 모바일 페이지 생성됨 — 원본은 PC 전용으로 설정됨');
+  }catch(e){ toast('실패: '+_aiErr(e)); }
+  finally{ btn.disabled=false; btn.textContent=old; }
+}
 
 // ── 도형 피커 (PPT식 카테고리 갤러리) ──
 function shapeIconStyle(k){
