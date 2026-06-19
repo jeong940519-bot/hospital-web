@@ -1595,10 +1595,8 @@ function renderCanvas(){
 }
 // ── 햄버거 메뉴: 캔버스에서 보면서 편집 (상단 바 페이지에서) ──
 let _hambOpen=false;
-function renderHambOnCanvas(){
-  const old=document.getElementById('hamb-menu'); if(old) old.remove();
-  const p=page(); if(!p.isHeader){ _hambOpen=false; return; }
-  const cfg=hamburgerCfg();
+function buildHambBtn(){
+  const p=page(), cfg=hamburgerCfg();
   const btn=document.createElement('div'); btn.id='hamb-btn';
   const sz=Math.min(cfg.size||40, p.h-8);
   const posLeft=(cfg.pos||'left')==='left';
@@ -1609,9 +1607,18 @@ function renderHambOnCanvas(){
   btn.title='클릭: 햄버거 메뉴 편집';
   btn.addEventListener('mousedown',ev=>ev.stopPropagation());
   btn.addEventListener('click',ev=>{ ev.stopPropagation(); _hambOpen=!_hambOpen; renderCanvas(); });
-  canvas.appendChild(btn);
+  return btn;
+}
+function renderHambOnCanvas(){
+  document.getElementById('hamb-menu')?.remove();
+  document.getElementById('hamb-btn')?.remove();
+  const p=page(); if(!p.isHeader){ _hambOpen=false; return; }
+  canvas.appendChild(buildHambBtn());
   if(_hambOpen) canvasWrap.appendChild(buildHambMenu());
 }
+function updateHambBtn(){ const ob=document.getElementById('hamb-btn'); if(ob) ob.replaceWith(buildHambBtn()); }
+// 패널을 스크롤 위치 보존하며 부분 갱신 (전체 renderCanvas 금지 → 스크롤 점프 방지)
+function refreshHambMenu(){ const old=document.getElementById('hamb-menu'); if(old&&_hambOpen){ const st=old.scrollTop; const fresh=buildHambMenu(); old.replaceWith(fresh); fresh.scrollTop=st; } updateHambBtn(); }
 function buildHambMenu(){
   const p=page(), cfg=hamburgerCfg(), items=hamburgerMaterialize(), roots=hamburgerRootPages();
   const pw=Math.min(360,p.w-16);
@@ -1646,25 +1653,30 @@ function buildHambMenu(){
     <button class="hmx-pos" data-pos="left" style="border:1px solid #ddd;background:${hpos==='left'?'#6c7bff':'#fff'};color:${hpos==='left'?'#fff':'#444'};border-radius:5px;cursor:pointer;font-size:11px;padding:4px 9px">왼쪽</button>
     <button class="hmx-pos" data-pos="right" style="border:1px solid #ddd;background:${hpos==='right'?'#6c7bff':'#fff'};color:${hpos==='right'?'#fff':'#444'};border-radius:5px;cursor:pointer;font-size:11px;padding:4px 9px">오른쪽</button>
   </div>
-  <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888">
+  <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888;margin-bottom:6px">
     <span>☰ 크기 <b id="hmx-size-val" style="color:#555">${hsz}</b></span>
     <input id="hmx-size" type="range" min="28" max="64" value="${hsz}" style="flex:1">
+  </div>
+  <div style="display:flex;gap:8px;align-items:center;font-size:11px;color:#888">
+    <span>메뉴 글자 <b id="hmx-isize-val" style="color:#555">${cfg.itemSize||17}</b></span>
+    <input id="hmx-isize" type="range" min="13" max="28" value="${cfg.itemSize||17}" style="flex:1">
   </div>`;
   panel.innerHTML=html;
   panel.querySelectorAll('.panel-cbtn').forEach(b=>b.addEventListener('click',ev=>{ ev.stopPropagation(); toggleColorPopup(b.dataset.cpkey, b); }));
-  panel.querySelectorAll('.hmx-pos').forEach(b=>b.addEventListener('click',()=>{ hamburgerCfg().pos=b.dataset.pos; save(true); snapshot(); renderCanvas(); }));
-  const szI=panel.querySelector('#hmx-size'); if(szI){ szI.addEventListener('input',()=>{ const v=parseInt(szI.value)||40; hamburgerCfg().size=v; save(true); const sv=panel.querySelector('#hmx-size-val'); if(sv)sv.textContent=v; const hb=document.getElementById('hamb-btn'); if(hb){ const pp=page(); const g=Math.max(3,Math.round(v*0.13)); hb.style.width=(v+10)+'px'; hb.style.height=v+'px'; hb.style.top=Math.round((pp.h-v)/2)+'px'; hb.style.gap=g+'px'; } }); szI.addEventListener('change',()=>{ renderCanvas(); snapshot(); }); }
+  panel.querySelectorAll('.hmx-pos').forEach(b=>b.addEventListener('click',()=>{ hamburgerCfg().pos=b.dataset.pos; save(true); snapshot(); refreshHambMenu(); }));
+  const szI=panel.querySelector('#hmx-size'); if(szI){ szI.addEventListener('input',()=>{ const v=parseInt(szI.value)||40; hamburgerCfg().size=v; save(true); const sv=panel.querySelector('#hmx-size-val'); if(sv)sv.textContent=v; const hb=document.getElementById('hamb-btn'); if(hb){ const pp=page(); const g=Math.max(3,Math.round(v*0.13)); hb.style.width=(v+10)+'px'; hb.style.height=v+'px'; hb.style.top=Math.round((pp.h-v)/2)+'px'; hb.style.gap=g+'px'; } }); szI.addEventListener('change',()=>snapshot()); }
+  const isI=panel.querySelector('#hmx-isize'); if(isI){ isI.addEventListener('input',()=>{ hamburgerCfg().itemSize=parseInt(isI.value)||16; save(true); const iv=panel.querySelector('#hmx-isize-val'); if(iv)iv.textContent=hamburgerCfg().itemSize; }); isI.addEventListener('change',()=>snapshot()); }
   panel.querySelector('#hmx-close').addEventListener('click',()=>{ _hambOpen=false; renderCanvas(); });
   panel.querySelectorAll('.hmx-item').forEach(row=>{
     const idx=+row.dataset.idx;
     row.querySelector('.hmx-name').addEventListener('input',e2=>{ hamburgerMaterialize()[idx].name=e2.target.value; save(true); });
     row.querySelector('.hmx-name').addEventListener('change',snapshot);
     row.querySelector('.hmx-link').addEventListener('change',e2=>{ hamburgerMaterialize()[idx].link=e2.target.value; save(true); snapshot(); });
-    row.querySelector('.hmx-up').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx>0){ [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; save(true); snapshot(); renderCanvas(); } });
-    row.querySelector('.hmx-down').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx<a.length-1){ [a[idx+1],a[idx]]=[a[idx],a[idx+1]]; save(true); snapshot(); renderCanvas(); } });
-    row.querySelector('.hmx-del').addEventListener('click',()=>{ const a=hamburgerMaterialize(); a.splice(idx,1); save(true); snapshot(); renderCanvas(); });
+    row.querySelector('.hmx-up').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx>0){ [a[idx-1],a[idx]]=[a[idx],a[idx-1]]; save(true); snapshot(); refreshHambMenu(); } });
+    row.querySelector('.hmx-down').addEventListener('click',()=>{ const a=hamburgerMaterialize(); if(idx<a.length-1){ [a[idx+1],a[idx]]=[a[idx],a[idx+1]]; save(true); snapshot(); refreshHambMenu(); } });
+    row.querySelector('.hmx-del').addEventListener('click',()=>{ const a=hamburgerMaterialize(); a.splice(idx,1); save(true); snapshot(); refreshHambMenu(); });
   });
-  panel.querySelector('#hmx-add').addEventListener('click',()=>{ const a=hamburgerMaterialize(); const r=roots[0]; a.push({name:r?r.name:'새 메뉴', link:r?r.id:''}); save(true); snapshot(); renderCanvas(); });
+  panel.querySelector('#hmx-add').addEventListener('click',()=>{ const a=hamburgerMaterialize(); const r=roots[0]; a.push({name:r?r.name:'새 메뉴', link:r?r.id:''}); save(true); snapshot(); refreshHambMenu(); });
   return panel;
 }
 // 텍스트 autofit — 상자에 넘치면 글자 크기를 줄여 맞춤(저장값은 최대치 유지)
@@ -2372,7 +2384,7 @@ function renderPageProps(box){
       <div style="font-size:12px;color:var(--sub);margin-bottom:8px;line-height:1.6">캔버스 상단 바의 <b style="color:var(--accent2)">☰ 버튼</b>을 클릭하면 메뉴를 <b>보면서</b> 항목·이름·연결·색을 편집할 수 있어요.</div>
       <button id="hm-open-canvas" class="tb-btn primary" style="width:100%">☰ 캔버스에서 메뉴 편집 열기</button>`;
     const ob=box.querySelector('#hm-open-canvas');
-    if(ob) ob.addEventListener('click',()=>{ _hambOpen=true; renderCanvas(); });
+    if(ob) ob.addEventListener('click',()=>{ _hambOpen=true; renderCanvas(); setTimeout(()=>{ const mn=document.getElementById('hamb-menu'); if(mn) mn.scrollIntoView({block:'nearest',behavior:'smooth'}); },30); });
   }
   // ── 섹션 관리 ──
   const secs=sortedSections(p);
@@ -4659,11 +4671,11 @@ const CP_TARGETS={
     current:()=>{ const e=selId?el(selId):null; return e&&e.stColor; },
     set:v=>{ const e=selId?el(selId):null; if(!e)return; e.stColor=v; liveStyleEl(e); } },
   hmBtn:{ label:'햄버거 버튼 색', rich:false, current:()=>hamburgerCfg().btnColor||'#1a2b5c',
-    set:v=>{ hamburgerCfg().btnColor=v; save(true); renderCanvas(); } },
+    set:v=>{ hamburgerCfg().btnColor=v; save(true); refreshHambMenu(); } },
   hmBg:{ label:'메뉴 배경', rich:false, current:()=>hamburgerCfg().bg||'#ffffff',
-    set:v=>{ hamburgerCfg().bg=v; save(true); renderCanvas(); } },
+    set:v=>{ hamburgerCfg().bg=v; save(true); refreshHambMenu(); } },
   hmColor:{ label:'메뉴 글자색', rich:false, current:()=>hamburgerCfg().color||'#1a2b5c',
-    set:v=>{ hamburgerCfg().color=v; save(true); renderCanvas(); } },
+    set:v=>{ hamburgerCfg().color=v; save(true); refreshHambMenu(); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){

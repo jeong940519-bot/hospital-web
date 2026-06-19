@@ -348,9 +348,9 @@
       +(_gFonts.length?'<link href="'+_fontsUrl+'" rel="stylesheet">':'')
       +(_ff?'<style>'+_ff+'</style>':'')
       +'<style>*{margin:0;box-sizing:border-box}body{background:#ffffff;font-family:\'Noto Sans KR\',sans-serif}'
-      +'nav{position:sticky;top:0;z-index:100;background:#fff;box-shadow:0 1px 8px #0002;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:12px}'
-      +'nav a{color:#1a2b5c;text-decoration:none;font-weight:700;font-size:15px;padding:7px 16px;border-radius:22px;transition:.15s;cursor:pointer}'
-      +'nav a:hover{background:#eef3ff}nav a.active{background:#2b6cff;color:#fff}'
+      +'.topnav{position:sticky;top:0;z-index:100;background:#fff;box-shadow:0 1px 8px #0002;display:flex;gap:4px;justify-content:center;flex-wrap:wrap;padding:12px}'
+      +'.topnav a{color:#1a2b5c;text-decoration:none;font-weight:700;font-size:15px;padding:7px 16px;border-radius:22px;transition:.15s;cursor:pointer}'
+      +'.topnav a:hover{background:#eef3ff}.topnav a.active{background:#2b6cff;color:#fff}'
       +'.pgwrap{width:100%;overflow:hidden}'
       +'.pg{position:relative;overflow:hidden;transform-origin:top left}'
       +'.secblock{width:100%;overflow:hidden;position:relative}'
@@ -362,14 +362,15 @@
       +'#hmbtn:active{background:rgba(0,0,0,.06)}'
       +'#hmdrawer{position:fixed;top:0;left:0;height:100%;width:74%;max-width:300px;background:#fff;z-index:420;transform:translateX(-100%);transition:transform .28s;box-shadow:2px 0 18px rgba(0,0,0,.25);padding:60px 0 20px;overflow-y:auto}'
       +'#hmdrawer.open{transform:none}'
-      +'#hmdrawer a{display:block;padding:15px 24px;color:inherit;text-decoration:none;font-weight:700;font-size:17px;border-bottom:1px solid rgba(0,0,0,.06)}'
+      +'#hmdrawer a{display:block;padding:15px 24px;color:inherit;text-decoration:none;font-weight:700;font-size:'+(hm.itemSize||17)+'px;border-bottom:1px solid rgba(0,0,0,.06);border-radius:0;background:none}'
+      +'#hmdrawer a.active{background:rgba(0,0,0,.05);color:inherit}'
       +'#hmdrawer a:active{background:#eef3ff}'
       +'#hmoverlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:410;opacity:0;pointer-events:none;transition:opacity .28s}'
       +'#hmoverlay.open{opacity:1;pointer-events:auto}'
       +'.el{position:absolute}'
       +FX_CSS
       +'</style></head>'
-      +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav>'+menu+'</nav>':'')+pagesHtml+footerHtml
+      +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav class="topnav">'+menu+'</nav>':'')+pagesHtml+footerHtml
       +'<script>var PW='+PAGE_W+';'+(opts.forceDevice?'window.__forceDev="'+opts.forceDevice+'";':'')
       +'function fit(){'
         +'var iw=window.innerWidth,HH=0;'
