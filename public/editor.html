@@ -3570,18 +3570,22 @@ function buildAiCtx(scope){
   const list = scoped ? p.elements.filter(e=>scope.has(e.id)) : p.elements;
   const rows=list.map((e)=>{
     const i=p.elements.indexOf(e);
-    let d=`[${i}] id="${e.id}" type=${e.type} pos=(${Math.round(e.x)},${Math.round(e.y)}) size=${Math.round(e.w)}×${Math.round(e.h)}`;
-    if(e.type==='text') d+=` 텍스트="${e.text.replace(/\n/g,'↵').slice(0,50)}" font=${e.fontFamily} ${e.fontSize}px w=${e.fontWeight} color=${e.color} align=${e.align}`;
-    else if(e.type==='shape') d+=` fill=${e.fill} shape=${e.shape} radius=${e.radius}`;
+    const oob=(e.x<0||e.y<0||e.x+e.w>p.w||e.y+e.h>p.h);
+    let d=`[${i}] id="${e.id}" type=${e.type} pos=(${Math.round(e.x)},${Math.round(e.y)}) size=${Math.round(e.w)}×${Math.round(e.h)}${oob?' ⚠화면밖':''}`;
+    if(e.type==='text'){ d+=` 텍스트="${e.text.replace(/\n/g,'↵').slice(0,50)}" font=${e.fontFamily} ${e.fontSize}px w=${e.fontWeight} color=${e.color} align=${e.align}`;
+      if(e.valign&&e.valign!=='middle') d+=` valign=${e.valign}`; if(e.highlight) d+=` 강조=${e.highlight}`; if(e.bullet&&e.bullet!=='none') d+=` 글머리=${e.bullet}`; }
+    else if(e.type==='shape'){ d+=` fill=${e.fill} shape=${e.shape} radius=${e.radius}`;
+      if(e.borderW) d+=` border=${e.borderW}/${e.borderColor}`; if(e.fillOpacity!=null&&e.fillOpacity<100) d+=` 불투명도=${e.fillOpacity}`; if(e.stext) d+=` 내부글자="${e.stext.slice(0,24)}"`; }
     else if(e.type==='image') d+=` fit=${e.fit} clip=${e.clip}`;
     if(e.rot) d+=` rot=${e.rot}°`;
     if(e.fx&&e.fx.type) d+=` [fx:${e.fx.type}]`;
     if(e.link){const lp=pageById(e.link);d+=` [링크→${lp?lp.name:e.link}]`;}
     return d;
   });
+  const dev = pageDevice(p)==='mobile' ? ' (모바일 페이지)' : pageDevice(p)==='pc' ? ' (PC 전용)' : '';
   const head = scoped
-    ? `페이지 "${p.name}" 중 ★선택된 섹션★ ${list.length}개 요소만 대상 (이 요소들 외엔 절대 건드리지 말 것):\n`
-    : `페이지: "${p.name}" ${p.w}×${p.h}px 배경=${p.bg}\n요소(${p.elements.length}개):\n`;
+    ? `페이지 "${p.name}"${dev} 중 ★선택된 섹션★ ${list.length}개 요소만 대상 (이 요소들 외엔 절대 건드리지 말 것). 캔버스 ${p.w}×${p.h}px:\n`
+    : `페이지: "${p.name}"${dev} ${p.w}×${p.h}px 배경=${p.bg}\n요소(${p.elements.length}개):\n`;
   return head+rows.join('\n');
 }
 
@@ -3590,7 +3594,7 @@ function applyAiActions(actions){
   for(const a of actions){
     if(a.type==='update_element'){
       const e=el(a.id); if(!e) continue;
-      Object.assign(e, a.props||{});
+      if(a.props && typeof a.props==='object'){ const pr={...a.props}; delete pr.id; delete pr.type; Object.assign(e, pr); }
       if('fx' in a){ if(a.fx&&a.fx.type) e.fx=a.fx; else delete e.fx; }
       changed=true;
     } else if(a.type==='add_element'){
@@ -3612,7 +3616,13 @@ function applyAiActions(actions){
       changed=true;
     } else if(a.type==='reorder_element'){
       const arr=page().elements,i=arr.findIndex(x=>x.id===a.id);
-      if(i>=0){if(a.to==='front')arr.push(arr.splice(i,1)[0]);else arr.unshift(arr.splice(i,1)[0]);changed=true;}
+      if(i>=0){
+        if(a.to==='front')arr.push(arr.splice(i,1)[0]);
+        else if(a.to==='back')arr.unshift(arr.splice(i,1)[0]);
+        else if(a.to==='forward'&&i<arr.length-1){[arr[i],arr[i+1]]=[arr[i+1],arr[i]];}
+        else if(a.to==='backward'&&i>0){[arr[i-1],arr[i]]=[arr[i],arr[i-1]];}
+        changed=true;
+      }
     }
   }
   return changed;
@@ -3655,12 +3665,12 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 2. {"type":"add_element","element":{type:"text"|"shape"|"image",x,y,w,h,rot:0,...속성}}
 3. {"type":"delete_element","id":"요소ID"}
 4. {"type":"update_page","props":{bg:"#hex",h:숫자,name:"문자열"}}
-5. {"type":"reorder_element","id":"요소ID","to":"front"|"back"}
+5. {"type":"reorder_element","id":"요소ID","to":"front"|"back"|"forward"|"backward"}
 
 속성 참고:
-텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right), lineHeight(0.8~2.5), letterSpacing, italic(bool), underline(bool)
-도형: fill(#hex), shape(rect|circle), radius, borderW, borderColor(#hex)
-이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor
+텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right|justify), valign(top|middle|bottom), lineHeight(0.8~2.5), letterSpacing, italic/underline/strike(bool), highlight(#hex|null), bullet(none|disc|number)
+도형: fill(#hex), shape(rect|rrect|circle|line|line-arrow 등), radius, borderW, borderColor(#hex), fillOpacity(0~100), 내부글자=stext/stColor/stSize
+이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor (src는 바꾸지 마라)
 이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"char-reveal",mode:"char"|"word",stagger:40}(텍스트 전용·글자 등장) | {type:"parallax",speed:0.15}(스크롤 패럴랙스) | {type:"scroll-scrub",mode:"both"|"scale"|"fade"}(스크롤 확대/페이드) | {type:"bg-video",src:"URL",kind:"mp4"|"youtube"|"vimeo"}(도형/이미지 배경영상) | {type:"sticky"}(상단 고정) | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
 진입(스크롤 시 1회): {type:"mask-wipe"|"mask-wipe-l"|"rotate-in"|"blur-in"|"skew-in"|"flip-in"|"zoom-in"|"zoom-out"|"bounce-in"|"fade-in"|"slide-down"|"slide-right"|"slide-left"|"flip-y"|"pop-in"} (옵션 없음)
 상시 루프: {type:"float"|"pulse"|"spin"|"wobble"|"shake"|"heartbeat"|"tada"|"swing"|"glow-loop"|"blink"} | {type:"gradient-flow"}(그라데이션 채운 도형) | {type:"marquee"}(텍스트만)
@@ -3674,6 +3684,20 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 - parallax=큰 배경사진에만, scroll-scrub=핵심 1~2개만, pulse/spin/marquee=페이지당 1개 이하·제목/본문 금지.
 - 한 요소에 fx 1개(루프 중복 금지). 진입+호버는 함께 OK. 사용자가 "과하게/화려하게" 안 했으면 절제(병원=차분/신뢰).
 - "효과 다 넣어줘" 같은 요청도 무분별하게 전부 넣지 말고 위 규칙대로 의미 있는 곳에만.
+
+[배치·안전 규칙]
+- 모든 x,y,w,h는 캔버스 안(0~${page().w}, 0~${page().h}). 요소를 페이지 밖으로 내보내지 마라. ⚠화면밖 요소는 안으로 들여라.
+- 요청과 무관한 요소는 건드리지 마라. 꼭 필요한 최소한만 수정.
+- "가운데/정렬/같은 간격"은 각 요소의 x(또는 y)를 직접 계산해 update_element로 맞춰라(가로 가운데 x=(페이지폭-요소폭)/2). 여러 개면 한 번에 여러 action.
+- 색/문구만 바꾸라면 위치·크기는 그대로.
+
+[예시]
+사용자: "제목 키우고 가운데, 그 아래 파란 예약 버튼 추가"
+응답: {"reply":"제목을 키워 가운데 정렬하고 아래에 파란 예약 버튼을 추가했어요.","actions":[
+ {"type":"update_element","id":"abc","props":{"fontSize":56,"align":"center","x":0,"w":${page().w}}},
+ {"type":"add_element","element":{"type":"shape","shape":"rrect","x":${Math.round(page().w/2-120)},"y":300,"w":240,"h":64,"fill":"#2b6cff","radius":32}},
+ {"type":"add_element","element":{"type":"text","x":${Math.round(page().w/2-120)},"y":300,"w":240,"h":64,"text":"진료 예약","fontSize":22,"fontWeight":700,"color":"#ffffff","align":"center","valign":"middle"}}
+]}
 
 반드시 JSON만 응답: {"reply":"한국어설명","actions":[...]}`+deviceHint();
 
@@ -3819,13 +3843,16 @@ document.querySelectorAll('#aicolor-modal [data-aicolor-preset]').forEach(b=>b.a
 document.getElementById('aicolor-go').onclick=async()=>{
   const p=page(); if(!p.elements.length){ aicolorStatus('요소가 없습니다'); return; }
   const desc=document.getElementById('aicolor-desc').value.trim();
-  const sys=`너는 병원 홈페이지 컬러 디자이너다. 페이지 요소 목록과 분위기 요청을 보고 일관된 색 팔레트를 정해 적용한다.
+  const sys=`너는 병원 홈페이지 컬러 디자이너다. 페이지 요소 목록을 보고 먼저 머릿속으로 팔레트(주색 1 + 보조 1~2 + 중성/배경)를 정한 뒤, 그 팔레트로 일관되게 적용한다.
 규칙:
-- 도형 fill, 텍스트 color, 페이지 배경(bg)을 조정해 통일감 있는 팔레트를 만든다.
-- 텍스트는 배경 대비 충분히(가독성). 본문은 어둡게, 강조/버튼은 포인트색.
-- 색은 #RRGGBB. 과하지 않게 2~3색 + 중성색 기조.
-${desc?`★ 분위기 요청 우선 반영: "${desc}"`:''}
-출력 JSON 하나만: {"reply":"한줄설명","actions":[{"type":"update_element","id":"ID","props":{"fill":"#hex"또는"color":"#hex"}},{"type":"update_page","props":{"bg":"#hex"}}]}`+deviceHint();
+- 색은 #RRGGBB. 전체 팔레트는 3~4색 이내로 절제. 병원은 신뢰감(차분한 블루/그린/네이비 + 화이트/그레이) 기조가 기본.
+- 본문 텍스트는 밝은 배경 위 진한색(대비 충분, 거의 검정 계열). 흰/밝은 배경에 옅은 회색 본문 금지.
+- 버튼(둥근 도형) = 포인트색 배경 + 흰색 글자. 카드 배경 = 아주 연한 톤(주색의 10~15% 명도), 그 위 글자는 진하게.
+- 큰 섹션 배경은 흰색 또는 아주 연한 톤. 페이지 bg는 보통 흰색/연한색.
+- 이미지(type=image)는 색이 없으니 건드리지 마라. 같은 역할(예: 카드들)은 같은 색으로 통일.
+- 텍스트=color, 도형=fill로만 바꾼다. 위치·크기·문구는 절대 바꾸지 마라.
+${desc?`★ 분위기 요청 우선 반영: "${desc}" (요청 톤에 팔레트를 맞춰라)`:''}
+출력 JSON 하나만: {"reply":"어떤 팔레트를 썼는지 한줄","actions":[{"type":"update_element","id":"ID","props":{"fill":"#hex"또는"color":"#hex"}},{"type":"update_page","props":{"bg":"#hex"}}]}`+deviceHint();
   const go=document.getElementById('aicolor-go'); go.disabled=true; go.textContent='🎨 구성 중…'; aicolorStatus('AI가 색감을 구성 중…');
   try{
     const parsed=await aiCall(sys, buildAiCtx()+(desc?`\n\n[분위기] ${desc}`:''), 4000);
@@ -3845,9 +3872,16 @@ document.getElementById('aireview-close').onclick=()=>document.getElementById('a
 document.getElementById('aireview-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aireview-modal') e.currentTarget.style.display='none'; });
 document.getElementById('aireview-run').onclick=async()=>{
   const p=page(); if(!p.elements.length){ aireviewStatus('요소가 없습니다'); return; }
-  const sys=`너는 병원 홈페이지 UI/UX 검수 전문가다. 현재 페이지를 점검하고 개선점을 제시한다.
-점검 항목: 텍스트-배경 대비/가독성, 글자 크기 균형, 요소 정렬·간격, 여백, 색 통일감, 빈/겹친 요소.
-출력 JSON 하나만: {"review":"발견한 문제와 제안을 항목별로 한국어로 (•머리표, 4~7줄)","actions":[{"type":"update_element","id":"ID","props":{...}} ... 자동 적용 가능한 구체 수정만, 없으면 빈 배열]}`+deviceHint();
+  const sys=`너는 병원 홈페이지 UI/UX 검수 전문가다. 현재 페이지를 점검하고 가장 중요한 개선점부터 제시한다.
+구체 점검 항목:
+- ⚠화면밖 표시된 요소(페이지 경계 초과) → 안으로
+- 텍스트-배경 대비 부족(밝은 배경에 옅은 글자 등) → 더 진하게
+- 너무 작은 본문 글자(14px 미만) 또는 제목/본문 크기 위계가 약함
+- 요소 겹침(같은 영역에 의도치 않게 포개짐), 정렬 안 맞음(좌측·중앙 제각각), 간격 불균일
+- 빈 텍스트("") 또는 자리표시자("제목","텍스트") 방치
+- 색 통일감 부족(버튼·카드 색이 제각각)
+규칙: review는 발견한 문제를 중요도 순으로 •머리표 4~7줄. 추측이 아니라 좌표·크기·색 근거로. actions에는 "확실히 좋아지는 구체 수정"만(없으면 빈 배열). 위치·색·크기 수정만, 문구 창작은 하지 마라.
+출력 JSON 하나만: {"review":"한국어 항목별 진단","actions":[{"type":"update_element","id":"ID","props":{...}} ...]}`+deviceHint();
   const btn=document.getElementById('aireview-run'); btn.disabled=true; btn.textContent='🔎 점검 중…'; aireviewStatus('AI가 페이지를 점검 중…');
   try{
     const parsed=await aiCall(sys, buildAiCtx(), 3000);
