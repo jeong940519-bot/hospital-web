@@ -253,7 +253,8 @@
     return '';
   }
 
-  function buildSiteHtml(project, PAGE_W){
+  function buildSiteHtml(project, PAGE_W, opts){
+    opts = opts || {};
     PAGE_W = PAGE_W||(project.pages[0]&&project.pages[0].w)||1200;
     // 상단 고정 바(직접 디자인한 헤더) 분리
     var headerPages = [], footerPages = [], contentPages = [];
@@ -362,7 +363,7 @@
       +FX_CSS
       +'</style></head>'
       +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav>'+menu+'</nav>':'')+pagesHtml+footerHtml
-      +'<script>var PW='+PAGE_W+';'
+      +'<script>var PW='+PAGE_W+';'+(opts.forceDevice?'window.__forceDev="'+opts.forceDevice+'";':'')
       +'function fit(){'
         +'var iw=window.innerWidth,HH=0;'
         +'document.querySelectorAll(".topbar").forEach(function(tb){if(tb.style.display==="none")return;var tp=tb.querySelector(".topbar-pg");var tw=tp.offsetWidth||PW;var ts=Math.min(1,iw/tw);tp.style.transform="scale("+ts+")";tp.style.marginLeft=Math.max(0,(iw-tw*ts)/2)+"px";HH=tp.offsetHeight*ts;tb.style.height=HH+"px";});'
@@ -379,7 +380,7 @@
         +'});'
         +'document.querySelectorAll(".footerbar").forEach(function(fb){if(fb.style.display==="none")return;var fp=fb.querySelector(".footer-pg");var fw=fp.offsetWidth||PW;var fs=Math.min(1,iw/fw);fp.style.transform="scale("+fs+")";fp.style.marginLeft=Math.max(0,(iw-fw*fs)/2)+"px";fb.style.height=(fp.offsetHeight*fs)+"px";});'
       +'}'
-      +'function curDev(){return window.innerWidth<=768?"mobile":"pc";}'
+      +'function curDev(){return window.__forceDev||(window.innerWidth<=768?"mobile":"pc");}'
       +'function devOk(el){var x=el.getAttribute("data-dev")||"both";var d=curDev();return x==="both"||x===d;}'
       +'function pickBar(sel){var bars=[].slice.call(document.querySelectorAll(sel));if(!bars.length)return;var d=curDev(),spec=null,both=null;bars.forEach(function(b){var x=b.getAttribute("data-dev")||"both";if(x===d&&!spec)spec=b;if(x==="both"&&!both)both=b;});var ch=spec||both||bars[0];bars.forEach(function(b){b.style.display=(b===ch)?"block":"none";});}'
       +'function hmToggle(o){var dr=document.getElementById("hmdrawer"),ov=document.getElementById("hmoverlay");if(!dr)return;var open=(o!=null)?o:!dr.classList.contains("open");dr.classList.toggle("open",open);ov.classList.toggle("open",open);}'

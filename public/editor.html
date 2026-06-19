@@ -4653,9 +4653,13 @@ window.addEventListener('keydown',ev=>{
 
 // ───────────────────────── 미리보기(발행 렌더) — site-render.js 공유 ─────────────────────────
 function preview(){
-  const w=window.open('','_blank');
-  w.document.write(SiteRender.buildSiteHtml(project, (project.pages[0]&&project.pages[0].w)||PAGE_W));
+  const mob = editorDevice==='mobile';
+  const w = mob ? window.open('','_blank','width=440,height=880') : window.open('','_blank');
+  if(!w){ toast('팝업이 차단되었습니다 — 허용해 주세요'); return; }
+  const baseW = (project.pages.find(p=>!p.isHeader&&!p.isFooter&&inDevice(p,editorDevice))||project.pages[0]||{}).w || PAGE_W;
+  w.document.write(SiteRender.buildSiteHtml(project, baseW, {forceDevice: editorDevice}));
   w.document.close();
+  toast(mob?'📱 모바일 미리보기':'💻 PC 미리보기');
 }
 
 // ───────────────────────── 유틸 ─────────────────────────
