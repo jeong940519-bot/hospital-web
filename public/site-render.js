@@ -31,6 +31,30 @@
         dotW:dotW, dotH:dotH, dotRadius:dotRadius, dotColor:dotColor, dotOn:dotOn, dotGap:dotGap, dotBottom:dotBottom, dotX:dotX, dotShape:dotShape, arrowShape:(fx.arrowShape||'circle'), prev:glyph[0], next:glyph[1] } };
   }
 
+  /* 고정탭(플로팅 탭) 스타일 해석 — 편집기·발행본 공유. corner=tl|tr|bl|br + dx/dy 오프셋. */
+  function fixTabResolve(t){
+    t=t||{};
+    var corner=t.corner||'br';
+    var dx=(t.dx!=null?+t.dx:24), dy=(t.dy!=null?+t.dy:24);
+    var w=(t.w!=null?+t.w:118), h=(t.h!=null?+t.h:46);
+    var hx=(corner.indexOf('l')>=0)?('left:'+dx+'px'):('right:'+dx+'px');
+    var hy=(corner.indexOf('t')>=0)?('top:'+dy+'px'):('bottom:'+dy+'px');
+    var radius=(t.radius!=null?+t.radius:23);
+    var appearance='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
+      +';font-size:'+(+(t.fontSize||15))+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
+      +';border-radius:'+radius+'px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2'
+      +';box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;box-sizing:border-box;padding:4px 8px;text-decoration:none';
+    return { hx:hx, hy:hy, w:w, h:h, appearance:appearance, label:(t.label!=null?t.label:'예약'), action:(t.action||'top'), link:t.link||'', url:t.url||'', dev:(t.device||'both') };
+  }
+  function fixTabHtml(t){
+    var r=fixTabResolve(t);
+    var common=' class="fixtab" data-dev="'+r.dev+'" style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.appearance+'"';
+    var inner=esc(r.label);
+    if(r.action==='url') return '<a href="'+esc(r.url||'#')+'" target="_blank" rel="noopener"'+common+'>'+inner+'</a>';
+    if(r.action==='link') return '<div data-link="'+esc(r.link)+'"'+common+'>'+inner+'</div>';
+    return '<div data-fixtab="top"'+common+'>'+inner+'</div>';
+  }
+
   /* ── 효과 CSS ── */
   var FX_CSS = [
     '[data-fx-sr]{opacity:0;transition:opacity .65s ease,transform .65s ease}',
@@ -353,10 +377,14 @@
     var hmBtnStyle = 'color:'+hmBtnC+';width:'+hmSize+'px;height:'+hmSize+'px;font-size:'+Math.round(hmSize*0.55)+'px;'+(hmPos==='right'?'right:10px;left:auto;':'left:10px;right:auto;');
     var drawerLinks = hmItems.map(function(it){ var pg=pageMap[it.link]; return '<a href="#" data-id="'+(it.link||'')+'" data-dev="'+((pg&&pg.device)||'both')+'">'+esc(it.name||'')+'</a>'; }).join('');
     var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴" style="'+hmBtnStyle+'">☰</button><div id="hmoverlay"></div><nav id="hmdrawer" style="background:'+hmBg+';color:'+hmColor+'">'+drawerLinks+'</nav>';
+    // 고정탭(플로팅) — 모든 페이지에 항상 표시
+    var fixTabsHtml = (project.fixedTabs||[]).map(fixTabHtml).join('');
 
     var fxJs=Object.keys(usedFx).map(function(k){return FX_JS[k]||'';}).join('\n');
     var hasAf=false; project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.autofit)hasAf=true;});});
     if(hasAf) fxJs+=';(function(){function aft(){document.querySelectorAll("[data-autofit]").forEach(function(inner){var box=inner.parentNode;if(!box)return;var max=+inner.getAttribute("data-af-max")||parseFloat(getComputedStyle(inner).fontSize);var s=max;inner.style.fontSize=s+"px";var g=0;while(inner.scrollHeight>box.clientHeight+1&&s>6&&g<240){s-=1;inner.style.fontSize=s+"px";g++;}});}window.addEventListener("load",aft);window.addEventListener("resize",aft);aft();})();';
+    // 고정탭: 맨위로 동작 + 디바이스별 표시/숨김
+    if((project.fixedTabs||[]).length) fxJs+=';(function(){function dev(){return window.__forceDev||(innerWidth<=768?"mobile":"pc");}function upd(){var d=dev();document.querySelectorAll(".fixtab").forEach(function(el){var x=el.getAttribute("data-dev")||"both";el.style.display=(x==="both"||x===d)?"flex":"none";});}document.querySelectorAll("[data-fixtab=\\"top\\"]").forEach(function(el){el.addEventListener("click",function(){window.scrollTo({top:0,behavior:"smooth"});});});window.addEventListener("resize",upd);upd();})();';
     // 관성 부드러운 스크롤 (모바일/접근성 자동 예외)
     if(project.smoothScroll) fxJs+=';(function(){try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;}catch(_){}if("ontouchstart" in window||navigator.maxTouchPoints>0)return;var target=window.scrollY||0,running=false;function maxY(){return Math.max(0,document.documentElement.scrollHeight-window.innerHeight);}function loop(){var cur=window.scrollY,d=target-cur;if(Math.abs(d)<0.5){running=false;return;}window.scrollTo(0,cur+d*0.09);requestAnimationFrame(loop);}window.addEventListener("wheel",function(e){if(e.ctrlKey)return;e.preventDefault();target=Math.max(0,Math.min(maxY(),(running?target:window.scrollY)+e.deltaY));if(!running){running=true;requestAnimationFrame(loop);}},{passive:false});window.addEventListener("resize",function(){target=Math.max(0,Math.min(maxY(),target));});})();';
 
@@ -400,7 +428,7 @@
       +'.el{position:absolute}'
       +FX_CSS
       +'</style></head>'
-      +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav class="topnav">'+menu+'</nav>':'')+pagesHtml+footerHtml
+      +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav class="topnav">'+menu+'</nav>':'')+pagesHtml+footerHtml+fixTabsHtml
       +'<script>var PW='+PAGE_W+';'+(opts.forceDevice?'window.__forceDev="'+opts.forceDevice+'";':'')
       +'function fit(){'
         +'var iw=window.innerWidth,HH=0;'
@@ -449,5 +477,5 @@
       +'<\/script></body></html>';
   }
 
-  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars};
+  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve};
 })();

@@ -531,6 +531,7 @@ function renderCanvas(){
   }
   applyAutofits();
   renderHambOnCanvas();
+  renderFixTabsOnCanvas();
 }
 // ── 햄버거 메뉴: 캔버스에서 보면서 편집 (상단 바 페이지에서) ──
 let _hambOpen=false;
@@ -849,6 +850,114 @@ function openSliderPartPopup(part,e,x,y){
   setTimeout(()=>document.addEventListener('mousedown',closer),0);
 }
 
+// ───────── 고정탭(플로팅 탭) — 캔버스 직접편집(드래그=위치, 핸들=크기, 우클릭=내용·색·폰트) ─────────
+let _fixTabSel=null;
+function fixedTabs(){ if(!project.fixedTabs) project.fixedTabs=[]; return project.fixedTabs; }
+function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
+function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
+function addFixedTab(){
+  const roots=hamburgerRootPages();
+  const t={ id:uid(), label:'예약', action:'top', link:(roots[0]&&roots[0].id)||'', url:'', corner:'br', dx:24, dy:24, w:118, h:46, bg:'#2b6cff', color:'#ffffff', fontSize:15, fontWeight:700, fontFamily:'Noto Sans KR', radius:23, device:'both' };
+  fixedTabs().push(t); _fixTabSel=t.id; selId=null; selIds=new Set();
+  renderCanvas(); renderProps(); snapshot();
+  // 우하단 기본 위치라 페이지가 길면 안 보임 → 그 지점으로 스크롤해 바로 보이게
+  const st=document.getElementById('stage'); if(st) st.scrollTop=st.scrollHeight;
+  toast('고정탭 추가 — 드래그로 위치, 모서리로 크기, 우클릭으로 내용·색·폰트');
+}
+function renderFixTabsOnCanvas(){
+  canvas.querySelectorAll('.fixtab-edit').forEach(n=>n.remove());
+  const R=(window.SiteRender&&SiteRender.fixTabResolve); if(!R) return;
+  fixedTabs().forEach(t=>{
+    const r=R(t), sel=(t.id===_fixTabSel && !selId && !selIds.size);
+    const right=(t.corner||'br').indexOf('r')>=0, bottom=(t.corner||'br').indexOf('b')>=0;
+    const node=document.createElement('div'); node.className='fixtab-edit';
+    node.style.cssText='position:absolute;z-index:90;'+r.hx+';'+r.hy+';'+r.appearance+(sel?';outline:2px solid var(--accent);outline-offset:2px':'');
+    node.textContent=r.label;
+    node.title='드래그=위치 · 모서리=크기 · 우클릭=내용·색·폰트';
+    node.addEventListener('mousedown',ev=>{ ev.stopPropagation(); if(!sel){ _fixTabSel=t.id; selId=null; selIds=new Set(); renderCanvas(); renderProps(); } startFixTabDrag(ev,t); });
+    node.addEventListener('contextmenu',ev=>{ ev.preventDefault(); ev.stopPropagation(); _fixTabSel=t.id; selId=null; selIds=new Set(); renderCanvas(); openFixTabPopup(t,ev.clientX,ev.clientY); });
+    if(sel){
+      const h=document.createElement('div');
+      h.style.cssText=`position:absolute;${right?'left:-7px':'right:-7px'};${bottom?'top:-7px':'bottom:-7px'};width:13px;height:13px;background:var(--accent);border:2px solid #fff;border-radius:50%;cursor:${right===bottom?'nwse':'nesw'}-resize;z-index:91`;
+      h.addEventListener('mousedown',ev=>{ ev.stopPropagation(); startFixTabResize(ev,t); });
+      node.appendChild(h);
+    }
+    canvas.appendChild(node);
+  });
+}
+function startFixTabDrag(ev,t){
+  ev.preventDefault();
+  const p=page(), r0=SiteRender.fixTabResolve(t), w=r0.w, h=r0.h, rect=canvas.getBoundingClientRect();
+  const startLeft=((t.corner||'br').indexOf('l')>=0)? t.dx : (p.w - t.dx - w);
+  const startTop =((t.corner||'br').indexOf('t')>=0)? t.dy : (p.h - t.dy - h);
+  const grabX=(ev.clientX-rect.left)/zoom-startLeft, grabY=(ev.clientY-rect.top)/zoom-startTop;
+  function mv(ev2){
+    let left=_clamp((ev2.clientX-rect.left)/zoom-grabX, 0, p.w-w), top=_clamp((ev2.clientY-rect.top)/zoom-grabY, 0, p.h-h);
+    const cx=left+w/2, cy=top+h/2;
+    t.corner=(cy<p.h/2?'t':'b')+(cx<p.w/2?'l':'r');
+    t.dx=Math.round(t.corner.indexOf('l')>=0?left:(p.w-(left+w)));
+    t.dy=Math.round(t.corner.indexOf('t')>=0?top:(p.h-(top+h)));
+    _fixSave();
+  }
+  function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
+  window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+}
+function startFixTabResize(ev,t){
+  ev.preventDefault();
+  const p=page(), rect=canvas.getBoundingClientRect();
+  const right=(t.corner||'br').indexOf('r')>=0, bottom=(t.corner||'br').indexOf('b')>=0;
+  function mv(ev2){
+    const mx=(ev2.clientX-rect.left)/zoom, my=(ev2.clientY-rect.top)/zoom;
+    t.w=Math.round(_clamp(right?((p.w-t.dx)-mx):(mx-t.dx), 50, 400));
+    t.h=Math.round(_clamp(bottom?((p.h-t.dy)-my):(my-t.dy), 28, 200));
+    _fixSave();
+  }
+  function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
+  window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+}
+function openFixTabPopup(t,x,y){
+  document.getElementById('fixtab-popup')?.remove();
+  const pop=document.createElement('div'); pop.id='fixtab-popup';
+  pop.style.cssText=`position:fixed;left:${Math.min(x,innerWidth-250)}px;top:${Math.min(y,innerHeight-380)}px;z-index:99999;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,.28);padding:11px 13px;width:228px;font-size:12px`;
+  pop.addEventListener('mousedown',ev=>ev.stopPropagation());
+  pop.addEventListener('contextmenu',ev=>ev.preventDefault());
+  const row=(lbl,inner)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0"><span style="color:var(--sub,#777);white-space:nowrap">${lbl}</span>${inner}</div>`;
+  const roots=hamburgerRootPages();
+  const pageOpts=roots.map(p=>`<option value="${p.id}"${t.link===p.id?' selected':''}>${(p.name||'페이지')}</option>`).join('');
+  const fontOpts=FONTS.map(f=>`<option value="${f[0]}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${f[1]}</option>`).join('');
+  const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택"><span style="background:${col||'#ffffff'}"></span></button>`;
+  pop.innerHTML=`<div style="font-weight:700;margin-bottom:6px">📌 고정탭</div>`
+    +row('내용',`<input type="text" id="ft-label" value="${(t.label||'').replace(/"/g,'&quot;')}" style="width:120px">`)
+    +row('동작',`<select id="ft-action"><option value="top"${t.action==='top'?' selected':''}>맨 위로</option><option value="link"${t.action==='link'?' selected':''}>내부 페이지</option><option value="url"${t.action==='url'?' selected':''}>외부 링크</option></select>`)
+    +(t.action==='link'?row('페이지',`<select id="ft-link">${pageOpts}</select>`):'')
+    +(t.action==='url'?row('URL',`<input type="text" id="ft-url" value="${(t.url||'').replace(/"/g,'&quot;')}" placeholder="https://" style="width:120px">`):'')
+    +row('배경색',swatch('fixTabBg',t.bg||'#2b6cff'))
+    +row('글자색',swatch('fixTabColor',t.color||'#ffffff'))
+    +row('글자크기',`<input type="number" id="ft-fs" value="${t.fontSize||15}" min="9" max="40" style="width:62px">`)
+    +row('폰트',`<select id="ft-font" style="max-width:130px">${fontOpts}</select>`)
+    +row('굵기',`<select id="ft-fw"><option value="400"${(t.fontWeight||700)==400?' selected':''}>보통</option><option value="700"${(t.fontWeight||700)==700?' selected':''}>굵게</option><option value="900"${(t.fontWeight||700)==900?' selected':''}>매우굵게</option></select>`)
+    +row('모서리',`<input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" min="0" max="60" style="width:62px">`)
+    +row('표시',`<select id="ft-dev"><option value="both"${(t.device||'both')==='both'?' selected':''}>PC+모바일</option><option value="pc"${t.device==='pc'?' selected':''}>PC만</option><option value="mobile"${t.device==='mobile'?' selected':''}>모바일만</option></select>`)
+    +`<button id="ft-del" style="width:100%;margin-top:8px;padding:6px;border-radius:7px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer">🗑 고정탭 삭제</button>`;
+  document.body.appendChild(pop);
+  const q=id=>pop.querySelector('#'+id);
+  q('ft-label').addEventListener('input',()=>{ t.label=q('ft-label').value; _fixSave(); });
+  q('ft-label').addEventListener('change',()=>snapshot());
+  q('ft-action').addEventListener('change',()=>{ t.action=q('ft-action').value; _fixSave(); snapshot(); openFixTabPopup(t,x,y); });
+  if(q('ft-link')) q('ft-link').addEventListener('change',()=>{ t.link=q('ft-link').value; _fixSave(); snapshot(); });
+  if(q('ft-url')) q('ft-url').addEventListener('input',()=>{ t.url=q('ft-url').value; _fixSave(); });
+  q('ft-fs').addEventListener('input',()=>{ t.fontSize=parseInt(q('ft-fs').value)||15; _fixSave(); });
+  q('ft-fs').addEventListener('change',()=>snapshot());
+  q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
+  q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
+  q('ft-rad').addEventListener('input',()=>{ t.radius=parseInt(q('ft-rad').value)||0; _fixSave(); });
+  q('ft-rad').addEventListener('change',()=>snapshot());
+  q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
+  q('ft-del').addEventListener('click',()=>{ const a=fixedTabs(); const i=a.findIndex(x=>x.id===t.id); if(i>=0)a.splice(i,1); _fixTabSel=null; pop.remove(); renderCanvas(); save(true); snapshot(); toast('고정탭 삭제됨'); });
+  const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ pop.remove(); document.removeEventListener('mousedown',closer); } };
+  setTimeout(()=>document.addEventListener('mousedown',closer),0);
+}
+
 // 그룹/다중선택 전체를 감싸는 프레임 + 통째 크기조절 핸들
 function addGroupFrame(){
   const arr=selAll(); if(arr.length<2) return;
@@ -1140,7 +1249,7 @@ canvas.addEventListener('mousedown', ev=>{
   if(ev.target !== canvas && ev.target.id !== 'marquee') return; // 요소 위면 무시
   ev.preventDefault();
   if(!ev.ctrlKey&&!ev.metaKey&&!ev.shiftKey){
-    selId=null; selIds=new Set();
+    selId=null; selIds=new Set(); _fixTabSel=null;
     renderCanvas(); renderProps(); updateRibbonState();
   }
   const marqueeEl=document.getElementById('marquee');
@@ -3664,6 +3773,10 @@ const CP_TARGETS={
     set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotColor=v; _slRerender(e); save(true); } },
   slDotOn:{ label:'점 활성색', rich:false, current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.dotActiveColor; },
     set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotActiveColor=v; _slRerender(e); save(true); } },
+  fixTabBg:{ label:'고정탭 배경', rich:false, current:()=>{ const t=_fixTab(); return t&&t.bg; },
+    set:v=>{ const t=_fixTab(); if(!t)return; t.bg=v; _fixSave(); } },
+  fixTabColor:{ label:'고정탭 글자색', rich:false, current:()=>{ const t=_fixTab(); return t&&t.color; },
+    set:v=>{ const t=_fixTab(); if(!t)return; t.color=v; _fixSave(); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){
@@ -3758,6 +3871,7 @@ document.getElementById('rb2-addimg')?.addEventListener('click',addImage);
 document.getElementById('rb2-addshape')?.addEventListener('click',()=>document.getElementById('open-shape').click());
 document.getElementById('rb2-newpage')?.addEventListener('click',openTplModal);
 document.getElementById('rb2-tpl')?.addEventListener('click',openTplModal);
+document.getElementById('rb2-fixtab')?.addEventListener('click',addFixedTab);
 // 보기 탭 버튼
 document.getElementById('rb-zoom-in')?.addEventListener('click',()=>{ zoom=Math.min(3,zoom+0.1); applyZoom(); updateRibbonState(); });
 document.getElementById('rb-zoom-out')?.addEventListener('click',()=>{ zoom=Math.max(0.1,zoom-0.1); applyZoom(); updateRibbonState(); });
