@@ -551,7 +551,8 @@ function buildHambBtn(){
 function renderHambOnCanvas(){
   document.getElementById('hamb-menu')?.remove();
   document.getElementById('hamb-btn')?.remove();
-  const p=page(); if(!p.isHeader){ _hambOpen=false; return; }
+  // 햄버거는 모바일 전용 — 모바일 편집 모드의 헤더에서만 캔버스에 표시
+  const p=page(); if(!p.isHeader || editorDevice!=='mobile'){ _hambOpen=false; return; }
   canvas.appendChild(buildHambBtn());
   if(_hambOpen) canvasWrap.appendChild(buildHambMenu());
 }
