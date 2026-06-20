@@ -303,8 +303,16 @@ function el(id){ return page().elements.find(e=>e.id===id); }
 // ───────────────────────── 저장/불러오기 ─────────────────────────
 const LS_KEY = 'canvas-editor-project';
 function save(silent){
-  localStorage.setItem(LS_KEY, JSON.stringify(project));
-  if(!silent) toast('저장됨 (이 브라우저)');
+  try{
+    localStorage.setItem(LS_KEY, JSON.stringify(project));
+    if(!silent) toast('저장됨 (이 브라우저)');
+  }catch(e){
+    // QuotaExceededError 등 — 저장 실패가 편집 흐름을 중단시키지 않게 흡수하고 안내
+    console.error('save 실패', e);
+    const quota = (e && (e.name==='QuotaExceededError' || /quota|exceeded/i.test(e.message||'')));
+    toast(quota ? '⚠ 저장 용량 초과 — 큰 이미지/폰트를 줄이거나 클라우드 저장을 이용하세요'
+                : '⚠ 저장에 실패했습니다');
+  }
 }
 function load(){
   try{ const s = localStorage.getItem(LS_KEY); return s? JSON.parse(s):null; }catch(e){ return null; }
@@ -3854,6 +3862,19 @@ function preview(){
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 let toastTimer;
 function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1600); }
+
+// ───────────────────────── 전역 에러 안전망 ─────────────────────────
+// JS 에러 하나가 안내 없이 에디터를 반쯤 멈추게 두지 않는다.
+let _lastErrAt = 0;
+function reportErr(label, err){
+  console.error(label, err);
+  const now = Date.now();
+  if(now - _lastErrAt < 4000) return; // 동일 에러 폭주 시 토스트 도배 방지
+  _lastErrAt = now;
+  try{ toast('⚠ 일시적 오류가 발생했습니다 — 작업은 자동 저장돼 있습니다'); }catch(_){}
+}
+window.addEventListener('error', (e)=> reportErr('window.onerror', e.error || e.message));
+window.addEventListener('unhandledrejection', (e)=> reportErr('unhandledrejection', e.reason));
 
 // ───────────────────────── 초기화 ─────────────────────────
 project = load() || newProject();
