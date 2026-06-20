@@ -4,8 +4,10 @@
 
   /* 슬라이더 화살표/점 스타일 해석 — 편집기 미리보기와 발행본이 동일하게 사용(드리프트 방지).
      반환: 컨테이너에 붙일 CSS 변수 문자열(vars) + 표시여부(arrows/dots). */
+  var SL_GLYPHS={ chevron:['‹','›'], triangle:['◀','▶'], arrow:['←','→'], double:['«','»'], angle:['〈','〉'] };
   function slStyleVars(fx){
     fx=fx||{};
+    var glyph=SL_GLYPHS[fx.arrowGlyph]||SL_GLYPHS.chevron;
     var none = fx.arrowShape==='none';
     var arrSize=+(fx.arrowSize||38);
     var arrRadius = fx.arrowShape==='square'?'8px':(none?'0':'50%');
@@ -26,7 +28,7 @@
       +'--sl-dot-w:'+dotW+'px;--sl-dot-h:'+dotH+'px;--sl-dot-radius:'+dotRadius+';--sl-dot:'+dotColor+';--sl-dot-on:'+dotOn+';--sl-dot-gap:'+dotGap+'px;--sl-dot-bottom:'+dotBottom+'px;--sl-dot-x:'+dotX+'%;';
     return { vars:vars, arrows:fx.arrows!==false, dots:fx.dots!==false,
       raw:{ arrSize:arrSize, arrBg:arrBg, arrColor:arrColor, arrRadius:arrRadius, arrGap:arrGap, arrY:arrY,
-        dotW:dotW, dotH:dotH, dotRadius:dotRadius, dotColor:dotColor, dotOn:dotOn, dotGap:dotGap, dotBottom:dotBottom, dotX:dotX, dotShape:dotShape, arrowShape:(fx.arrowShape||'circle') } };
+        dotW:dotW, dotH:dotH, dotRadius:dotRadius, dotColor:dotColor, dotOn:dotOn, dotGap:dotGap, dotBottom:dotBottom, dotX:dotX, dotShape:dotShape, arrowShape:(fx.arrowShape||'circle'), prev:glyph[0], next:glyph[1] } };
   }
 
   /* ── 효과 CSS ── */
@@ -248,7 +250,7 @@
         var slv=slStyleVars(fx);
         var slides=[e.src].concat(fx.slides||[]);
         var sImgs=slides.map(function(src){return '<img class="fx-sl-img" src="'+src+'">';}).join('');
-        var sArrows=slv.arrows?'<button class="fx-sl-btn fx-sl-prev">&#8249;</button><button class="fx-sl-btn fx-sl-next">&#8250;</button>':'';
+        var sArrows=slv.arrows?'<button class="fx-sl-btn fx-sl-prev">'+slv.raw.prev+'</button><button class="fx-sl-btn fx-sl-next">'+slv.raw.next+'</button>':'';
         var sDots=slv.dots&&slides.length>1?'<div class="fx-sl-dots">'+slides.map(function(){return '<button class="fx-sl-dot"></button>';}).join('')+'</div>':'';
         return '<div class="el fx-slider"'+lnk+ea+' style="'+s3+slv.vars+'" data-sl-auto="'+(fx.auto!==false?'1':'0')+'" data-sl-iv="'+(fx.interval||3000)+'">'+sImgs+sArrows+sDots+'</div>';
       }

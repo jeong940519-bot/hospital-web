@@ -762,14 +762,13 @@ function _slFx(e){ if(!e.fx) e.fx={}; return e.fx; }
 function _slLocal(ev,e){ const r=canvas.getBoundingClientRect(); return { x:(ev.clientX-r.left)/zoom - e.x, y:(ev.clientY-r.top)/zoom - e.y }; }
 function _slRerender(e){ const old=canvas.querySelector(`[data-id="${e.id}"]`); if(old){ const fresh=renderEl(e); old.replaceWith(fresh); if(e.id===selId) addHandles(canvas.querySelector(`[data-id="${e.id}"]`),e); } }
 function _slDragLoop(mv){ function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); } window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up); }
-function _slToHex(c){ if(!c) return '#000000'; c=String(c).trim(); if(c[0]==='#'){ return c.length===4?('#'+c[1]+c[1]+c[2]+c[2]+c[3]+c[3]):c.slice(0,7); } const m=c.match(/[\d.]+/g); if(m&&m.length>=3){ return '#'+m.slice(0,3).map(n=>Math.max(0,Math.min(255,Math.round(+n))).toString(16).padStart(2,'0')).join(''); } return '#000000'; }
 function buildSliderOverlay(node,e){
   const SV=(window.SiteRender&&SiteRender.slStyleVars)?SiteRender.slStyleVars(e.fx||{}):null; if(!SV||!SV.raw) return;
   const r=SV.raw, sel=(e.id===selId);
   const slides=[e.src].concat((e.fx&&e.fx.slides)||[]);
   node.style.overflow='hidden';
   if(SV.arrows){
-    [[true,'‹'],[false,'›']].forEach(([isLeft,glyph])=>{
+    [[true,r.prev],[false,r.next]].forEach(([isLeft,glyph])=>{
       const b=document.createElement('div');
       b.style.cssText=`position:absolute;top:${r.arrY}%;${isLeft?'left':'right'}:${r.arrGap}px;transform:translateY(-50%);width:${r.arrSize}px;height:${r.arrSize}px;background:${r.arrBg};color:${r.arrColor};border-radius:${r.arrRadius};display:flex;align-items:center;justify-content:center;font-size:${Math.round(r.arrSize*0.58)}px;line-height:1;z-index:12;box-sizing:border-box;${sel?'cursor:move;outline:1.5px solid var(--accent)':'pointer-events:none'}`;
       b.textContent=glyph;
@@ -819,31 +818,34 @@ function openSliderPartPopup(part,e,x,y){
   pop.addEventListener('mousedown',ev=>ev.stopPropagation());
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
   const row=(lbl,inner)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0"><span style="color:var(--sub,#777)">${lbl}</span>${inner}</div>`;
-  const shapeBtns=(id,opts,cur)=>`<span id="${id}" style="display:flex;gap:3px">`+opts.map(o=>`<button data-v="${o[0]}" style="padding:2px 7px;border-radius:6px;border:1px solid var(--border,#ccc);background:${cur===o[0]?'var(--accent)':'transparent'};color:${cur===o[0]?'#fff':'inherit'};cursor:pointer">${o[1]}</button>`).join('')+`</span>`;
+  const shapeBtns=(id,opts,cur)=>`<span id="${id}" style="display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end">`+opts.map(o=>`<button data-v="${o[0]}" style="min-width:26px;padding:2px 7px;border-radius:6px;border:1px solid var(--border,#ccc);background:${cur===o[0]?'var(--accent)':'transparent'};color:${cur===o[0]?'#fff':'inherit'};cursor:pointer">${o[1]}</button>`).join('')+`</span>`;
+  // PPT 색상 팝업과 동일한 스와치 버튼(.panel-cbtn) — 전역 핸들러가 toggleColorPopup 처리
+  const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택"><span style="background:${col||'#ffffff'}"></span></button>`;
   if(part==='arrow'){
     pop.innerHTML=`<div style="font-weight:700;margin-bottom:6px">◀▶ 화살표</div>`
-      +row('배경색',`<input type="color" id="slp-abg" value="${_slToHex(fx.arrowBg||'#000000')}">`)
-      +row('아이콘색',`<input type="color" id="slp-acol" value="${_slToHex(fx.arrowColor||'#ffffff')}">`)
+      +row('배경색',swatch('slArrowBg',fx.arrowBg||'#000000'))
+      +row('아이콘색',swatch('slArrowColor',fx.arrowColor||'#ffffff'))
       +row('크기',`<input type="number" id="slp-asize" value="${fx.arrowSize||38}" min="16" max="140" style="width:62px">`)
-      +row('모양',shapeBtns('slp-ashape',[['circle','원'],['square','사각'],['none','없음']],fx.arrowShape||'circle'))
+      +row('배경모양',shapeBtns('slp-ashape',[['circle','●'],['square','■'],['none','없음']],fx.arrowShape||'circle'))
+      +row('화살표',shapeBtns('slp-aglyph',[['chevron','‹ ›'],['triangle','◀ ▶'],['arrow','← →'],['double','« »'],['angle','〈 〉']],fx.arrowGlyph||'chevron'))
       +row('표시',`<button id="slp-ashow" style="padding:2px 9px;border-radius:6px;border:1px solid var(--border,#ccc);cursor:pointer">${fx.arrows!==false?'켜짐':'꺼짐'}</button>`);
   } else {
     pop.innerHTML=`<div style="font-weight:700;margin-bottom:6px">● 점</div>`
-      +row('기본색',`<input type="color" id="slp-dcol" value="${_slToHex(fx.dotColor||'#ffffff')}">`)
-      +row('활성색',`<input type="color" id="slp-don" value="${_slToHex(fx.dotActiveColor||'#ffffff')}">`)
+      +row('기본색',swatch('slDotColor',fx.dotColor||'#ffffff'))
+      +row('활성색',swatch('slDotOn',fx.dotActiveColor||'#ffffff'))
       +row('크기',`<input type="number" id="slp-dsize" value="${fx.dotSize||9}" min="4" max="44" style="width:62px">`)
-      +row('모양',shapeBtns('slp-dshape',[['circle','원'],['square','사각'],['bar','막대']],fx.dotShape||'circle'))
+      +row('모양',shapeBtns('slp-dshape',[['circle','●'],['square','■'],['bar','▬']],fx.dotShape||'circle'))
       +row('표시',`<button id="slp-dshow" style="padding:2px 9px;border-radius:6px;border:1px solid var(--border,#ccc);cursor:pointer">${fx.dots!==false?'켜짐':'꺼짐'}</button>`);
   }
   document.body.appendChild(pop);
   const apply=()=>{ _slRerender(e); save(true); };
-  const wireColor=(id,key)=>{ const el=pop.querySelector('#'+id); if(el) el.addEventListener('input',()=>{ fx[key]=el.value; apply(); }); el&&el.addEventListener('change',()=>snapshot()); };
   const wireNum=(id,key)=>{ const el=pop.querySelector('#'+id); if(el) el.addEventListener('input',()=>{ fx[key]=parseInt(el.value)||0; apply(); }); el&&el.addEventListener('change',()=>snapshot()); };
   const wireShape=(id,key)=>{ const sp=pop.querySelector('#'+id); if(sp) sp.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{ fx[key]=b.dataset.v; sp.querySelectorAll('button').forEach(o=>{o.style.background='transparent';o.style.color='inherit';}); b.style.background='var(--accent)'; b.style.color='#fff'; apply(); snapshot(); })); };
   const wireShow=(id,key)=>{ const b=pop.querySelector('#'+id); if(b) b.addEventListener('click',()=>{ fx[key]=(fx[key]===false); b.textContent=fx[key]!==false?'켜짐':'꺼짐'; apply(); snapshot(); }); };
-  if(part==='arrow'){ wireColor('slp-abg','arrowBg'); wireColor('slp-acol','arrowColor'); wireNum('slp-asize','arrowSize'); wireShape('slp-ashape','arrowShape'); wireShow('slp-ashow','arrows'); }
-  else { wireColor('slp-dcol','dotColor'); wireColor('slp-don','dotActiveColor'); wireNum('slp-dsize','dotSize'); wireShape('slp-dshape','dotShape'); wireShow('slp-dshow','dots'); }
-  const closer=ev=>{ if(!ev.target.closest('#sl-popup')){ pop.remove(); document.removeEventListener('mousedown',closer); } };
+  if(part==='arrow'){ wireNum('slp-asize','arrowSize'); wireShape('slp-ashape','arrowShape'); wireShape('slp-aglyph','arrowGlyph'); wireShow('slp-ashow','arrows'); }
+  else { wireNum('slp-dsize','dotSize'); wireShape('slp-dshape','dotShape'); wireShow('slp-dshow','dots'); }
+  // 바깥 클릭 시 닫되, PPT 색상 팝업(#fill-dd) 사용 중엔 유지
+  const closer=ev=>{ if(!ev.target.closest('#sl-popup') && !ev.target.closest('#fill-dd')){ pop.remove(); document.removeEventListener('mousedown',closer); } };
   setTimeout(()=>document.addEventListener('mousedown',closer),0);
 }
 
@@ -3653,6 +3655,15 @@ const CP_TARGETS={
     set:v=>{ hamburgerCfg().bg=v; save(true); refreshHambMenu(); } },
   hmColor:{ label:'메뉴 글자색', rich:false, current:()=>hamburgerCfg().color||'#1a2b5c',
     set:v=>{ hamburgerCfg().color=v; save(true); refreshHambMenu(); } },
+  slArrowBg:{ label:'화살표 배경', rich:false, noFill:true, noFillLabel:'배경 없음',
+    current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.arrowBg; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; const fx=_slFx(e); if(v==='transparent'){ fx.arrowShape='none'; } else { fx.arrowBg=v; if(fx.arrowShape==='none')fx.arrowShape='circle'; } _slRerender(e); save(true); } },
+  slArrowColor:{ label:'화살표 아이콘색', rich:false, current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.arrowColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).arrowColor=v; _slRerender(e); save(true); } },
+  slDotColor:{ label:'점 기본색', rich:false, current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.dotColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotColor=v; _slRerender(e); save(true); } },
+  slDotOn:{ label:'점 활성색', rich:false, current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.dotActiveColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotActiveColor=v; _slRerender(e); save(true); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){
