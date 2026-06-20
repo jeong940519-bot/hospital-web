@@ -4,3 +4,5 @@ node_modules/
 *.log
 .env
 .env.local
+
+editor.html.baseline.bak
