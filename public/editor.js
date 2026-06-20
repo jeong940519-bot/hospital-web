@@ -8,6 +8,8 @@ import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/
 import { SHAPE_CLIP, _clamp, _starPoly, SHAPE_ADJ, adjOf, shapeClipOf, SHAPE_LABELS, SHAPE_CATS } from './editor-shapes.js';
 // AI 응답 JSON 견고 파서(순수, editor 상태 비의존) — public/editor-ai-parse.js
 import { parseAiJson } from './editor-ai-parse.js';
+// 내장 템플릿 데이터 + 순수 엘리먼트 빌더 — public/editor-templates.js
+import { PHOTO, tEl, tText, tImg, tShape, tCard, TEMPLATES } from './editor-templates.js';
 const fbApp = initializeApp({
   apiKey:"AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",
   authDomain:"newworld-1a1d5.firebaseapp.com",
@@ -125,7 +127,7 @@ function scaleTpl(p){
   p.h=Math.round(maxB + 60*s);
   return p;
 }
-let project = null; // 아래 const(PHOTO/TEMPLATES) 정의 이후 초기화 (TDZ 방지)
+let project = null; // 실제 초기화는 아래에서 (PHOTO/TEMPLATES는 editor-templates.js import)
 let curPage = 0;
 let selId = null;       // 주 선택 (핸들/속성패널 기준)
 let selIds = new Set(); // 다중 선택 전체 집합
@@ -226,23 +228,7 @@ function addFooterBar(){
 }
 
 // ───────────────────────── 내장 템플릿 ─────────────────────────
-const PHOTO = 'data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#e6e9f2"/><text x="50%" y="50%" font-size="26" fill="#9aa3c0" text-anchor="middle" dominant-baseline="middle">사진</text></svg>');
-function tEl(o){ return Object.assign({id:uid(),rot:0}, o); }
-function tText(x,y,w,h,text,o){ return tEl(Object.assign({type:'text',x,y,w,h,text,fontFamily:'Noto Sans KR',fontWeight:400,fontSize:24,color:'#333333',align:'left',lineHeight:1.4,letterSpacing:0,italic:false,underline:false},o||{})); }
-function tImg(x,y,w,h,o){ return tEl(Object.assign({type:'image',x,y,w,h,src:PHOTO,fit:'cover',radius:0,clip:'none',borderW:0,borderColor:'#333333'},o||{})); }
-function tShape(x,y,w,h,o){ return tEl(Object.assign({type:'shape',x,y,w,h,shape:'rect',fill:'#6c7bff',radius:0,borderW:0,borderColor:'#333333'},o||{})); }
-function tCard(x,title,desc){
-  return [ tShape(x,820,300,250,{fill:'#f5f7fc',radius:16}),
-    tText(x,910,300,40,title,{fontSize:24,fontWeight:700,align:'center',color:'#1a2b5c'}),
-    tText(x,958,300,70,desc,{fontSize:16,align:'center',color:'#667089',lineHeight:1.5}) ]; }
-
-const TEMPLATES = [
-  { key:'blank', name:'빈 페이지', desc:'아무것도 없는 캔버스' },
-  { key:'home', name:'병원 홈(메인)', desc:'히어로 + 진료과목 카드' },
-  { key:'about', name:'병원 소개', desc:'사진 + 소개 문단' },
-  { key:'service', name:'진료 안내', desc:'카드 그리드' },
-  { key:'contact', name:'오시는 길', desc:'지도 자리 + 연락처' },
-];
+// PHOTO/tEl/tText/tImg/tShape/tCard/TEMPLATES → public/editor-templates.js 로 분리 (상단 import)
 function buildTemplate(key){
   const p = newPage();
   if(key==='blank'){ p.name='새 페이지'; return p; }
