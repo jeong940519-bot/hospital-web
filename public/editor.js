@@ -6,6 +6,8 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 // 도형 기하 데이터(순수, editor 상태 비의존) — public/editor-shapes.js
 import { SHAPE_CLIP, _clamp, _starPoly, SHAPE_ADJ, adjOf, shapeClipOf, SHAPE_LABELS, SHAPE_CATS } from './editor-shapes.js';
+// AI 응답 JSON 견고 파서(순수, editor 상태 비의존) — public/editor-ai-parse.js
+import { parseAiJson } from './editor-ai-parse.js';
 const fbApp = initializeApp({
   apiKey:"AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",
   authDomain:"newworld-1a1d5.firebaseapp.com",
@@ -2465,42 +2467,7 @@ document.getElementById('prj-new-btn').addEventListener('click', async()=>{
   finally{ btn.textContent='+ 새 프로젝트로 저장'; btn.disabled=false; }
 });
 
-// ───────────────────────── AI 응답 JSON 견고 파서 ─────────────────────────
-// 잘리거나 약간 깨진 JSON도 최대한 복구해서 파싱한다.
-function parseAiJson(text){
-  if(!text) return null;
-  let t=String(text).replace(/```json/gi,'').replace(/```/g,'').trim();
-  const i=t.indexOf('{'); if(i<0) return null; t=t.slice(i);
-  const tryP=s=>{ try{ return JSON.parse(s); }catch(_){ return undefined; } };
-  let r=tryP(t); if(r!==undefined) return r;
-  // 1) 트레일링 콤마 제거
-  let s=t.replace(/,(\s*[}\]])/g,'$1'); r=tryP(s); if(r!==undefined) return r;
-  // 2) 스택으로 괄호 균형 맞추고, 잘린 꼬리 보정
-  let stack=[],inStr=false,esc=false;
-  for(let k=0;k<s.length;k++){ const ch=s[k];
-    if(inStr){ if(esc)esc=false; else if(ch==='\\')esc=true; else if(ch==='"')inStr=false; continue; }
-    if(ch==='"')inStr=true; else if(ch==='{'||ch==='[')stack.push(ch==='{'?'}':']'); else if(ch==='}'||ch===']')stack.pop();
-  }
-  let fixed=s;
-  if(inStr) fixed+='"';                       // 문자열 도중 잘림
-  fixed=fixed.replace(/[\s,]*$/,'');           // 꼬리 콤마/공백
-  fixed=fixed.replace(/:\s*$/,':null');        // 콜론 직후 잘림
-  fixed=fixed.replace(/,(\s*[}\]])/g,'$1');
-  for(let k=stack.length-1;k>=0;k--) fixed+=stack[k];
-  r=tryP(fixed); if(r!==undefined) return r;
-  // 3) elements 배열의 마지막 완성 객체까지만 살리기
-  const em=s.match(/"elements"\s*:\s*\[/);
-  if(em){
-    const arrStart=em.index+em[0].length;
-    let depth=0,inS=false,es=false,lastObjEnd=-1;
-    for(let k=arrStart;k<s.length;k++){ const ch=s[k];
-      if(inS){ if(es)es=false; else if(ch==='\\')es=true; else if(ch==='"')inS=false; continue; }
-      if(ch==='"')inS=true; else if(ch==='{'||ch==='[')depth++; else if(ch==='}'||ch===']'){ depth--; if(depth===0) lastObjEnd=k; }
-    }
-    if(lastObjEnd>0){ const cand=s.slice(0,lastObjEnd+1)+']}'; r=tryP(cand); if(r!==undefined) return r; }
-  }
-  return null;
-}
+// parseAiJson() → public/editor-ai-parse.js 로 분리 (상단 import)
 
 // ───────────────────────── AI 초안 생성 ─────────────────────────
 let aiRefImgs=[];
