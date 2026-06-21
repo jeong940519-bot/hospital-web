@@ -6,6 +6,8 @@ import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 // 도형 기하 데이터(순수, editor 상태 비의존) — public/editor-shapes.js
 import { SHAPE_CLIP, _clamp, _starPoly, SHAPE_ADJ, adjOf, shapeClipOf, SHAPE_LABELS, SHAPE_CATS } from './editor-shapes.js';
+// 색상 데이터/수학(순수) — public/editor-colors.js
+import { CP_THEME, CP_TEX, _hex2rgb, _rgb2hex, _lighten, _darken, _shades } from './editor-colors.js';
 // AI 응답 JSON 견고 파서(순수, editor 상태 비의존) — public/editor-ai-parse.js
 import { parseAiJson } from './editor-ai-parse.js';
 // 내장 템플릿 데이터 + 순수 엘리먼트 빌더 — public/editor-templates.js
@@ -3845,23 +3847,8 @@ function setupHomeFontPicker(){
 }
 
 // ───────────────────────── PPT식 색상 팝업 (도형 채우기) ─────────────────────────
-const CP_THEME=['#ffffff','#000000','#e7e6e6','#44546a','#5b9bd5','#ed7d31','#a5a5a5','#ffc000','#4472c4','#70ad47'];
-const CP_STD=['#c00000','#ff0000','#ffc000','#ffff00','#92d050','#00b050','#00b0f0','#0070c0','#002060','#7030a0'];
-const CP_TEX=[
-  'repeating-linear-gradient(45deg,#e2e2e2,#e2e2e2 8px,#f6f6f6 8px,#f6f6f6 16px)',
-  'repeating-linear-gradient(0deg,#dfe7f5,#dfe7f5 7px,#eef3fb 7px,#eef3fb 14px)',
-  'radial-gradient(#c3d3ff 1.6px,transparent 1.6px) 0 0/14px 14px #eef3ff',
-  'linear-gradient(135deg,#f6d365,#fda085)',
-  'linear-gradient(135deg,#a1c4fd,#c2e9fb)',
-  'linear-gradient(135deg,#d4fc79,#96e6a1)',
-  'repeating-linear-gradient(90deg,#ececec,#ececec 2px,#fff 2px,#fff 11px)',
-  'conic-gradient(from 45deg,#e6e6e6,#fafafa,#e6e6e6,#fafafa,#e6e6e6)',
-];
-function _hex2rgb(h){ h=String(h).replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); return [parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16),parseInt(h.slice(4,6),16)]; }
-function _rgb2hex(a){ return '#'+a.map(v=>Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join(''); }
-function _lighten(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v+(255-v)*p)); }
-function _darken(hex,p){ const c=_hex2rgb(hex); return _rgb2hex(c.map(v=>v*(1-p))); }
-function _shades(hex){ return [_lighten(hex,.8),_lighten(hex,.6),_lighten(hex,.4),_darken(hex,.25),_darken(hex,.5)]; }
+// 색상 데이터/수학(CP_THEME/CP_TEX/_hex2rgb/_rgb2hex/_lighten/_darken/_shades)은
+// public/editor-colors.js로 분리됨 — 상단에서 import.
 // 색상 팝업 타겟 — 글꼴색·강조색·도형채우기·윤곽선 공용
 let _cpTarget=null;
 function _setBar(id,v){ const b=document.getElementById(id); if(b) b.style.background=(v==='transparent'?'repeating-conic-gradient(#fff 0 25%,#ddd 0 50%) 50%/6px 6px':v); }
