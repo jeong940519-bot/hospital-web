@@ -852,6 +852,7 @@ function openSliderPartPopup(part,e,x,y){
 
 // ───────── 고정탭(플로팅 탭) — 캔버스 직접편집(드래그=위치, 핸들=크기, 우클릭=내용·색·폰트) ─────────
 let _fixTabSel=null;
+let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
 function fixedTabs(){ if(!project.fixedTabs) project.fixedTabs=[]; return project.fixedTabs; }
 function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
 function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
@@ -890,7 +891,7 @@ function renderFixTabsOnCanvas(){
     // 항목들을 발행본과 동일하게 시각적으로 표시(편집기에선 클릭 비활성, 컨테이너 단위로 선택)
     r.items.forEach((it,i)=>{
       const cell=document.createElement('div');
-      cell.style.cssText=r.itemCss+(i>0?';'+r.divCss:'')+';pointer-events:none;overflow:hidden;text-overflow:ellipsis';
+      cell.style.cssText=r.itemStyle(it,i)+';pointer-events:none';
       cell.textContent=(it.label!=null?it.label:'')||' ';
       node.appendChild(cell);
     });
@@ -966,6 +967,8 @@ function openFixTabPopup(t,x,y){
   const fontOpts=FONTS.map(f=>`<option value="${ea(f[0])}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${ea(f[1])}</option>`).join('');
   const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);cursor:pointer;flex:1"><span style="width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.15);background:${col||'#ffffff'}"></span><span style="font-size:11px;color:var(--sub,#888)">색</span></button>`;
   const dbtn=(val,lbl)=>`<button type="button" class="ft-dir" data-d="${val}" style="flex:1;padding:6px;border:1px solid ${dir===val?'var(--accent,#2b6cff)':'var(--border,#dcdce8)'};border-radius:7px;background:${dir===val?'var(--accent,#2b6cff)':'transparent'};color:${dir===val?'#fff':'var(--text,#333)'};cursor:pointer;font-size:11px;font-weight:600">${lbl}</button>`;
+  // 항목별 색 스와치(클릭 시 _fixItemIdx 지정 후 공용 색상 팝업)
+  const isw=(i,which,col,lbl)=>`<button type="button" class="panel-cbtn ft-isw" data-cpkey="${which==='bg'?'fixItemBg':'fixItemColor'}" data-i="${i}" title="항목 ${lbl}" style="display:flex;align-items:center;gap:5px;padding:4px 7px;border:1px solid var(--border,#dcdce8);border-radius:6px;background:var(--bg,#fff);cursor:pointer;flex:1"><span style="width:14px;height:14px;border-radius:4px;border:1px solid rgba(0,0,0,.18);background:${col||'transparent'}"></span><span style="font-size:10px;color:var(--sub,#888)">${lbl}</span></button>`;
   const itemHtml=items.map((it,i)=>`
     <div style="border:1px solid var(--border,#e7e7f1);border-radius:9px;padding:7px;margin-bottom:6px;background:rgba(127,127,170,.05)">
       <div style="display:flex;gap:6px;align-items:center">
@@ -981,6 +984,7 @@ function openFixTabPopup(t,x,y){
         ${it.action==='link'?`<select class="ft-lk" data-i="${i}" style="${IN};flex:1.2">${pageOptsSel(it.link)}</select>`:''}
       </div>
       ${it.action==='url'?`<input class="ft-u" data-i="${i}" type="text" value="${ea(it.url)}" placeholder="https://" style="${IN};width:100%;margin-top:6px">`:''}
+      <div style="display:flex;gap:6px;margin-top:6px">${isw(i,'bg',it.bg,'배경')}${isw(i,'color',it.color,'글자')}</div>
     </div>`).join('');
   const pop=document.createElement('div'); pop.id='fixtab-popup';
   pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:9500;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px`;
@@ -1002,6 +1006,14 @@ function openFixTabPopup(t,x,y){
     <div style="display:flex;gap:6px;margin-bottom:8px">
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${t.fontSize||15}" min="9" max="40" style="${IN}"></label>
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" min="0" max="60" style="${IN}"></label>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">자간(px)</span><input type="number" id="ft-ls" value="${t.letterSpacing||0}" step="0.5" min="-2" max="12" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">행간</span><input type="number" id="ft-lh" value="${t.lineHeight!=null?t.lineHeight:1.2}" step="0.1" min="0.8" max="2.5" style="${IN}"></label>
+    </div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-end">
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${t.borderW||0}" min="0" max="12" style="${IN}"></label>
+      <div style="flex:1.2;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 색</span>${swatch('fixTabBorder',t.borderColor||'#e2e2ee')}</div>
     </div>
     <label style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"><span style="font-size:10px;color:var(--sub,#999)">폰트</span><select id="ft-font" style="${IN};width:100%">${fontOpts}</select></label>
     <div style="display:flex;gap:6px;margin-bottom:4px">
@@ -1039,6 +1051,14 @@ function openFixTabPopup(t,x,y){
   q('ft-fs').addEventListener('change',()=>snapshot());
   q('ft-rad').addEventListener('input',()=>{ t.radius=parseInt(q('ft-rad').value)||0; _fixSave(); });
   q('ft-rad').addEventListener('change',()=>snapshot());
+  q('ft-ls').addEventListener('input',()=>{ t.letterSpacing=parseFloat(q('ft-ls').value)||0; _fixSave(); });
+  q('ft-ls').addEventListener('change',()=>snapshot());
+  q('ft-lh').addEventListener('input',()=>{ t.lineHeight=parseFloat(q('ft-lh').value)||1.2; _fixSave(); });
+  q('ft-lh').addEventListener('change',()=>snapshot());
+  q('ft-bw').addEventListener('input',()=>{ t.borderW=parseInt(q('ft-bw').value)||0; _fixSave(); });
+  q('ft-bw').addEventListener('change',()=>snapshot());
+  // 항목별 색 스와치: 클릭 시 대상 항목 인덱스 지정 + 토글 모호성 제거(항상 새로 열기)
+  pop.querySelectorAll('.ft-isw').forEach(b=>b.addEventListener('click',()=>{ _fixItemIdx=+b.dataset.i; _cpTarget=null; }));
   q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
   q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
@@ -3862,10 +3882,18 @@ const CP_TARGETS={
     set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotColor=v; _slRerender(e); save(true); } },
   slDotOn:{ label:'점 활성색', rich:false, current:()=>{ const e=selId?el(selId):null; return e&&e.fx&&e.fx.dotActiveColor; },
     set:v=>{ const e=selId?el(selId):null; if(!e)return; _slFx(e).dotActiveColor=v; _slRerender(e); save(true); } },
-  fixTabBg:{ label:'고정탭 배경', rich:false, current:()=>{ const t=_fixTab(); return t&&t.bg; },
-    set:v=>{ const t=_fixTab(); if(!t)return; t.bg=v; _fixSave(); } },
-  fixTabColor:{ label:'고정탭 글자색', rich:false, current:()=>{ const t=_fixTab(); return t&&t.color; },
+  fixTabBg:{ label:'탭 배경', rich:false, noFill:true, noFillLabel:'배경 없음(투명)', current:()=>{ const t=_fixTab(); return t&&t.bg; },
+    set:v=>{ const t=_fixTab(); if(!t)return; t.bg=(v==='transparent'?'transparent':v); _fixSave(); } },
+  fixTabColor:{ label:'탭 글자색', rich:false, current:()=>{ const t=_fixTab(); return t&&t.color; },
     set:v=>{ const t=_fixTab(); if(!t)return; t.color=v; _fixSave(); } },
+  fixTabBorder:{ label:'탭 테두리 색', rich:false, noFill:true, noFillLabel:'테두리 없음', current:()=>{ const t=_fixTab(); return t&&t.borderColor; },
+    set:v=>{ const t=_fixTab(); if(!t)return; if(v==='transparent'){ t.borderW=0; } else { t.borderColor=v; if(!t.borderW)t.borderW=2; } _fixSave(); } },
+  fixItemBg:{ label:'항목 배경', rich:false, noFill:true, noFillLabel:'배경 없음(투명)',
+    current:()=>{ const t=_fixTab(); const it=t&&fixTabItemsOf(t)[_fixItemIdx]; return it&&it.bg; },
+    set:v=>{ const t=_fixTab(); if(!t)return; const it=fixTabItemsOf(t)[_fixItemIdx]; if(!it)return; it.bg=(v==='transparent'?'':v); _fixSave(); } },
+  fixItemColor:{ label:'항목 글자색', rich:false, noFill:true, noFillLabel:'기본색 사용',
+    current:()=>{ const t=_fixTab(); const it=t&&fixTabItemsOf(t)[_fixItemIdx]; return it&&it.color; },
+    set:v=>{ const t=_fixTab(); if(!t)return; const it=fixTabItemsOf(t)[_fixItemIdx]; if(!it)return; it.color=(v==='transparent'?'':v); _fixSave(); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){

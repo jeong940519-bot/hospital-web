@@ -47,18 +47,36 @@
     var hy=(corner.indexOf('t')>=0)?('top:'+dy+'px'):('bottom:'+dy+'px');
     var radius=(t.radius!=null?+t.radius:23);
     var dir=(t.dir==='col')?'column':'row';
+    var items=fixTabItems(t);
+    var pill=items.some(function(it){return it&&it.bg;});   // 항목별 배경이 하나라도 있으면 '알약' 모드
+    var lh=(t.lineHeight!=null?+t.lineHeight:1.2);
+    var ls=(t.letterSpacing!=null?+t.letterSpacing:0);
+    var bw=(t.borderW!=null?+t.borderW:0);
+    var pad=pill?6:0, gap=pill?6:0;
+    var innerR=pill?Math.max(4,radius-pad):0;
     var container='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
       +';font-size:'+(+(t.fontSize||15))+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
-      +';border-radius:'+radius+'px;display:flex;flex-direction:'+dir+';align-items:stretch;line-height:1.2'
+      +';border-radius:'+radius+'px;display:flex;flex-direction:'+dir+';align-items:stretch'
+      +';line-height:'+lh+';letter-spacing:'+ls+'px'
+      +(bw>0?';border:'+bw+'px solid '+(t.borderColor||'#e2e2ee'):'')
+      +(pad?';padding:'+pad+'px;gap:'+gap+'px':'')
       +';box-shadow:0 4px 14px rgba(0,0,0,.22);box-sizing:border-box;overflow:hidden';
-    var itemCss='flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;padding:2px 10px;white-space:nowrap;text-decoration:none;color:inherit';
+    var itemBase='flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;padding:2px 8px;white-space:pre-line;text-decoration:none;color:inherit;overflow:hidden';
     var divCss=(dir==='column')?'border-top:1px solid rgba(255,255,255,.28)':'border-left:1px solid rgba(255,255,255,.28)';
-    return { hx:hx, hy:hy, w:w, h:h, container:container, itemCss:itemCss, divCss:divCss, dir:dir, radius:radius, items:fixTabItems(t), dev:(t.device||'both') };
+    function itemStyle(it,i){
+      var s=itemBase;
+      if(pill){ s+=';border-radius:'+innerR+'px'; }
+      else if(i>0){ s+=';'+divCss; }
+      if(it&&it.bg) s+=';background:'+it.bg;
+      if(it&&it.color) s+=';color:'+it.color;
+      return s;
+    }
+    return { hx:hx, hy:hy, w:w, h:h, container:container, itemCss:itemBase, divCss:divCss, itemStyle:itemStyle, dir:dir, radius:radius, items:items, dev:(t.device||'both') };
   }
   function fixTabHtml(t){
     var r=fixTabResolve(t);
     var inner=r.items.map(function(it,i){
-      var css=r.itemCss+(i>0?';'+r.divCss:'');
+      var css=r.itemStyle(it,i);
       var attr=' class="fixtab-item" style="'+css+'"';
       var lbl=esc(it.label!=null?it.label:'');
       if(it.action==='url') return '<a href="'+esc(it.url||'#')+'" target="_blank" rel="noopener"'+attr+'>'+lbl+'</a>';
