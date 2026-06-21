@@ -135,6 +135,7 @@ let project = null; // 실제 초기화는 아래에서 (PHOTO/TEMPLATES는 edit
 let curPage = 0;
 let selId = null;       // 주 선택 (핸들/속성패널 기준)
 let selIds = new Set(); // 다중 선택 전체 집합
+let _tblSel = null;     // 표 셀 범위 선택 {id, r0,c0,r1,c1} (저장 안 함, 일시적)
 let zoom = 1;
 // ── editor-fixtab.js(분리 모듈)가 import로 읽는 바인딩/세터 + 재할당 션트 ──
 function _clearSel(){ selId=null; selIds=new Set(); }   // 모듈에서 코어 선택 let을 직접 못 바꾸므로 세터 경유
@@ -378,7 +379,7 @@ function addTable(cols,rows){
   const w=cols*cellW, h=rows*cellH;
   const {x,y}=getViewCenter(w,h);
   const cells=[];
-  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({r,c,text:r===0?`항목${c+1}`:''});
+  for(let r=0;r<rows;r++) for(let c=0;c<cols;c++) cells.push({r,c,text:''});
   const e={id:uid(),type:'table',x,y,w,h,rot:0,
     cols,rows,cells,
     borderW:1,borderColor:'#333333',
@@ -529,6 +530,7 @@ function startSectionDrag(ev,sec){
 }
 
 function renderCanvas(){
+  if(_tblSel && selId!==_tblSel.id) _tblSel=null;   // 표 선택 해제 시 셀 범위선택도 해제
   const p = page();
   canvas.style.width = p.w+'px';
   canvas.style.height = p.h+'px';
@@ -749,6 +751,7 @@ function renderEl(e){
         td.style.cssText=`border:${e.borderW||1}px solid ${e.borderColor||'#333'};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
         td.textContent=cell.text||'';
         td.dataset.row=r; td.dataset.col=c;
+        if(_tblInSel(e.id,r,c)) td.style.boxShadow=_TBL_HL;
         tr.appendChild(td);
       }
       tbl.appendChild(tr);
@@ -780,6 +783,8 @@ function renderEl(e){
       const colH=ev.target.dataset.tblColResize, rowH=ev.target.dataset.tblRowResize;
       if(colH!=null){ ev.stopPropagation(); ev.preventDefault(); startTblColResize(ev,e,+colH); return; }
       if(rowH!=null){ ev.stopPropagation(); ev.preventDefault(); startTblRowResize(ev,e,+rowH); return; }
+      // 표가 이미 선택된 상태에서 셀을 누르면 → 셀 범위선택(드래그). 표 이동은 빈 곳 클릭 후 다시 드래그.
+      if(selId===e.id && ev.button===0 && ev.target.closest('td')){ startTblCellSelect(ev,e); return; }
     }
     startDrag(ev,e);
   });
@@ -2445,31 +2450,56 @@ function startTblRowResize(ev,e,rowIdx){
 }
 
 // ── 표 셀 인라인 편집 ──
-function startTableEdit(node,e,ev){
-  const td=ev.target.closest('td');
+// ── 표 셀 범위 선택 (PPT식 클릭-드래그) ──
+function _tblNorm(s){ return { r0:Math.min(s.r0,s.r1), r1:Math.max(s.r0,s.r1), c0:Math.min(s.c0,s.c1), c1:Math.max(s.c0,s.c1) }; }
+function _tblInSel(id,r,c){ if(!_tblSel||_tblSel.id!==id) return false; const n=_tblNorm(_tblSel); return r>=n.r0&&r<=n.r1&&c>=n.c0&&c<=n.c1; }
+const _TBL_HL='inset 0 0 0 2px var(--accent), inset 0 0 0 200px rgba(43,108,255,.16)';
+function _tblHighlight(e){
+  const node=canvas.querySelector(`[data-id="${e.id}"]`); if(!node) return;
+  node.querySelectorAll('td').forEach(td=>{ td.style.boxShadow = _tblInSel(e.id,+td.dataset.row,+td.dataset.col) ? _TBL_HL : ''; });
+}
+function _tblCellAt(clientX,clientY,e){
+  const el2=document.elementFromPoint(clientX,clientY); if(!el2) return null;
+  const td=el2.closest && el2.closest('td'); if(!td) return null;
+  const host=td.closest('[data-id]'); if(!host||host.dataset.id!==e.id) return null;
+  return { r:+td.dataset.row, c:+td.dataset.col };
+}
+function startTblCellSelect(ev,e){
+  ev.preventDefault(); ev.stopPropagation();
+  const start=_tblCellAt(ev.clientX,ev.clientY,e); if(!start){ startDrag(ev,e); return; }
+  _tblSel={ id:e.id, r0:start.r, c0:start.c, r1:start.r, c1:start.c };
+  _tblHighlight(e);
+  function mv(ev2){ const cur=_tblCellAt(ev2.clientX,ev2.clientY,e); if(cur){ _tblSel.r1=cur.r; _tblSel.c1=cur.c; _tblHighlight(e); } }
+  function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); }
+  window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+}
+// 우클릭/툴바 작업 대상 = 선택 범위(클릭칸이 그 안일 때) 아니면 클릭칸 1개
+function _tblTargets(e,r,c){
+  if(_tblSel && _tblSel.id===e.id){ const n=_tblNorm(_tblSel); if(r>=n.r0&&r<=n.r1&&c>=n.c0&&c<=n.c1){ const out=[]; for(let rr=n.r0;rr<=n.r1;rr++) for(let cc=n.c0;cc<=n.c1;cc++) out.push({r:rr,c:cc}); return out; } }
+  return [{r,c}];
+}
+function _tdSelectAll(td){ try{ const rg=document.createRange(); rg.selectNodeContents(td); const s=window.getSelection(); s.removeAllRanges(); s.addRange(rg); }catch(_){} }
+function _editTd(e,td){
   if(!td) return;
   const r=+td.dataset.row, c=+td.dataset.col;
-  td.contentEditable=true; td.focus();
-  td.style.outline='2px solid var(--accent)';
-  const finish=()=>{
+  td.contentEditable=true; td.style.boxShadow=''; td.style.outline='2px solid var(--accent)'; td.focus(); _tdSelectAll(td);
+  const commit=()=>{
     td.contentEditable=false; td.style.outline='';
     const txt=td.textContent.trim();
     let cell=(e.cells||[]).find(x=>x.r===r&&x.c===c);
     if(!cell){ cell={r,c,text:''}; e.cells.push(cell); }
-    cell.text=txt;
-    save(true); renderCanvas(); renderProps();
+    cell.text=txt; save(true); renderCanvas(); renderProps();
   };
-  td.addEventListener('blur',finish,{once:true});
+  td.addEventListener('blur',commit,{once:true});
   td.addEventListener('keydown',ev2=>{
     if(ev2.key==='Enter'&&!ev2.shiftKey){ ev2.preventDefault(); td.blur(); }
-    if(ev2.key==='Escape'){ td.textContent=(e.cells||[]).find(x=>x.r===r&&x.c===c)?.text||''; td.blur(); }
-    if(ev2.key==='Tab'){
-      ev2.preventDefault(); td.blur();
-      const nc=ev2.shiftKey? c-1 : c+1;
-      if(nc>=0&&nc<e.cols){ const next=node.querySelector(`td[data-row="${r}"][data-col="${nc}"]`); if(next){ next.contentEditable=true; next.focus(); next.style.outline='2px solid var(--accent)'; const f2=()=>{ next.contentEditable=false; next.style.outline=''; let cl=(e.cells||[]).find(x=>x.r===r&&x.c===nc); if(!cl){cl={r,c:nc,text:''};e.cells.push(cl);} cl.text=next.textContent.trim(); save(true); }; next.addEventListener('blur',f2,{once:true}); } }
-    }
+    else if(ev2.key==='Escape'){ td.textContent=(e.cells||[]).find(x=>x.r===r&&x.c===c)?.text||''; td.blur(); }
+    else if(ev2.key==='Tab'){ ev2.preventDefault(); const nc=ev2.shiftKey? c-1 : c+1; td.blur(); if(nc>=0&&nc<e.cols) editTableCell(e,r,nc); }
   });
 }
+function startTableEdit(node,e,ev){ const td=ev.target.closest('td'); if(td) _editTd(e,td); }
+// 임의 셀 편집 (F2/Enter·Tab 이동에서 호출) — 최신 노드를 다시 조회
+function editTableCell(e,r,c){ const node=canvas.querySelector(`[data-id="${e.id}"]`); if(!node) return; const td=node.querySelector(`td[data-row="${r}"][data-col="${c}"]`); if(td) _editTd(e,td); }
 
 // ── 템플릿 모달 ──
 function openTplModal(){
@@ -2528,9 +2558,12 @@ function showTableCtx(x,y,e,ev){
   const clickR=td?+td.dataset.row:0, clickC=td?+td.dataset.col:0;
   const cell=(e.cells||[]).find(c=>c.r===clickR&&c.c===clickC)||{};
   const isHead=clickR===0;
+  const targets=_tblTargets(e,clickR,clickC);   // 선택 범위 전체(또는 클릭칸 1개) — 색/배경/정렬 일괄 적용
+  const _applyCells=(key,val)=>targets.forEach(t=>_tblCellProp(e,t.r,t.c,key,val));
 
   // ─ 미니 툴바 (PPT 스타일) ─
   let h='<div class="ctx-tbar">';
+  if(targets.length>1) h+=`<span style="font-size:11px;color:var(--accent);font-weight:700;padding:0 4px">${targets.length}칸 선택</span>`;
   h+=`<select id="ct-font" style="max-width:110px">${FONTS.map(f=>`<option value="${f[0]}" ${e.fontFamily===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select>`;
   h+=`<input type="number" id="ct-fsize" value="${e.fontSize||14}" min="8" max="72">`;
   h+=`<button class="ct-btn${(isHead?(e.headerWeight||700):(e.fontWeight||400))>=700?' on':''}" id="ct-bold" title="굵게" style="font-weight:900">가</button>`;
@@ -2578,20 +2611,20 @@ function showTableCtx(x,y,e,ev){
     else{ e.fontWeight=(e.fontWeight||400)>=700?400:700; }
     _live(); hideCtx();
   };
-  $c('ct-align-l').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'left'); _live(); hideCtx(); };
-  $c('ct-align-c').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'center'); _live(); hideCtx(); };
-  $c('ct-align-r').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'right'); _live(); hideCtx(); };
+  $c('ct-align-l').onclick=()=>{ _applyCells('align','left'); _live(); hideCtx(); };
+  $c('ct-align-c').onclick=()=>{ _applyCells('align','center'); _live(); hideCtx(); };
+  $c('ct-align-r').onclick=()=>{ _applyCells('align','right'); _live(); hideCtx(); };
 
   $c('ct-fc').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxColor', $c('ct-fc')); };
   $c('ct-bg').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxBg', $c('ct-bg')); };
 
-  // 임시 CP_TARGETS (이 셀에 대한)
-  CP_TARGETS.tblCtxColor={ label:'셀 글자색', rich:false,
+  // 임시 CP_TARGETS — 선택 범위 전체에 적용(개별로 바꾼 칸도 덮어씀)
+  CP_TARGETS.tblCtxColor={ label:targets.length>1?`${targets.length}칸 글자색`:'셀 글자색', rich:false,
     current:()=>cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')),
-    set:v=>{ _tblCellProp(e,clickR,clickC,'color',v); liveStyleEl(e); }};
-  CP_TARGETS.tblCtxBg={ label:'셀 배경색', rich:false,
+    set:v=>{ _applyCells('color',v); liveStyleEl(e); }};
+  CP_TARGETS.tblCtxBg={ label:targets.length>1?`${targets.length}칸 배경색`:'셀 배경색', rich:false,
     current:()=>cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')),
-    set:v=>{ _tblCellProp(e,clickR,clickC,'bg',v); liveStyleEl(e); }};
+    set:v=>{ _applyCells('bg',v); liveStyleEl(e); }};
 
   $c('ct-bw-up').onclick=()=>{ e.borderW=(e.borderW||1)+1; _live(); };
   $c('ct-bw-dn').onclick=()=>{ e.borderW=Math.max(0,(e.borderW||1)-1); _live(); };
@@ -4219,6 +4252,8 @@ window.addEventListener('keydown',ev=>{
   if(!ck && (code==='F2'||code==='Enter'||code==='NumpadEnter') && selId){
     const e=el(selId);
     if(e && (e.type==='text'||e.type==='shape')){ ev.preventDefault(); const node=canvas.querySelector(`[data-id="${e.id}"]`); if(node) startEdit(node,e); return; }
+    // 표: 단일 셀 선택 상태에서 F2/Enter → 그 셀 편집
+    if(e && e.type==='table' && _tblSel && _tblSel.id===e.id){ const n=_tblNorm(_tblSel); if(n.r0===n.r1&&n.c0===n.c1){ ev.preventDefault(); editTableCell(e,n.r0,n.c0); return; } }
   }
   // 텍스트 서식 단축키 (텍스트 선택 시)
   if(ck&&selTextEls().length){
