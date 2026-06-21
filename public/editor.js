@@ -2902,9 +2902,10 @@ function showBorderDialog(e){
   const card=document.createElement('div');
   card.style.cssText='width:560px;max-width:94vw;max-height:92vh;overflow:auto;background:var(--panel,#fff);color:var(--text,#222);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.4);padding:0';
   card.innerHTML=`
-    <div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border,#ececf4)">
+    <div id="bd-head" style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border,#ececf4);cursor:move;user-select:none">
       <span style="font-weight:800;font-size:15px">⊞ 셀 테두리</span>
       <span style="font-size:12px;color:var(--sub,#888)">적용 대상: <b style="color:var(--accent)">${scope}</b></span>
+      <span style="color:var(--sub,#888);letter-spacing:1px;margin-left:8px" title="드래그로 이동">⠿⠿</span>
       <button id="bd-x" style="margin-left:auto;border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--sub,#999)">✕</button>
     </div>
     <div style="display:flex;gap:18px;padding:16px 18px">
@@ -3011,6 +3012,17 @@ function showBorderDialog(e){
     prev.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" style="background:var(--panel2,#f6f6fb);border-radius:8px">${g}</svg>`;
     prev.querySelectorAll('[data-hit]').forEach(ln=>ln.addEventListener('click',()=>cycle(ln.dataset.hit)));
   }
+
+  // 헤더 드래그로 이동(중앙정렬 기준 transform 오프셋)
+  let _dx=0,_dy=0;
+  $('#bd-head').addEventListener('mousedown',ev=>{
+    if(ev.target.closest('#bd-x')) return;
+    ev.preventDefault();
+    const sx=ev.clientX, sy=ev.clientY, ox=_dx, oy=_dy;
+    const mv=e2=>{ _dx=ox+(e2.clientX-sx); _dy=oy+(e2.clientY-sy); card.style.transform=`translate(${_dx}px,${_dy}px)`; };
+    const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+    window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+  });
 
   function close(){ delete CP_TARGETS.tblBdDlgColor; try{ closeAllDD(); }catch(_){} ov.remove(); }
   $('#bd-x').onclick=close; $('#bd-cancel').onclick=close;
