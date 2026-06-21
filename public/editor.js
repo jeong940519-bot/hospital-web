@@ -856,6 +856,9 @@ let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
 let _fixPopupT=null; // 현재 열린 고정탭 팝업의 대상 탭(색 선택 후 스와치 갱신용)
 // 색 선택 직후 고정탭 팝업의 스와치를 즉시 갱신(위치 유지). 팝업이 없으면 무시.
 function _fixRefreshPopup(){ const p=document.getElementById('fixtab-popup'); if(p&&_fixPopupT){ const r=p.getBoundingClientRect(); openFixTabPopup(_fixPopupT, r.left, r.top, r.width, r.height); } }
+// 팝업 위치·크기를 localStorage에 보존 → 닫았다 다시 열어도 유지
+function _fixSaveGeo(){ const p=document.getElementById('fixtab-popup'); if(!p)return; const r=p.getBoundingClientRect(); try{ localStorage.setItem('hw_fixtab_geo', JSON.stringify({x:Math.round(r.left),y:Math.round(r.top),w:Math.round(r.width),h:Math.round(r.height)})); }catch(_){} }
+function _fixLoadGeo(){ try{ return JSON.parse(localStorage.getItem('hw_fixtab_geo')||'null'); }catch(_){ return null; } }
 function fixedTabs(){ if(!project.fixedTabs) project.fixedTabs=[]; return project.fixedTabs; }
 function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
 function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
@@ -962,6 +965,8 @@ function startFixTabResize(ev,t,pos){
 function openFixTabPopup(t,x,y,pw,ph){
   document.getElementById('fixtab-popup')?.remove();
   _fixPopupT=t;
+  // 새로 여는 경우(프로그램 재오픈 아님) 저장된 위치·크기 복원
+  if(pw==null){ const g=_fixLoadGeo(); if(g){ x=g.x; y=g.y; pw=g.w; ph=g.h; } }
   const items=fixTabItemsOf(t), dir=(t.dir==='col')?'col':'row';
   const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const roots=hamburgerRootPages();
@@ -1045,9 +1050,11 @@ function openFixTabPopup(t,x,y,pw,ph){
     ev.preventDefault();
     const sx=ev.clientX, sy=ev.clientY, l0=pop.getBoundingClientRect().left, t0=pop.getBoundingClientRect().top;
     const mv=e2=>{ pop.style.left=_clamp(l0+e2.clientX-sx,0,innerWidth-pop.offsetWidth)+'px'; pop.style.top=_clamp(t0+e2.clientY-sy,0,innerHeight-pop.offsetHeight)+'px'; };
-    const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+    const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); _fixSaveGeo(); };
     window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
   });
+  // 모서리 드래그(resize:both) 종료 시 크기 저장
+  pop.addEventListener('mouseup',_fixSaveGeo);
   // 항목별 핸들러
   pop.querySelectorAll('.ft-l').forEach(inp=>{ inp.addEventListener('input',()=>{ items[+inp.dataset.i].label=inp.value; _fixSave(); }); inp.addEventListener('change',()=>snapshot()); });
   pop.querySelectorAll('.ft-act').forEach(sel=>sel.addEventListener('change',()=>{ items[+sel.dataset.i].action=sel.value; _fixSave(); snapshot(); reopen(); }));
@@ -1076,7 +1083,7 @@ function openFixTabPopup(t,x,y,pw,ph){
   q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
   q('ft-del').addEventListener('click',()=>{ const a=fixedTabs(); const i=a.findIndex(x=>x.id===t.id); if(i>=0)a.splice(i,1); _fixTabSel=null; pop.remove(); renderCanvas(); save(true); snapshot(); toast('고정탭 삭제됨'); });
-  const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ pop.remove(); document.removeEventListener('mousedown',closer); } };
+  const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ _fixSaveGeo(); pop.remove(); document.removeEventListener('mousedown',closer); } };
   setTimeout(()=>document.addEventListener('mousedown',closer),0);
 }
 
