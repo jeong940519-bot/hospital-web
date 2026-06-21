@@ -347,10 +347,16 @@
     if(e.type==='table'){
       var tbStyle=base+'overflow:hidden;'+(e.radius?'border-radius:'+e.radius+'px;':'');
       var thtml='<table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:\''+(e.fontFamily||'Noto Sans KR')+'\',sans-serif;font-size:'+(e.fontSize||14)+'px">';
+      if(e.colWidths&&e.colWidths.length===e.cols){
+        thtml+='<colgroup>';
+        for(var ci=0;ci<e.cols;ci++) thtml+='<col style="width:'+(e.colWidths[ci]/e.w*100)+'%">';
+        thtml+='</colgroup>';
+      }
       var cellMap={};
       (e.cells||[]).forEach(function(c){ cellMap[c.r+'_'+c.c]=c; });
       for(var r=0;r<e.rows;r++){
-        thtml+='<tr>';
+        var trStyle=(e.rowHeights&&e.rowHeights[r])?'height:'+(e.rowHeights[r]/e.h*100)+'%':'';
+        thtml+='<tr'+(trStyle?' style="'+trStyle+'"':'')+'>';
         for(var c=0;c<e.cols;c++){
           var cell=cellMap[r+'_'+c]||{};
           var isHead=r===0;

@@ -728,14 +728,20 @@ function renderEl(e){
    }
   }
   if(e.type==='table'){
-    node.style.overflow='hidden';
+    node.style.overflow='hidden'; node.style.position='absolute';
     if(e.radius) node.style.borderRadius=e.radius+'px';
+    if(!e.colWidths||e.colWidths.length!==e.cols){ e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols)); }
+    if(!e.rowHeights||e.rowHeights.length!==e.rows){ e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows)); }
     const tbl=document.createElement('table');
     tbl.style.cssText=`width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:'${e.fontFamily||'Noto Sans KR'}',sans-serif;font-size:${e.fontSize||14}px`;
+    const cg=document.createElement('colgroup');
+    e.colWidths.forEach(w=>{ const col=document.createElement('col'); col.style.width=(w/e.w*100)+'%'; cg.appendChild(col); });
+    tbl.appendChild(cg);
     const cellMap={};
     (e.cells||[]).forEach(c=>{ cellMap[c.r+'_'+c.c]=c; });
     for(let r=0;r<e.rows;r++){
       const tr=document.createElement('tr');
+      tr.style.height=(e.rowHeights[r]/e.h*100)+'%';
       for(let c=0;c<e.cols;c++){
         const td=document.createElement('td');
         const cell=cellMap[r+'_'+c]||{};
@@ -748,10 +754,35 @@ function renderEl(e){
       tbl.appendChild(tr);
     }
     node.appendChild(tbl);
+    // column resize handles
+    let cx=0;
+    for(let c=0;c<e.cols-1;c++){
+      cx+=e.colWidths[c];
+      const h=document.createElement('div');
+      h.dataset.tblColResize=c;
+      h.style.cssText=`position:absolute;top:0;height:100%;width:6px;left:${cx/e.w*100}%;transform:translateX(-3px);cursor:col-resize;z-index:10`;
+      node.appendChild(h);
+    }
+    // row resize handles
+    let ry=0;
+    for(let r=0;r<e.rows-1;r++){
+      ry+=e.rowHeights[r];
+      const h=document.createElement('div');
+      h.dataset.tblRowResize=r;
+      h.style.cssText=`position:absolute;left:0;width:100%;height:6px;top:${ry/e.h*100}%;transform:translateY(-3px);cursor:row-resize;z-index:10`;
+      node.appendChild(h);
+    }
   }
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
-  node.addEventListener('mousedown', ev=> startDrag(ev,e));
+  node.addEventListener('mousedown', ev=>{
+    if(e.type==='table'){
+      const colH=ev.target.dataset.tblColResize, rowH=ev.target.dataset.tblRowResize;
+      if(colH!=null){ ev.stopPropagation(); ev.preventDefault(); startTblColResize(ev,e,+colH); return; }
+      if(rowH!=null){ ev.stopPropagation(); ev.preventDefault(); startTblRowResize(ev,e,+rowH); return; }
+    }
+    startDrag(ev,e);
+  });
   node.addEventListener('dblclick', ev=>{ if(e.type==='text'||e.type==='shape') startEdit(node,e); else if(e.type==='table') startTableEdit(node,e,ev); });
   node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); if(e.type==='table') showTableCtx(ev.clientX, ev.clientY, e, ev); else showLinkMenu(ev.clientX, ev.clientY, e); });
   return node;
@@ -1434,22 +1465,25 @@ function renderProps(){
     html += `<div class="grp"><label>열 × 행</label><div class="row">
       <div class="num-unit" style="flex:1"><span>열</span><input type="number" id="tb-cols" value="${e.cols}" min="1" max="20"></div>
       <div class="num-unit" style="flex:1"><span>행</span><input type="number" id="tb-rows" value="${e.rows}" min="1" max="50"></div></div></div>`;
-    html += `<div class="grp"><label>글자 크기</label><div class="num-unit"><input type="number" id="tb-fsize" value="${e.fontSize||14}"></div></div>`;
+    html += `<div class="grp"><label>폰트</label><select id="tb-font">${FONTS.map(f=>`<option value="${f[0]}" ${e.fontFamily===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select></div>`;
+    html += `<div class="grp"><label>글자 크기 / 굵기</label><div class="row">
+      <div class="num-unit" style="flex:1"><input type="number" id="tb-fsize" value="${e.fontSize||14}"></div>
+      <select id="tb-fw" style="flex:1">${[['300','얇게'],['400','보통'],['500','중간'],['700','굵게']].map(w=>`<option value="${w[0]}" ${String(e.fontWeight||400)===w[0]?'selected':''}>${w[1]}</option>`).join('')}</select></div></div>`;
     html += `<div class="sec-hd">▾ 머리행</div>`;
-    html += `<div class="grp"><label>배경 / 글자</label><div class="row">
-      <input type="color" id="tb-hbg" value="${e.headerBg||'#4a5568'}">
-      <input type="color" id="tb-hc" value="${e.headerColor||'#ffffff'}">
+    html += `<div class="grp"><label>배경 / 글자 / 굵기</label><div class="row">
+      <button type="button" class="panel-cbtn" data-cpkey="tblHeaderBg" title="머리행 배경"><span style="background:${e.headerBg||'#4a5568'}"></span></button>
+      <button type="button" class="panel-cbtn" data-cpkey="tblHeaderColor" title="머리행 글자"><span style="background:${e.headerColor||'#ffffff'}"></span></button>
       <select id="tb-hw" style="flex:1"><option value="400" ${(e.headerWeight||700)<700?'selected':''}>보통</option><option value="700" ${(e.headerWeight||700)>=700?'selected':''}>굵게</option></select></div></div>`;
     html += `<div class="sec-hd">▾ 본문</div>`;
     html += `<div class="grp"><label>배경 / 글자</label><div class="row">
-      <input type="color" id="tb-cbg" value="${e.cellBg||'#ffffff'}">
-      <input type="color" id="tb-cc" value="${e.cellColor||'#333333'}"></div></div>`;
+      <button type="button" class="panel-cbtn" data-cpkey="tblCellBg" title="본문 배경"><span style="background:${e.cellBg||'#ffffff'}"></span></button>
+      <button type="button" class="panel-cbtn" data-cpkey="tblCellColor" title="본문 글자"><span style="background:${e.cellColor||'#333333'}"></span></button></div></div>`;
     html += `<div class="sec-hd">▾ 테두리</div>`;
     html += `<div class="grp"><div class="row">
       <div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="tb-bw" value="${e.borderW||1}"></div>
-      <input type="color" id="tb-bc" value="${e.borderColor||'#333333'}"></div></div>`;
+      <button type="button" class="panel-cbtn" data-cpkey="tblBorder" title="테두리 색"><span style="background:${e.borderColor||'#333333'}"></span></button></div></div>`;
     html += `<div class="grp"><label>모서리 둥글기</label><input type="range" id="tb-radius" min="0" max="30" value="${e.radius||0}"></div>`;
-    html += `<div class="grp"><label>셀 내용 편집</label><div style="font-size:11px;color:var(--sub)">표를 더블클릭하면 셀 내용을 수정할 수 있습니다. Tab으로 다음 셀 이동.</div></div>`;
+    html += `<div class="grp"><label>셀 내용 편집</label><div style="font-size:11px;color:var(--sub)">더블클릭으로 셀 편집 · Tab 이동 · 테두리 드래그로 행/열 크기 조절</div></div>`;
     html += `<div class="grp"><div class="btn-grp">
       <button id="tb-add-row">+ 행 추가</button>
       <button id="tb-add-col">+ 열 추가</button></div></div>`;
@@ -1651,40 +1685,40 @@ function bindProps(e){
     const tblNum=(id,key)=>{ const i=$(id); if(!i)return; i.addEventListener('change',()=>{ e[key]=parseFloat(i.value)||0; tblSync(); snapshot(); }); };
     tblNum('tb-fsize','fontSize');
     tblNum('tb-bw','borderW');
+    if($('tb-font')) $('tb-font').addEventListener('change',()=>{ e.fontFamily=$('tb-font').value; loadFont(e.fontFamily); liveStyle(); snapshot(); });
+    if($('tb-fw')) $('tb-fw').addEventListener('change',()=>{ e.fontWeight=parseInt($('tb-fw').value); liveStyle(); snapshot(); });
     if($('tb-radius')) $('tb-radius').addEventListener('input',()=>{ e.radius=parseInt($('tb-radius').value)||0; liveStyle(); });
     if($('tb-radius')) $('tb-radius').addEventListener('change',snapshot);
-    ['tb-hbg:headerBg','tb-hc:headerColor','tb-cbg:cellBg','tb-cc:cellColor','tb-bc:borderColor'].forEach(p=>{
-      const [id,key]=p.split(':');
-      if($(id)){ $(id).addEventListener('input',()=>{ e[key]=$(id).value; liveStyle(); }); $(id).addEventListener('change',snapshot); }
-    });
     if($('tb-hw')) $('tb-hw').addEventListener('change',()=>{ e.headerWeight=parseInt($('tb-hw').value); liveStyle(); snapshot(); });
     if($('tb-cols')) $('tb-cols').addEventListener('change',()=>{
       const nc=Math.max(1,Math.min(20,parseInt($('tb-cols').value)||3));
-      if(nc>e.cols){ for(let r=0;r<e.rows;r++) e.cells.push({r,c:nc-1,text:r===0?`항목${nc}`:''}); }
-      else if(nc<e.cols){ e.cells=e.cells.filter(c=>c.c<nc); }
-      e.cols=nc; e.w=nc*120; tblSync(); snapshot();
+      if(nc>e.cols){ for(let r=0;r<e.rows;r++) e.cells.push({r,c:nc-1,text:r===0?`항목${nc}`:''}); e.colWidths=e.colWidths||[]; while(e.colWidths.length<nc) e.colWidths.push(120); }
+      else if(nc<e.cols){ e.cells=e.cells.filter(c=>c.c<nc); if(e.colWidths) e.colWidths=e.colWidths.slice(0,nc); }
+      e.cols=nc; e.w=e.colWidths?e.colWidths.reduce((a,b)=>a+b,0):nc*120; tblSync(); snapshot();
     });
     if($('tb-rows')) $('tb-rows').addEventListener('change',()=>{
       const nr=Math.max(1,Math.min(50,parseInt($('tb-rows').value)||3));
-      if(nr>e.rows){ for(let c=0;c<e.cols;c++) e.cells.push({r:nr-1,c,text:''}); }
-      else if(nr<e.rows){ e.cells=e.cells.filter(c=>c.r<nr); }
-      e.rows=nr; e.h=nr*40; tblSync(); snapshot();
+      if(nr>e.rows){ for(let c=0;c<e.cols;c++) e.cells.push({r:nr-1,c,text:''}); e.rowHeights=e.rowHeights||[]; while(e.rowHeights.length<nr) e.rowHeights.push(40); }
+      else if(nr<e.rows){ e.cells=e.cells.filter(c=>c.r<nr); if(e.rowHeights) e.rowHeights=e.rowHeights.slice(0,nr); }
+      e.rows=nr; e.h=e.rowHeights?e.rowHeights.reduce((a,b)=>a+b,0):nr*40; tblSync(); snapshot();
     });
     if($('tb-add-row')) $('tb-add-row').addEventListener('click',()=>{
       for(let c=0;c<e.cols;c++) e.cells.push({r:e.rows,c,text:''});
-      e.rows++; e.h+=40; tblSync(); snapshot();
+      e.rows++; if(!e.rowHeights) e.rowHeights=[]; e.rowHeights.push(40); e.h+=40; tblSync(); snapshot();
     });
     if($('tb-add-col')) $('tb-add-col').addEventListener('click',()=>{
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:e.cols,text:r===0?`항목${e.cols+1}`:''});
-      e.cols++; e.w+=120; tblSync(); snapshot();
+      e.cols++; if(!e.colWidths) e.colWidths=[]; e.colWidths.push(120); e.w+=120; tblSync(); snapshot();
     });
     if($('tb-del-row')) $('tb-del-row').addEventListener('click',()=>{
       if(e.rows<=1) return;
-      e.rows--; e.cells=e.cells.filter(c=>c.r<e.rows); e.h=Math.max(40,e.h-40); tblSync(); snapshot();
+      const removed=e.rowHeights?e.rowHeights.pop():40;
+      e.rows--; e.cells=e.cells.filter(c=>c.r<e.rows); e.h=Math.max(40,e.h-removed); tblSync(); snapshot();
     });
     if($('tb-del-col')) $('tb-del-col').addEventListener('click',()=>{
       if(e.cols<=1) return;
-      e.cols--; e.cells=e.cells.filter(c=>c.c<e.cols); e.w=Math.max(120,e.w-120); tblSync(); snapshot();
+      const removed=e.colWidths?e.colWidths.pop():120;
+      e.cols--; e.cells=e.cells.filter(c=>c.c<e.cols); e.w=Math.max(120,e.w-removed); tblSync(); snapshot();
     });
   }
   // 링크 설정
@@ -2376,6 +2410,40 @@ function shapeIconStyle(k){
   document.getElementById('rb2-addtable').onclick=()=>document.getElementById('table-modal').style.display='flex';
 })();
 
+// ── 표 열/행 드래그 리사이즈 ──
+function startTblColResize(ev,e,colIdx){
+  const startX=ev.clientX, z=zoom;
+  const origW=[...e.colWidths];
+  const onMove=mv=>{
+    const dx=(mv.clientX-startX)/z;
+    const nw1=Math.max(30, origW[colIdx]+dx);
+    const nw2=Math.max(30, origW[colIdx+1]-dx);
+    if(nw1<30||nw2<30) return;
+    e.colWidths[colIdx]=Math.round(nw1);
+    e.colWidths[colIdx+1]=Math.round(nw2);
+    liveStyleEl(e);
+  };
+  const onUp=()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); snapshot(); };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+function startTblRowResize(ev,e,rowIdx){
+  const startY=ev.clientY, z=zoom;
+  const origH=[...e.rowHeights];
+  const onMove=mv=>{
+    const dy=(mv.clientY-startY)/z;
+    const nh1=Math.max(20, origH[rowIdx]+dy);
+    const nh2=Math.max(20, origH[rowIdx+1]-dy);
+    if(nh1<20||nh2<20) return;
+    e.rowHeights[rowIdx]=Math.round(nh1);
+    e.rowHeights[rowIdx+1]=Math.round(nh2);
+    liveStyleEl(e);
+  };
+  const onUp=()=>{ document.removeEventListener('mousemove',onMove); document.removeEventListener('mouseup',onUp); snapshot(); };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
 // ── 표 셀 인라인 편집 ──
 function startTableEdit(node,e,ev){
   const td=ev.target.closest('td');
@@ -2474,32 +2542,42 @@ function showTableCtx(x,y,e,ev){
   m.style.top=Math.min(y, window.innerHeight - m.offsetHeight - 8)+'px';
   m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
     const a=it.dataset.ta;
+    if(!e.colWidths) e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols));
+    if(!e.rowHeights) e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows));
     if(a==='ins-row-above'){
       e.cells.forEach(c=>{ if(c.r>=clickR) c.r++; });
       for(let c=0;c<e.cols;c++) e.cells.push({r:clickR,c,text:''});
+      e.rowHeights.splice(clickR,0,40);
       e.rows++; e.h+=40;
     }else if(a==='ins-row-below'){
       const nr=clickR+1;
       e.cells.forEach(c=>{ if(c.r>=nr) c.r++; });
       for(let c=0;c<e.cols;c++) e.cells.push({r:nr,c,text:''});
+      e.rowHeights.splice(nr,0,40);
       e.rows++; e.h+=40;
     }else if(a==='ins-col-left'){
       e.cells.forEach(c=>{ if(c.c>=clickC) c.c++; });
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:clickC,text:''});
+      e.colWidths.splice(clickC,0,120);
       e.cols++; e.w+=120;
     }else if(a==='ins-col-right'){
       const nc=clickC+1;
       e.cells.forEach(c=>{ if(c.c>=nc) c.c++; });
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:nc,text:''});
+      e.colWidths.splice(nc,0,120);
       e.cols++; e.w+=120;
     }else if(a==='del-row'&&e.rows>1){
+      const rh=e.rowHeights[clickR]||40;
       e.cells=e.cells.filter(c=>c.r!==clickR);
       e.cells.forEach(c=>{ if(c.r>clickR) c.r--; });
-      e.rows--; e.h=Math.max(40,e.h-40);
+      e.rowHeights.splice(clickR,1);
+      e.rows--; e.h=Math.max(40,e.h-rh);
     }else if(a==='del-col'&&e.cols>1){
+      const cw=e.colWidths[clickC]||120;
       e.cells=e.cells.filter(c=>c.c!==clickC);
       e.cells.forEach(c=>{ if(c.c>clickC) c.c--; });
-      e.cols--; e.w=Math.max(120,e.w-120);
+      e.colWidths.splice(clickC,1);
+      e.cols--; e.w=Math.max(120,e.w-cw);
     }else if(a==='clear-row'){
       e.cells.forEach(c=>{ if(c.r===clickR) c.text=''; });
     }else if(a==='clear-col'){
@@ -2508,9 +2586,11 @@ function showTableCtx(x,y,e,ev){
       e.cells.forEach(c=>{ c.text=''; });
     }else if(a==='add-row'){
       for(let c=0;c<e.cols;c++) e.cells.push({r:e.rows,c,text:''});
+      e.rowHeights.push(40);
       e.rows++; e.h+=40;
     }else if(a==='add-col'){
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:e.cols,text:''});
+      e.colWidths.push(120);
       e.cols++; e.w+=120;
     }
     afterMutate(); hideCtx();
@@ -3946,6 +4026,21 @@ const CP_TARGETS={
   fixItemColor:{ label:'항목 글자색', rich:false, noFill:true, noFillLabel:'기본색 사용',
     current:()=>{ const t=_fixTab(); const it=t&&fixTabItemsOf(t)[_fixItemIdx]; return it&&it.color; },
     set:v=>{ const t=_fixTab(); if(!t)return; const it=fixTabItemsOf(t)[_fixItemIdx]; if(!it)return; it.color=(v==='transparent'?'':v); _fixSave(); } },
+  tblHeaderBg:{ label:'머리행 배경', rich:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.headerBg; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.headerBg=v; liveStyleEl(e); } },
+  tblHeaderColor:{ label:'머리행 글자색', rich:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.headerColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.headerColor=v; liveStyleEl(e); } },
+  tblCellBg:{ label:'본문 배경', rich:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.cellBg; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.cellBg=v; liveStyleEl(e); } },
+  tblCellColor:{ label:'본문 글자색', rich:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.cellColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.cellColor=v; liveStyleEl(e); } },
+  tblBorder:{ label:'표 테두리 색', rich:false,
+    current:()=>{ const e=selId?el(selId):null; return e&&e.borderColor; },
+    set:v=>{ const e=selId?el(selId):null; if(!e)return; e.borderColor=v; liveStyleEl(e); } },
 };
 function recentColors(){ try{ return JSON.parse(localStorage.getItem('hw_recent_colors')||'[]'); }catch(_){ return []; } }
 function pushRecentColor(v){
