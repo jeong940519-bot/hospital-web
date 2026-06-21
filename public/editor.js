@@ -1935,7 +1935,7 @@ function renderFxPanel(){
     if(_fxPending===''){ _t.forEach(x=>delete x.fx); }
     else if(_fxPending){ _t.forEach(x=>{ if(!x.fx)x.fx={}; x.fx.type=_fxPending; }); }
     _fxPending=null; _fxInfoOpen=null;
-    renderFxPanel();renderProps();liveStyle();snapshot();
+    renderFxPanel();renderProps();renderCanvas();save(true);snapshot();   // liveStyle()(renderProps 지역함수)는 스코프 밖→에러였음. 전체 갱신으로 교체
     if(_t.length>1) toast(`${_t.length}개에 적용됨`);
   });
   // 취소 버튼
