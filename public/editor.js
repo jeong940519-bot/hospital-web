@@ -853,6 +853,9 @@ function openSliderPartPopup(part,e,x,y){
 // ───────── 고정탭(플로팅 탭) — 캔버스 직접편집(드래그=위치, 핸들=크기, 우클릭=내용·색·폰트) ─────────
 let _fixTabSel=null;
 let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
+let _fixPopupT=null; // 현재 열린 고정탭 팝업의 대상 탭(색 선택 후 스와치 갱신용)
+// 색 선택 직후 고정탭 팝업의 스와치를 즉시 갱신(위치 유지). 팝업이 없으면 무시.
+function _fixRefreshPopup(){ const p=document.getElementById('fixtab-popup'); if(p&&_fixPopupT){ const r=p.getBoundingClientRect(); openFixTabPopup(_fixPopupT, r.left, r.top); } }
 function fixedTabs(){ if(!project.fixedTabs) project.fixedTabs=[]; return project.fixedTabs; }
 function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
 function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
@@ -958,6 +961,7 @@ function startFixTabResize(ev,t,pos){
 }
 function openFixTabPopup(t,x,y){
   document.getElementById('fixtab-popup')?.remove();
+  _fixPopupT=t;
   const items=fixTabItemsOf(t), dir=(t.dir==='col')?'col':'row';
   const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const roots=hamburgerRootPages();
@@ -1004,15 +1008,16 @@ function openFixTabPopup(t,x,y){
     <div style="display:flex;gap:6px;margin-bottom:8px">${dbtn('row','가로 배열')}${dbtn('col','세로 배열')}</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">${swatch('fixTabBg',t.bg||'#2b6cff')}${swatch('fixTabColor',t.color||'#ffffff')}</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${t.fontSize||15}" min="9" max="40" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" min="0" max="60" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${t.fontSize||15}" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" style="${IN}"></label>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">자간(px)</span><input type="number" id="ft-ls" value="${t.letterSpacing||0}" step="0.5" min="-2" max="12" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">행간</span><input type="number" id="ft-lh" value="${t.lineHeight!=null?t.lineHeight:1.2}" step="0.1" min="0.8" max="2.5" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">자간(px)</span><input type="number" id="ft-ls" value="${t.letterSpacing||0}" step="0.5" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">행간</span><input type="number" id="ft-lh" value="${t.lineHeight!=null?t.lineHeight:1.2}" step="0.1" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">항목 간격</span><input type="number" id="ft-gap" value="${t.gap!=null?t.gap:''}" placeholder="자동" style="${IN}"></label>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-end">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${t.borderW||0}" min="0" max="12" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${t.borderW||0}" style="${IN}"></label>
       <div style="flex:1.2;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 색</span>${swatch('fixTabBorder',t.borderColor||'#e2e2ee')}</div>
     </div>
     <label style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"><span style="font-size:10px;color:var(--sub,#999)">폰트</span><select id="ft-font" style="${IN};width:100%">${fontOpts}</select></label>
@@ -1057,6 +1062,8 @@ function openFixTabPopup(t,x,y){
   q('ft-lh').addEventListener('change',()=>snapshot());
   q('ft-bw').addEventListener('input',()=>{ t.borderW=parseInt(q('ft-bw').value)||0; _fixSave(); });
   q('ft-bw').addEventListener('change',()=>snapshot());
+  q('ft-gap').addEventListener('input',()=>{ const v=q('ft-gap').value.trim(); t.gap=(v===''?null:(parseInt(v)||0)); _fixSave(); });
+  q('ft-gap').addEventListener('change',()=>snapshot());
   // 항목별 색 스와치: 클릭 시 대상 항목 인덱스 지정 + 토글 모호성 제거(항상 새로 열기)
   pop.querySelectorAll('.ft-isw').forEach(b=>b.addEventListener('click',()=>{ _fixItemIdx=+b.dataset.i; _cpTarget=null; }));
   q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
@@ -3904,7 +3911,7 @@ function pushRecentColor(v){
   arr.unshift(v); arr=arr.slice(0,20);
   localStorage.setItem('hw_recent_colors',JSON.stringify(arr));
 }
-function cpApply(val){ if(!_cpTarget) return; _cpTarget.set(val); pushRecentColor(val); snapshot(); renderProps(); closeAllDD(); }
+function cpApply(val){ if(!_cpTarget) return; _cpTarget.set(val); pushRecentColor(val); snapshot(); renderProps(); closeAllDD(); _fixRefreshPopup(); }
 function openColorPopup(key, btn){
   const t=CP_TARGETS[key]; if(!t) return; _cpTarget=t;
   document.getElementById('fill-dd-title').textContent=t.label;
