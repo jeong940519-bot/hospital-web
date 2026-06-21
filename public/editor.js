@@ -1585,11 +1585,12 @@ function bindProps(e){
   const linkSel=$('el-link');
   if(linkSel) linkSel.addEventListener('change',()=>{
     const v=linkSel.value;
+    const _ts=selAll(); const _t=_ts.length?_ts:[e];   // 그룹/다중선택이면 전체 링크
     if(v==='__new__'){
       const child=newPage(prompt('새로 만들 페이지 이름','새 페이지')||'새 페이지', page().id);
-      project.pages.push(child); e.link=child.id;
-      renderProps(); afterMutate(); toast('새 페이지를 만들어 연결했습니다');
-    }else{ e.link=v||null; liveStyle(); snapshot(); renderProps(); }
+      project.pages.push(child); _t.forEach(x=>x.link=child.id);
+      renderProps(); afterMutate(); toast('새 페이지를 만들어 연결했습니다'+(_t.length>1?` (${_t.length}개)`:''));
+    }else{ _t.forEach(x=>x.link=v||null); liveStyle(); snapshot(); renderProps(); if(_t.length>1&&v) toast(`${_t.length}개에 링크 연결됨`); }
   });
   const linkGo=$('el-link-go');
   if(linkGo) linkGo.addEventListener('click',()=>{ const i=pageIndex(e.link); if(i>=0){ curPage=i; selId=null; renderCanvas(); renderPages(); renderProps(); toast('연결된 페이지로 이동'); } });
@@ -1930,10 +1931,12 @@ function renderFxPanel(){
   // 적용 버튼
   const applyBtn=document.getElementById('fx-apply-btn');
   if(applyBtn) applyBtn.addEventListener('click',()=>{
-    if(_fxPending===''){delete e.fx;}
-    else if(_fxPending){if(!e.fx)e.fx={};e.fx.type=_fxPending;}
+    const _ts=selAll(); const _t=_ts.length?_ts:[e];   // 그룹/다중선택이면 전체 적용
+    if(_fxPending===''){ _t.forEach(x=>delete x.fx); }
+    else if(_fxPending){ _t.forEach(x=>{ if(!x.fx)x.fx={}; x.fx.type=_fxPending; }); }
     _fxPending=null; _fxInfoOpen=null;
     renderFxPanel();renderProps();liveStyle();snapshot();
+    if(_t.length>1) toast(`${_t.length}개에 적용됨`);
   });
   // 취소 버튼
   const cancelBtn=document.getElementById('fx-cancel-btn');
@@ -2260,10 +2263,11 @@ function showLinkMenu(x,y,e){
   m.style.top=Math.min(y, window.innerHeight - m.offsetHeight - 8)+'px';
   m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
     const lid=it.dataset.link, act=it.dataset.act;
-    if(lid){ e.link=lid; afterMutate(); toast('링크 연결됨 🔗'); }
-    else if(act==='new'){ const child=newPage(prompt('새 페이지 이름','새 페이지')||'새 페이지', page().id); project.pages.push(child); e.link=child.id; afterMutate(); toast('새 페이지를 만들어 연결했습니다'); }
+    const _ts=selAll(); const _t=_ts.length?_ts:[e];   // 그룹/다중선택이면 전체 링크
+    if(lid){ _t.forEach(x=>x.link=lid); afterMutate(); toast('링크 연결됨 🔗'+(_t.length>1?` (${_t.length}개)`:'')); }
+    else if(act==='new'){ const child=newPage(prompt('새 페이지 이름','새 페이지')||'새 페이지', page().id); project.pages.push(child); _t.forEach(x=>x.link=child.id); afterMutate(); toast('새 페이지를 만들어 연결했습니다'); }
     else if(act==='go'){ const i=pageIndex(e.link); if(i>=0){ curPage=i; selId=null; renderCanvas(); renderPages(); renderProps(); toast('연결된 페이지로 이동'); } }
-    else if(act==='clear'){ e.link=null; afterMutate(); toast('링크 해제됨'); }
+    else if(act==='clear'){ _t.forEach(x=>x.link=null); afterMutate(); toast('링크 해제됨'); }
     hideCtx();
   }));
 }
