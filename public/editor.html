@@ -94,6 +94,19 @@
   .ctx .head:hover{background:none;color:var(--sub)}
   .ctx .sep{height:1px;background:var(--border);margin:4px 2px}
 
+  /* 표 우클릭 미니 툴바 (PPT 스타일) */
+  .ctx-tbar{display:flex;align-items:center;gap:3px;padding:4px 6px;flex-wrap:wrap}
+  .ctx-tbar select{background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:2px 4px;height:26px;font-family:inherit;outline:none}
+  .ctx-tbar select:focus{border-color:var(--accent)}
+  .ctx-tbar input[type=number]{width:38px;background:var(--panel2);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:2px 4px;height:26px;text-align:center;font-family:inherit;outline:none}
+  .ctx-tbar input[type=number]:focus{border-color:var(--accent)}
+  .ctx-tbar .ct-btn{width:26px;height:26px;border:none;background:transparent;color:var(--sub);cursor:pointer;border-radius:4px;font-size:13px;display:flex;align-items:center;justify-content:center;font-family:inherit;position:relative}
+  .ctx-tbar .ct-btn:hover{background:var(--panel2);color:var(--text)}
+  .ctx-tbar .ct-btn.on{background:rgba(108,123,255,.18);color:var(--accent)}
+  .ctx-tbar .ct-vsep{width:1px;height:18px;background:var(--border);margin:0 1px;flex-shrink:0}
+  .ctx-tbar .ct-color{width:26px;height:26px;border:1px solid var(--border);background:transparent;cursor:pointer;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:12px;line-height:1;position:relative}
+  .ctx-tbar .ct-color .ct-bar{display:block;width:14px;height:3px;border-radius:1px}
+
   /* selection handles */
   .handle{position:absolute;width:11px;height:11px;background:#fff;border:2px solid var(--accent);border-radius:2px;z-index:50}
   .handle.nw{top:-6px;left:-6px;cursor:nwse-resize}

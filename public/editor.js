@@ -2517,12 +2517,37 @@ function showLinkMenu(x,y,e){
     hideCtx();
   }));
 }
-// ── 표 전용 우클릭 메뉴 (PPT식) ──
+// ── 표 전용 우클릭 메뉴 (PPT 미니 툴바 + 테이블 메뉴) ──
+function _tblEnsureWH(e){
+  if(!e.colWidths||e.colWidths.length!==e.cols) e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols));
+  if(!e.rowHeights||e.rowHeights.length!==e.rows) e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows));
+}
 function showTableCtx(x,y,e,ev){
   const m=document.getElementById('ctx-menu');
   const td=ev.target.closest('td');
   const clickR=td?+td.dataset.row:0, clickC=td?+td.dataset.col:0;
-  let h='<div class="head">▦ 표 편집</div>';
+  const cell=(e.cells||[]).find(c=>c.r===clickR&&c.c===clickC)||{};
+  const isHead=clickR===0;
+
+  // ─ 미니 툴바 (PPT 스타일) ─
+  let h='<div class="ctx-tbar">';
+  h+=`<select id="ct-font" style="max-width:110px">${FONTS.map(f=>`<option value="${f[0]}" ${e.fontFamily===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select>`;
+  h+=`<input type="number" id="ct-fsize" value="${e.fontSize||14}" min="8" max="72">`;
+  h+=`<button class="ct-btn${(isHead?(e.headerWeight||700):(e.fontWeight||400))>=700?' on':''}" id="ct-bold" title="굵게" style="font-weight:900">가</button>`;
+  h+=`<div class="ct-vsep"></div>`;
+  h+=`<button class="ct-btn" id="ct-align-l" title="왼쪽 정렬" style="font-size:11px">☰</button>`;
+  h+=`<button class="ct-btn" id="ct-align-c" title="가운데 정렬" style="font-size:11px">☰</button>`;
+  h+=`<button class="ct-btn" id="ct-align-r" title="오른쪽 정렬" style="font-size:11px">☰</button>`;
+  h+=`<div class="ct-vsep"></div>`;
+  h+=`<button class="ct-color" id="ct-fc" title="글자 색"><span style="font-size:12px">가</span><span class="ct-bar" style="background:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))}"></span></button>`;
+  h+=`<button class="ct-color" id="ct-bg" title="셀 배경색"><span style="font-size:10px">🪣</span><span class="ct-bar" style="background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))}"></span></button>`;
+  h+=`<div class="ct-vsep"></div>`;
+  h+=`<button class="ct-btn" id="ct-bw-up" title="테두리 +">▬</button>`;
+  h+=`<button class="ct-btn" id="ct-bw-dn" title="테두리 −" style="font-size:9px">▬</button>`;
+  h+='</div>';
+
+  // ─ 테이블 액션 메뉴 ─
+  h+='<div class="sep"></div>';
   h+='<div class="ci" data-ta="ins-row-above">↑ 위에 행 삽입</div>';
   h+='<div class="ci" data-ta="ins-row-below">↓ 아래에 행 삽입</div>';
   h+='<div class="ci" data-ta="ins-col-left">← 왼쪽에 열 삽입</div>';
@@ -2530,71 +2555,93 @@ function showTableCtx(x,y,e,ev){
   h+='<div class="sep"></div>';
   if(e.rows>1) h+='<div class="ci" data-ta="del-row">🗑 이 행 삭제</div>';
   if(e.cols>1) h+='<div class="ci" data-ta="del-col">🗑 이 열 삭제</div>';
-  h+='<div class="sep"></div>';
+  if(e.rows>1||e.cols>1) h+='<div class="sep"></div>';
   h+='<div class="ci" data-ta="clear-row">⌫ 이 행 내용 지우기</div>';
   h+='<div class="ci" data-ta="clear-col">⌫ 이 열 내용 지우기</div>';
   h+='<div class="ci" data-ta="clear-all">⌫ 표 전체 내용 지우기</div>';
-  h+='<div class="sep"></div>';
-  h+='<div class="ci" data-ta="add-row">＋ 맨 아래 행 추가</div>';
-  h+='<div class="ci" data-ta="add-col">＋ 맨 오른쪽 열 추가</div>';
+
   m.innerHTML=h; m.style.display='block';
   m.style.left=Math.min(x, window.innerWidth - m.offsetWidth - 8)+'px';
   m.style.top=Math.min(y, window.innerHeight - m.offsetHeight - 8)+'px';
+
+  // ─ 미니 툴바 바인딩 ─
+  const _live=()=>{ liveStyleEl(e); snapshot(); };
+  const $c=id=>m.querySelector('#'+id);
+
+  $c('ct-font').onchange=()=>{ e.fontFamily=$c('ct-font').value; loadFont(e.fontFamily); _live(); };
+  $c('ct-fsize').onchange=()=>{ e.fontSize=parseInt($c('ct-fsize').value)||14; _live(); };
+  $c('ct-bold').onclick=()=>{
+    if(isHead){ e.headerWeight=(e.headerWeight||700)>=700?400:700; }
+    else{ e.fontWeight=(e.fontWeight||400)>=700?400:700; }
+    _live(); hideCtx();
+  };
+  $c('ct-align-l').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'left'); _live(); hideCtx(); };
+  $c('ct-align-c').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'center'); _live(); hideCtx(); };
+  $c('ct-align-r').onclick=()=>{ _tblCellAlign(e,clickR,clickC,'right'); _live(); hideCtx(); };
+
+  $c('ct-fc').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxColor', $c('ct-fc')); };
+  $c('ct-bg').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxBg', $c('ct-bg')); };
+
+  // 임시 CP_TARGETS (이 셀에 대한)
+  CP_TARGETS.tblCtxColor={ label:'셀 글자색', rich:false,
+    current:()=>cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')),
+    set:v=>{ _tblCellProp(e,clickR,clickC,'color',v); liveStyleEl(e); }};
+  CP_TARGETS.tblCtxBg={ label:'셀 배경색', rich:false,
+    current:()=>cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')),
+    set:v=>{ _tblCellProp(e,clickR,clickC,'bg',v); liveStyleEl(e); }};
+
+  $c('ct-bw-up').onclick=()=>{ e.borderW=(e.borderW||1)+1; _live(); };
+  $c('ct-bw-dn').onclick=()=>{ e.borderW=Math.max(0,(e.borderW||1)-1); _live(); };
+
+  // ─ 테이블 액션 바인딩 ─
   m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
-    const a=it.dataset.ta;
-    if(!e.colWidths) e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols));
-    if(!e.rowHeights) e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows));
+    const a=it.dataset.ta; if(!a) return;
+    _tblEnsureWH(e);
     if(a==='ins-row-above'){
       e.cells.forEach(c=>{ if(c.r>=clickR) c.r++; });
       for(let c=0;c<e.cols;c++) e.cells.push({r:clickR,c,text:''});
-      e.rowHeights.splice(clickR,0,40);
-      e.rows++; e.h+=40;
+      e.rowHeights.splice(clickR,0,40); e.rows++; e.h+=40;
     }else if(a==='ins-row-below'){
       const nr=clickR+1;
       e.cells.forEach(c=>{ if(c.r>=nr) c.r++; });
       for(let c=0;c<e.cols;c++) e.cells.push({r:nr,c,text:''});
-      e.rowHeights.splice(nr,0,40);
-      e.rows++; e.h+=40;
+      e.rowHeights.splice(nr,0,40); e.rows++; e.h+=40;
     }else if(a==='ins-col-left'){
       e.cells.forEach(c=>{ if(c.c>=clickC) c.c++; });
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:clickC,text:''});
-      e.colWidths.splice(clickC,0,120);
-      e.cols++; e.w+=120;
+      e.colWidths.splice(clickC,0,120); e.cols++; e.w+=120;
     }else if(a==='ins-col-right'){
       const nc=clickC+1;
       e.cells.forEach(c=>{ if(c.c>=nc) c.c++; });
       for(let r=0;r<e.rows;r++) e.cells.push({r,c:nc,text:''});
-      e.colWidths.splice(nc,0,120);
-      e.cols++; e.w+=120;
+      e.colWidths.splice(nc,0,120); e.cols++; e.w+=120;
     }else if(a==='del-row'&&e.rows>1){
       const rh=e.rowHeights[clickR]||40;
       e.cells=e.cells.filter(c=>c.r!==clickR);
       e.cells.forEach(c=>{ if(c.r>clickR) c.r--; });
-      e.rowHeights.splice(clickR,1);
-      e.rows--; e.h=Math.max(40,e.h-rh);
+      e.rowHeights.splice(clickR,1); e.rows--; e.h=Math.max(40,e.h-rh);
     }else if(a==='del-col'&&e.cols>1){
       const cw=e.colWidths[clickC]||120;
       e.cells=e.cells.filter(c=>c.c!==clickC);
       e.cells.forEach(c=>{ if(c.c>clickC) c.c--; });
-      e.colWidths.splice(clickC,1);
-      e.cols--; e.w=Math.max(120,e.w-cw);
+      e.colWidths.splice(clickC,1); e.cols--; e.w=Math.max(120,e.w-cw);
     }else if(a==='clear-row'){
       e.cells.forEach(c=>{ if(c.r===clickR) c.text=''; });
     }else if(a==='clear-col'){
       e.cells.forEach(c=>{ if(c.c===clickC) c.text=''; });
     }else if(a==='clear-all'){
       e.cells.forEach(c=>{ c.text=''; });
-    }else if(a==='add-row'){
-      for(let c=0;c<e.cols;c++) e.cells.push({r:e.rows,c,text:''});
-      e.rowHeights.push(40);
-      e.rows++; e.h+=40;
-    }else if(a==='add-col'){
-      for(let r=0;r<e.rows;r++) e.cells.push({r,c:e.cols,text:''});
-      e.colWidths.push(120);
-      e.cols++; e.w+=120;
     }
     afterMutate(); hideCtx();
   }));
+}
+function _tblCellProp(e,r,c,key,val){
+  let cell=(e.cells||[]).find(x=>x.r===r&&x.c===c);
+  if(!cell){ cell={r,c,text:''}; e.cells.push(cell); }
+  cell[key]=val;
+}
+function _tblCellAlign(e,r,c,align){
+  _tblCellProp(e,r,c,'align',align);
 }
 
 function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; }
