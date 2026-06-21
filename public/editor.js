@@ -730,12 +730,17 @@ function renderEl(e){
    }
   }
   if(e.type==='table'){
-    node.style.overflow='hidden'; node.style.position='absolute';
+    node.style.overflow='visible'; node.style.position='absolute';
     if(e.radius) node.style.borderRadius=e.radius+'px';
     if(!e.colWidths||e.colWidths.length!==e.cols){ e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols)); }
     if(!e.rowHeights||e.rowHeights.length!==e.rows){ e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows)); }
+    // colWidths/rowHeights 합을 e.w/e.h에 정규화
+    const cwSum=e.colWidths.reduce((a,b)=>a+b,0);
+    if(cwSum>0&&cwSum!==e.w){ const s=e.w/cwSum; e.colWidths=e.colWidths.map((v,i,a)=>i<a.length-1?Math.round(v*s):0); e.colWidths[e.colWidths.length-1]=e.w-e.colWidths.slice(0,-1).reduce((a,b)=>a+b,0); }
+    const rhSum=e.rowHeights.reduce((a,b)=>a+b,0);
+    if(rhSum>0&&rhSum!==e.h){ const s=e.h/rhSum; e.rowHeights=e.rowHeights.map((v,i,a)=>i<a.length-1?Math.round(v*s):0); e.rowHeights[e.rowHeights.length-1]=e.h-e.rowHeights.slice(0,-1).reduce((a,b)=>a+b,0); }
     const tbl=document.createElement('table');
-    tbl.style.cssText=`width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:'${e.fontFamily||'Noto Sans KR'}',sans-serif;font-size:${e.fontSize||14}px`;
+    tbl.style.cssText=`width:100%;height:100%;border-collapse:collapse;table-layout:fixed;cursor:default;font-family:'${e.fontFamily||'Noto Sans KR'}',sans-serif;font-size:${e.fontSize||14}px`;
     const cg=document.createElement('colgroup');
     e.colWidths.forEach(w=>{ const col=document.createElement('col'); col.style.width=(w/e.w*100)+'%'; cg.appendChild(col); });
     tbl.appendChild(cg);
@@ -746,11 +751,11 @@ function renderEl(e){
       tr.style.height=(e.rowHeights[r]/e.h*100)+'%';
       for(let c=0;c<e.cols;c++){
         const cell=cellMap[r+'_'+c]||{};
-        if(cell.merged) continue;   // 병합으로 가려진 칸은 렌더 안 함
+        if(cell.merged) continue;
         const td=document.createElement('td');
         const isHead=r===0;
         if(cell.span){ td.rowSpan=cell.span.rs; td.colSpan=cell.span.cs; }
-        td.style.cssText=`${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
+        td.style.cssText=`cursor:default;${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
         td.textContent=cell.text||'';
         td.dataset.row=r; td.dataset.col=c;
         if(_tblInSel(e.id,r,c)) td.style.boxShadow=_TBL_HL;
@@ -759,22 +764,22 @@ function renderEl(e){
       tbl.appendChild(tr);
     }
     node.appendChild(tbl);
-    // column resize handles
+    // column resize handles — px 기준으로 정확히 배치
     let cx=0;
     for(let c=0;c<e.cols-1;c++){
       cx+=e.colWidths[c];
       const h=document.createElement('div');
       h.dataset.tblColResize=c;
-      h.style.cssText=`position:absolute;top:0;height:100%;width:6px;left:${cx/e.w*100}%;transform:translateX(-3px);cursor:col-resize;z-index:10`;
+      h.style.cssText=`position:absolute;top:0;height:100%;width:10px;left:${cx}px;transform:translateX(-5px);cursor:col-resize;z-index:20;pointer-events:auto`;
       node.appendChild(h);
     }
-    // row resize handles
+    // row resize handles — px 기준으로 정확히 배치
     let ry=0;
     for(let r=0;r<e.rows-1;r++){
       ry+=e.rowHeights[r];
       const h=document.createElement('div');
       h.dataset.tblRowResize=r;
-      h.style.cssText=`position:absolute;left:0;width:100%;height:6px;top:${ry/e.h*100}%;transform:translateY(-3px);cursor:row-resize;z-index:10`;
+      h.style.cssText=`position:absolute;left:0;width:100%;height:10px;top:${ry}px;transform:translateY(-5px);cursor:row-resize;z-index:20;pointer-events:auto`;
       node.appendChild(h);
     }
   }
