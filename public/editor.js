@@ -2837,20 +2837,39 @@ function _bdIcon(t){
 function showBorderMenu(btn,e,clickR,clickC){
   document.getElementById('tbl-bd-pop')?.remove();
   const pop=document.createElement('div'); pop.id='tbl-bd-pop'; pop.className='ctx';
-  pop.style.cssText+=';min-width:158px;width:max-content';
+  pop.style.cssText+=';min-width:178px;width:max-content;max-height:84vh;overflow:auto;display:flex;flex-direction:column';
   const rng=_tblBorderRange(e);
   const scope=(rng.r0===0&&rng.c0===0&&rng.r1===e.rows-1&&rng.c1===e.cols-1)?'표 전체':`${rng.r1-rng.r0+1}×${rng.c1-rng.c0+1} 범위`;
   const items=[['all','모든 테두리'],['outer','바깥쪽 테두리'],['inner','안쪽 테두리'],['_sep'],
     ['top','위쪽 테두리'],['bottom','아래쪽 테두리'],['left','왼쪽 테두리'],['right','오른쪽 테두리'],['_sep'],
     ['inner-h','안쪽 가로 테두리'],['inner-v','안쪽 세로 테두리'],['_sep'],['none','테두리 없음'],['_sep'],['_more','테두리 상세… (두께·색·선스타일)']];
-  pop.innerHTML=`<div style="padding:5px 10px;font-size:11px;color:var(--sub,#888)">적용 대상: <b style="color:var(--accent)">${scope}</b></div><div class="sep"></div>`+
+  pop.innerHTML=`<div id="bdpop-head" style="display:flex;align-items:center;gap:6px;padding:7px 10px;cursor:move;user-select:none;border-bottom:1px solid var(--border,#3a3a4a);position:sticky;top:0;background:inherit;z-index:2">
+      <span style="font-weight:700;font-size:12px">⊞ 테두리</span>
+      <span style="font-size:11px;color:var(--sub,#999)">· ${scope}</span>
+      <span style="margin-left:auto;color:var(--sub,#888);letter-spacing:1px" title="드래그로 이동">⠿⠿</span>
+    </div>
+    <div style="overflow:auto">`+
     items.map(it=> it[0]==='_sep'?'<div class="sep"></div>'
     : it[0]==='_more'?`<div class="ci" data-bd="_more" style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--accent)">⚙️<span>${it[1]}</span></div>`
-    :`<div class="ci" data-bd="${it[0]}" style="display:flex;align-items:center;gap:8px">${_bdIcon(it[0])}<span>${it[1]}</span></div>`).join('');
+    :`<div class="ci" data-bd="${it[0]}" style="display:flex;align-items:center;gap:8px">${_bdIcon(it[0])}<span>${it[1]}</span></div>`).join('')+`</div>`;
   document.body.appendChild(pop);
   const r=btn.getBoundingClientRect();
-  pop.style.left=Math.min(r.left, innerWidth-pop.offsetWidth-8)+'px';
-  pop.style.top=Math.min(r.bottom+4, innerHeight-pop.offsetHeight-8)+'px';
+  // 화면 안에 들어오도록 배치(아래 공간 부족하면 버튼 위로, 오른쪽 잘리면 왼쪽으로)
+  const pw=pop.offsetWidth, ph=pop.offsetHeight;
+  let left=r.left, top=r.bottom+4;
+  if(top+ph>innerHeight-8) top=Math.max(8, r.top-ph-4);
+  if(top+ph>innerHeight-8) top=Math.max(8, innerHeight-ph-8);
+  left=Math.max(8, Math.min(left, innerWidth-pw-8));
+  pop.style.left=left+'px'; pop.style.top=top+'px';
+  // 헤더 드래그로 이동
+  const head=pop.querySelector('#bdpop-head');
+  head.addEventListener('mousedown',ev=>{
+    ev.preventDefault(); ev.stopPropagation();
+    const sx=ev.clientX, sy=ev.clientY, l0=pop.getBoundingClientRect().left, t0=pop.getBoundingClientRect().top;
+    const mv=e2=>{ pop.style.left=Math.max(0,Math.min(l0+e2.clientX-sx, innerWidth-pop.offsetWidth))+'px'; pop.style.top=Math.max(0,Math.min(t0+e2.clientY-sy, innerHeight-pop.offsetHeight))+'px'; };
+    const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+    window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+  });
   pop.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
     if(it.dataset.bd==='_more'){ pop.remove(); showBorderDialog(e); return; }
     _tblPresetApply(e,it.dataset.bd); liveStyleEl(e); snapshot(); pop.remove();
