@@ -1,6 +1,12 @@
 /* 발행 렌더링 공유 모듈 — 편집기(미리보기)와 공개 페이지(index.html)가 동일하게 사용. */
 (function(){
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // 표 셀 4방향 테두리 (cell.bd={t,r,b,l} 폭 오버라이드; 미지정=기본 e.borderW, 0=없음) — 편집기와 동일 규칙
+  function tblBorderCss(e,cell){
+    var col=e.borderColor||'#333', def=(e.borderW!=null?e.borderW:1);
+    function sd(s,css){ var bd=cell&&cell.bd; var w=(bd&&bd[s]!=null)?bd[s]:def; return 'border-'+css+':'+(w>0?(w+'px solid '+col):'0'); }
+    return [sd('t','top'),sd('r','right'),sd('b','bottom'),sd('l','left')].join(';');
+  }
 
   /* 슬라이더 화살표/점 스타일 해석 — 편집기 미리보기와 발행본이 동일하게 사용(드리프트 방지).
      반환: 컨테이너에 붙일 CSS 변수 문자열(vars) + 표시여부(arrows/dots). */
@@ -360,7 +366,7 @@
         for(var c=0;c<e.cols;c++){
           var cell=cellMap[r+'_'+c]||{};
           var isHead=r===0;
-          var tdS='border:'+(e.borderW||1)+'px solid '+(e.borderColor||'#333')+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
+          var tdS=tblBorderCss(e,cell)+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
           thtml+='<td style="'+tdS+'">'+esc(cell.text||'')+'</td>';
         }
         thtml+='</tr>';

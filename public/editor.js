@@ -748,7 +748,7 @@ function renderEl(e){
         const td=document.createElement('td');
         const cell=cellMap[r+'_'+c]||{};
         const isHead=r===0;
-        td.style.cssText=`border:${e.borderW||1}px solid ${e.borderColor||'#333'};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
+        td.style.cssText=`${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
         td.textContent=cell.text||'';
         td.dataset.row=r; td.dataset.col=c;
         if(_tblInSel(e.id,r,c)) td.style.boxShadow=_TBL_HL;
@@ -2578,8 +2578,9 @@ function showTableCtx(x,y,e,ev,rc){
   h+=`<button class="ct-color" id="ct-fc" title="글자 색"><span style="font-size:12px">가</span><span class="ct-bar" style="background:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))}"></span></button>`;
   h+=`<button class="ct-color" id="ct-bg" title="셀 배경색"><span style="font-size:10px">🪣</span><span class="ct-bar" style="background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))}"></span></button>`;
   h+=`<div class="ct-vsep"></div>`;
-  h+=`<button class="ct-btn" id="ct-bw-up" title="테두리 +">▬</button>`;
-  h+=`<button class="ct-btn" id="ct-bw-dn" title="테두리 −" style="font-size:9px">▬</button>`;
+  h+=`<button class="ct-btn" id="ct-bw-up" title="테두리 굵기 +">▬</button>`;
+  h+=`<button class="ct-btn" id="ct-bw-dn" title="테두리 굵기 −" style="font-size:9px">▬</button>`;
+  h+=`<button class="ct-btn" id="ct-border" title="테두리 적용(엑셀식)" style="width:auto;padding:0 4px;gap:1px">${_bdIcon('outer')}<span style="font-size:8px">▾</span></button>`;
   h+='</div>';
 
   // ─ 표 구조 (2번째 줄, PPT식 아이콘 툴바) ─
@@ -2632,6 +2633,7 @@ function showTableCtx(x,y,e,ev,rc){
 
   $c('ct-bw-up').onclick=()=>{ e.borderW=(e.borderW||1)+1; _live(); };
   $c('ct-bw-dn').onclick=()=>{ e.borderW=Math.max(0,(e.borderW||1)-1); _live(); };
+  $c('ct-border').onclick=(ev2)=>{ ev2.stopPropagation(); showBorderMenu($c('ct-border'),e,clickR,clickC); };
 
   // ─ 테이블 액션 바인딩 ─
   m.querySelectorAll('[data-ta],[data-tl]').forEach(it=>it.addEventListener('click',()=>{
@@ -2690,12 +2692,75 @@ function _tblCellProp(e,r,c,key,val){
   if(!cell){ cell={r,c,text:''}; e.cells.push(cell); }
   cell[key]=val;
 }
+// 셀 4방향 테두리 CSS (cell.bd={t,r,b,l} 폭 오버라이드; 미지정=기본 e.borderW, 0=없음)
+function _tblBorderCss(e,cell){
+  const col=e.borderColor||'#333', def=(e.borderW!=null?e.borderW:1);
+  const sd=(s,css)=>{ const bd=cell&&cell.bd; const w=(bd&&bd[s]!=null)?bd[s]:def; return `border-${css}:${w>0?w+'px solid '+col:'0'}`; };
+  return [sd('t','top'),sd('r','right'),sd('b','bottom'),sd('l','left')].join(';');
+}
+// 엑셀/PPT식 테두리 프리셋을 선택 범위에 적용
+function _tblBorderPreset(e,targets,preset){
+  if(!targets||!targets.length) return;
+  const rs=targets.map(t=>t.r), cs=targets.map(t=>t.c);
+  const r0=Math.min(...rs),r1=Math.max(...rs),c0=Math.min(...cs),c1=Math.max(...cs);
+  const W=Math.max(1,e.borderW||1);
+  const setS=(r,c,s,v)=>{ let cell=(e.cells||[]).find(x=>x.r===r&&x.c===c); if(!cell){cell={r,c,text:''};e.cells.push(cell);} if(!cell.bd)cell.bd={}; if(v===undefined) delete cell.bd[s]; else cell.bd[s]=v; };
+  targets.forEach(({r,c})=>{
+    const top=r===r0,bot=r===r1,lft=c===c0,rgt=c===c1;
+    switch(preset){
+      case 'none': setS(r,c,'t',0);setS(r,c,'b',0);setS(r,c,'l',0);setS(r,c,'r',0); break;
+      case 'all': setS(r,c,'t',W);setS(r,c,'b',W);setS(r,c,'l',W);setS(r,c,'r',W); break;
+      case 'outer': setS(r,c,'t',top?W:0);setS(r,c,'b',bot?W:0);setS(r,c,'l',lft?W:0);setS(r,c,'r',rgt?W:0); break;
+      case 'inner': setS(r,c,'t',top?undefined:W);setS(r,c,'b',bot?undefined:W);setS(r,c,'l',lft?undefined:W);setS(r,c,'r',rgt?undefined:W); break;
+      case 'inner-h': setS(r,c,'t',top?undefined:W);setS(r,c,'b',bot?undefined:W); break;
+      case 'inner-v': setS(r,c,'l',lft?undefined:W);setS(r,c,'r',rgt?undefined:W); break;
+      case 'top': if(top) setS(r,c,'t',W); break;
+      case 'bottom': if(bot) setS(r,c,'b',W); break;
+      case 'left': if(lft) setS(r,c,'l',W); break;
+      case 'right': if(rgt) setS(r,c,'r',W); break;
+    }
+  });
+}
+function _bdIcon(t){
+  const F='#5b6b88', A='#3b82f6', L=2,T=2,R=14,B=14,M=8;
+  const ln=(x1,y1,x2,y2,col)=>`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.4" stroke-linecap="round"/>`;
+  const base=ln(L,T,R,T,F)+ln(L,B,R,B,F)+ln(L,T,L,B,F)+ln(R,T,R,B,F)+ln(L,M,R,M,F)+ln(M,T,M,B,F);
+  let a=[];
+  if(t==='all')a=[[L,T,R,T],[L,B,R,B],[L,T,L,B],[R,T,R,B],[L,M,R,M],[M,T,M,B]];
+  else if(t==='outer')a=[[L,T,R,T],[L,B,R,B],[L,T,L,B],[R,T,R,B]];
+  else if(t==='inner')a=[[L,M,R,M],[M,T,M,B]];
+  else if(t==='inner-h')a=[[L,M,R,M]];
+  else if(t==='inner-v')a=[[M,T,M,B]];
+  else if(t==='top')a=[[L,T,R,T]];
+  else if(t==='bottom')a=[[L,B,R,B]];
+  else if(t==='left')a=[[L,T,L,B]];
+  else if(t==='right')a=[[R,T,R,B]];
+  return `<svg width="16" height="16" viewBox="0 0 16 16" style="vertical-align:middle;flex-shrink:0">${base}${a.map(x=>ln(x[0],x[1],x[2],x[3],A)).join('')}</svg>`;
+}
+function showBorderMenu(btn,e,clickR,clickC){
+  document.getElementById('tbl-bd-pop')?.remove();
+  const targets=_tblTargets(e,clickR,clickC);
+  const pop=document.createElement('div'); pop.id='tbl-bd-pop'; pop.className='ctx';
+  pop.style.cssText+=';min-width:158px;width:max-content';
+  const items=[['all','모든 테두리'],['outer','바깥쪽 테두리'],['inner','안쪽 테두리'],['_sep'],
+    ['top','위쪽 테두리'],['bottom','아래쪽 테두리'],['left','왼쪽 테두리'],['right','오른쪽 테두리'],['_sep'],
+    ['inner-h','안쪽 가로 테두리'],['inner-v','안쪽 세로 테두리'],['_sep'],['none','테두리 없음']];
+  pop.innerHTML=items.map(it=> it[0]==='_sep'?'<div class="sep"></div>'
+    :`<div class="ci" data-bd="${it[0]}" style="display:flex;align-items:center;gap:8px">${_bdIcon(it[0])}<span>${it[1]}</span></div>`).join('');
+  document.body.appendChild(pop);
+  const r=btn.getBoundingClientRect();
+  pop.style.left=Math.min(r.left, innerWidth-pop.offsetWidth-8)+'px';
+  pop.style.top=Math.min(r.bottom+4, innerHeight-pop.offsetHeight-8)+'px';
+  pop.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{ _tblBorderPreset(e,targets,it.dataset.bd); liveStyleEl(e); snapshot(); pop.remove(); }));
+  const closer=ev=>{ if(!ev.target.closest('#tbl-bd-pop')&&ev.target!==btn){ pop.remove(); document.removeEventListener('mousedown',closer); } };
+  setTimeout(()=>document.addEventListener('mousedown',closer),0);
+}
 function _tblCellAlign(e,r,c,align){
   _tblCellProp(e,r,c,'align',align);
 }
 
 function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; }
-window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu') && !e.target.closest('#fill-dd')) hideCtx(); });
+window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu') && !e.target.closest('#fill-dd') && !e.target.closest('#tbl-bd-pop')) hideCtx(); });
 window.addEventListener('blur',hideCtx);
 
 // ── 페이지 맵 (노드 + 연결선) ──
