@@ -53,6 +53,7 @@ function renderFixTabsOnCanvas(){
       cell.textContent=(it.label!=null?it.label:'')||' ';
       node.appendChild(cell);
     });
+    if(t.fx&&t.fx.type){ const fb=document.createElement('div'); fb.textContent='✨'; fb.title='효과: '+t.fx.type+' (미리보기에서 재생)'; fb.style.cssText='position:absolute;top:-9px;left:-9px;width:18px;height:18px;font-size:11px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:92;pointer-events:none'; node.appendChild(fb); }
     node.title='드래그=위치 · 8방향 모서리=크기 · 우클릭=항목·색·폰트';
     node.addEventListener('mousedown',ev=>{ ev.stopPropagation(); if(!sel){ _fixTabSel=t.id; _clearSel(); renderCanvas(); renderProps(); } startFixTabDrag(ev,t); });
     node.addEventListener('contextmenu',ev=>{ ev.preventDefault(); ev.stopPropagation(); _fixTabSel=t.id; _clearSel(); renderCanvas(); openFixTabPopup(t,ev.clientX,ev.clientY); });
@@ -126,6 +127,13 @@ function openFixTabPopup(t,x,y,pw,ph){
   const SL='font-size:11px;font-weight:700;color:var(--sub,#8a8aa0);margin:0 0 6px;letter-spacing:.02em';
   const pageOptsSel=sel=>roots.map(p=>`<option value="${p.id}"${sel===p.id?' selected':''}>${ea(p.name||'페이지')}</option>`).join('');
   const fontOpts=FONTS.map(f=>`<option value="${ea(f[0])}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${ea(f[1])}</option>`).join('');
+  // 효과(이펙트) — 발행본 FX_ANIM/LOOP/HOVER 키와 동일. 미리보기·발행에서 재생.
+  const curFx=(t.fx&&t.fx.type)||'';
+  const fxOpt=(v,l)=>`<option value="${v}"${curFx===v?' selected':''}>${l}</option>`;
+  const fxOpts=fxOpt('','없음')
+    +`<optgroup label="등장(한 번)">${fxOpt('pop-in','팝')}${fxOpt('fade-in','페이드')}${fxOpt('bounce-in','바운스')}${fxOpt('zoom-in','줌 인')}${fxOpt('slide-down','위에서 내려옴')}</optgroup>`
+    +`<optgroup label="계속(루프)">${fxOpt('pulse','펄스')}${fxOpt('float','둥둥')}${fxOpt('glow-loop','반짝임')}${fxOpt('heartbeat','하트비트')}${fxOpt('shake','흔들기')}${fxOpt('swing','스윙')}</optgroup>`
+    +`<optgroup label="마우스 호버">${fxOpt('hover-lift','떠오름')}${fxOpt('hover-grow','확대')}${fxOpt('hover-glow','빛남')}</optgroup>`;
   const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);cursor:pointer;flex:1"><span style="width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.15);background:${col||'#ffffff'}"></span><span style="font-size:11px;color:var(--sub,#888)">색</span></button>`;
   const dbtn=(val,lbl)=>`<button type="button" class="ft-dir" data-d="${val}" style="flex:1;padding:6px;border:1px solid ${dir===val?'var(--accent,#2b6cff)':'var(--border,#dcdce8)'};border-radius:7px;background:${dir===val?'var(--accent,#2b6cff)':'transparent'};color:${dir===val?'#fff':'var(--text,#333)'};cursor:pointer;font-size:11px;font-weight:600">${lbl}</button>`;
   // 항목별 색 스와치(클릭 시 _fixItemIdx 지정 후 공용 색상 팝업)
@@ -183,6 +191,7 @@ function openFixTabPopup(t,x,y,pw,ph){
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">굵기</span><select id="ft-fw" style="${IN}"><option value="400"${(t.fontWeight||700)==400?' selected':''}>보통</option><option value="700"${(t.fontWeight||700)==700?' selected':''}>굵게</option><option value="900"${(t.fontWeight||700)==900?' selected':''}>매우굵게</option></select></label>
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">표시</span><select id="ft-dev" style="${IN}"><option value="both"${(t.device||'both')==='both'?' selected':''}>PC+모바일</option><option value="pc"${t.device==='pc'?' selected':''}>PC만</option><option value="mobile"${t.device==='mobile'?' selected':''}>모바일만</option></select></label>
     </div>
+    <label style="display:flex;flex-direction:column;gap:3px;margin-top:8px"><span style="font-size:10px;color:var(--sub,#999)">효과 (▶ 미리보기·발행에서 재생)</span><select id="ft-fx" style="${IN};width:100%">${fxOpts}</select></label>
     <button id="ft-del" style="width:100%;margin-top:11px;padding:7px;border-radius:8px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer;font-weight:600">🗑 이 고정탭 삭제</button>`;
   document.body.appendChild(pop);
   // 사용자가 조절한 크기 유지(재오픈 시)
@@ -234,6 +243,7 @@ function openFixTabPopup(t,x,y,pw,ph){
   q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
   q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
+  q('ft-fx').addEventListener('change',()=>{ const v=q('ft-fx').value; if(v) t.fx={type:v}; else delete t.fx; _fixSave(); snapshot(); });
   q('ft-del').addEventListener('click',()=>{ const a=fixedTabs(); const i=a.findIndex(x=>x.id===t.id); if(i>=0)a.splice(i,1); _fixTabSel=null; pop.remove(); renderCanvas(); save(true); snapshot(); toast('고정탭 삭제됨'); });
   const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ _fixSaveGeo(); pop.remove(); document.removeEventListener('mousedown',closer); } };
   setTimeout(()=>document.addEventListener('mousedown',closer),0);

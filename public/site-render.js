@@ -74,6 +74,14 @@
     }
     return { hx:hx, hy:hy, w:w, h:h, container:container, itemCss:itemBase, divCss:divCss, itemStyle:itemStyle, dir:dir, radius:radius, items:items, dev:(t.device||'both') };
   }
+  // 고정탭 효과 — 일반 요소와 동일한 data 속성 방식(등장/루프/호버). FX_ANIM/LOOP/HOVER는 호출시점에 초기화됨.
+  function fixTabFxAttr(fx){
+    var t=(fx||{}).type||''; if(!t) return '';
+    if(FX_ANIM[t]) return ' data-fx-anim="'+FX_ANIM[t]+'"'+(fx.delay?' data-fx-delay="'+fx.delay+'"':'');
+    if(FX_LOOP[t]) return ' data-fx-loop="'+FX_LOOP[t]+'"';
+    if(FX_HOVER[t]) return ' data-fx-hover="'+FX_HOVER[t]+'"';
+    return '';
+  }
   function fixTabHtml(t){
     var r=fixTabResolve(t);
     var inner=r.items.map(function(it,i){
@@ -84,7 +92,7 @@
       if(it.action==='link') return '<div data-link="'+esc(it.link||'')+'"'+attr+'>'+lbl+'</div>';
       return '<div data-fixtab="top"'+attr+'>'+lbl+'</div>';
     }).join('');
-    return '<div class="fixtab" data-dev="'+r.dev+'" style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.container+'">'+inner+'</div>';
+    return '<div class="fixtab" data-dev="'+r.dev+'"'+fixTabFxAttr(t.fx)+' style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.container+'">'+inner+'</div>';
   }
 
   /* ── 효과 CSS ── */
@@ -370,6 +378,7 @@
         if(FX_ANIM[t]) usedFx['anim']=1;
       });
     });
+    (project.fixedTabs||[]).forEach(function(t){ if(FX_ANIM[(t.fx||{}).type]) usedFx['anim']=1; });
 
     function secsOf(p){ if(!p.sections||p.sections.length<2) return null; var s=p.sections.slice().sort(function(a,b){return a.y-b.y;}); s[0]=Object.assign({},s[0],{y:0}); return s; }
     var pagesHtml = contentPages.map(function(p){
