@@ -739,8 +739,10 @@ function renderEl(e){
     const rhSum=e.rowHeights.reduce((a,b)=>a+b,0);
     if(rhSum>0&&rhSum!==e.h){ const s=e.h/rhSum; e.rowHeights=e.rowHeights.map((v,i,a)=>i<a.length-1?Math.round(v*s):0); e.rowHeights[e.rowHeights.length-1]=e.h-e.rowHeights.slice(0,-1).reduce((a,b)=>a+b,0); }
     // 둥근 모서리: 래퍼가 표를 클리핑(node는 핸들 때문에 overflow:visible 유지)
+    // + inset box-shadow로 둥근 외곽선을 그려, 잘린 모서리 그리드선을 덮어 매끄럽게
+    const _bw=(e.borderW!=null?e.borderW:1), _bc=e.borderColor||'#333';
     const wrap=document.createElement('div');
-    wrap.style.cssText=`position:absolute;inset:0;overflow:hidden${e.radius?`;border-radius:${e.radius}px`:''}`;
+    wrap.style.cssText=`position:absolute;inset:0;overflow:hidden${e.radius?`;border-radius:${e.radius}px${_bw>0?`;box-shadow:inset 0 0 0 ${_bw}px ${_bc}`:''}`:''}`;
     const tbl=document.createElement('table');
     tbl.style.cssText=`width:100%;height:100%;border-collapse:collapse;table-layout:fixed;cursor:default;font-family:'${e.fontFamily||'Noto Sans KR'}',sans-serif;font-size:${e.fontSize||14}px`;
     const cg=document.createElement('colgroup');

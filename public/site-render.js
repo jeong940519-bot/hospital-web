@@ -351,7 +351,8 @@
       return '<div class="el"'+lnk+ea+' style="'+base+'"><div style="'+bgStyle+'"></div>'+stxt+'</div>';
     }
     if(e.type==='table'){
-      var tbStyle=base+'overflow:hidden;'+(e.radius?'border-radius:'+e.radius+'px;':'');
+      var _bw=(e.borderW!=null?e.borderW:1), _bc=e.borderColor||'#333';
+      var tbStyle=base+'overflow:hidden;'+(e.radius?'border-radius:'+e.radius+'px;'+(_bw>0?'box-shadow:inset 0 0 0 '+_bw+'px '+_bc+';':''):'');
       var thtml='<table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:\''+(e.fontFamily||'Noto Sans KR')+'\',sans-serif;font-size:'+(e.fontSize||14)+'px">';
       if(e.colWidths&&e.colWidths.length===e.cols){
         thtml+='<colgroup>';
