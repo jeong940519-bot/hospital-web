@@ -2552,10 +2552,12 @@ function _tblEnsureWH(e){
   if(!e.colWidths||e.colWidths.length!==e.cols) e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols));
   if(!e.rowHeights||e.rowHeights.length!==e.rows) e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows));
 }
-function showTableCtx(x,y,e,ev){
+function showTableCtx(x,y,e,ev,rc){
   const m=document.getElementById('ctx-menu');
-  const td=ev.target.closest('td');
-  const clickR=td?+td.dataset.row:0, clickC=td?+td.dataset.col:0;
+  const td=ev?ev.target.closest('td'):null;
+  let clickR = rc? rc.r : (td?+td.dataset.row:0);
+  let clickC = rc? rc.c : (td?+td.dataset.col:0);
+  clickR=Math.max(0,Math.min(clickR,e.rows-1)); clickC=Math.max(0,Math.min(clickC,e.cols-1));
   const cell=(e.cells||[]).find(c=>c.r===clickR&&c.c===clickC)||{};
   const isHead=clickR===0;
   const targets=_tblTargets(e,clickR,clickC);   // 선택 범위 전체(또는 클릭칸 1개) — 색/배경/정렬 일괄 적용
@@ -2568,9 +2570,10 @@ function showTableCtx(x,y,e,ev){
   h+=`<input type="number" id="ct-fsize" value="${e.fontSize||14}" min="8" max="72">`;
   h+=`<button class="ct-btn${(isHead?(e.headerWeight||700):(e.fontWeight||400))>=700?' on':''}" id="ct-bold" title="굵게" style="font-weight:900">가</button>`;
   h+=`<div class="ct-vsep"></div>`;
-  h+=`<button class="ct-btn" id="ct-align-l" title="왼쪽 정렬" style="font-size:11px">☰</button>`;
-  h+=`<button class="ct-btn" id="ct-align-c" title="가운데 정렬" style="font-size:11px">☰</button>`;
-  h+=`<button class="ct-btn" id="ct-align-r" title="오른쪽 정렬" style="font-size:11px">☰</button>`;
+  const _alSvg=d=>`<svg width="15" height="11" viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="${d}"/></svg>`;
+  h+=`<button class="ct-btn" id="ct-align-l" title="왼쪽 정렬">${_alSvg('M1 2h14M1 6h9M1 10h12')}</button>`;
+  h+=`<button class="ct-btn" id="ct-align-c" title="가운데 정렬">${_alSvg('M1 2h14M4 6h8M3 10h10')}</button>`;
+  h+=`<button class="ct-btn" id="ct-align-r" title="오른쪽 정렬">${_alSvg('M1 2h14M6 6h9M3 10h12')}</button>`;
   h+=`<div class="ct-vsep"></div>`;
   h+=`<button class="ct-color" id="ct-fc" title="글자 색"><span style="font-size:12px">가</span><span class="ct-bar" style="background:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))}"></span></button>`;
   h+=`<button class="ct-color" id="ct-bg" title="셀 배경색"><span style="font-size:10px">🪣</span><span class="ct-bar" style="background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))}"></span></button>`;
@@ -2588,6 +2591,9 @@ function showTableCtx(x,y,e,ev){
   h+='<div class="ct-vsep"></div>';
   if(e.rows>1) h+='<button class="ct-tbtn danger" data-ta="del-row" title="이 행 삭제">－행</button>';
   if(e.cols>1) h+='<button class="ct-tbtn danger" data-ta="del-col" title="이 열 삭제">－열</button>';
+  h+='<div class="ct-vsep"></div>';
+  h+='<button class="ct-tbtn" data-ta="rows-even" title="선택 행 높이 같게(선택 없으면 전체)">행⇕같게</button>';
+  h+='<button class="ct-tbtn" data-ta="cols-even" title="선택 열 너비 같게(선택 없으면 전체)">열⇔같게</button>';
   h+='<div class="ct-vsep"></div>';
   h+=`<button class="ct-tbtn" data-ta="clear-sel" title="${targets.length>1?'선택한 칸':'이 칸'} 내용 지우기">⌫ 지우기</button>`;
   h+='<div class="ct-vsep"></div>';
@@ -2607,11 +2613,11 @@ function showTableCtx(x,y,e,ev){
   $c('ct-bold').onclick=()=>{
     if(isHead){ e.headerWeight=(e.headerWeight||700)>=700?400:700; }
     else{ e.fontWeight=(e.fontWeight||400)>=700?400:700; }
-    _live(); hideCtx();
+    _live();
   };
-  $c('ct-align-l').onclick=()=>{ _applyCells('align','left'); _live(); hideCtx(); };
-  $c('ct-align-c').onclick=()=>{ _applyCells('align','center'); _live(); hideCtx(); };
-  $c('ct-align-r').onclick=()=>{ _applyCells('align','right'); _live(); hideCtx(); };
+  $c('ct-align-l').onclick=()=>{ _applyCells('align','left'); _live(); };
+  $c('ct-align-c').onclick=()=>{ _applyCells('align','center'); _live(); };
+  $c('ct-align-r').onclick=()=>{ _applyCells('align','right'); _live(); };
 
   $c('ct-fc').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxColor', $c('ct-fc')); };
   $c('ct-bg').onclick=(ev2)=>{ ev2.stopPropagation(); toggleColorPopup('tblCtxBg', $c('ct-bg')); };
@@ -2663,8 +2669,20 @@ function showTableCtx(x,y,e,ev){
     }else if(a==='clear-sel'){
       const tg=_tblTargets(e,clickR,clickC); const set=new Set(tg.map(t=>t.r+'_'+t.c));
       e.cells.forEach(c=>{ if(set.has(c.r+'_'+c.c)) c.text=''; });
+    }else if(a==='rows-even'){
+      const n=(_tblSel&&_tblSel.id===e.id)?_tblNorm(_tblSel):{r0:0,r1:e.rows-1,c0:0,c1:e.cols-1};
+      const rs=[]; for(let r=n.r0;r<=n.r1;r++) rs.push(r);
+      const tot=rs.reduce((s,r)=>s+(e.rowHeights[r]||40),0), each=Math.max(20,Math.round(tot/rs.length));
+      rs.forEach(r=>e.rowHeights[r]=each); e.h=e.rowHeights.reduce((s,v)=>s+v,0);
+    }else if(a==='cols-even'){
+      const n=(_tblSel&&_tblSel.id===e.id)?_tblNorm(_tblSel):{r0:0,r1:e.rows-1,c0:0,c1:e.cols-1};
+      const cs=[]; for(let c=n.c0;c<=n.c1;c++) cs.push(c);
+      const tot=cs.reduce((s,c)=>s+(e.colWidths[c]||120),0), each=Math.max(40,Math.round(tot/cs.length));
+      cs.forEach(c=>e.colWidths[c]=each); e.w=e.colWidths.reduce((s,v)=>s+v,0);
     }
-    afterMutate(); hideCtx();
+    const structural = a.indexOf('ins-')===0 || a.indexOf('del-')===0;
+    afterMutate();   // 메뉴 유지(작업해도 안 닫힘) — 바깥 클릭으로만 닫힘
+    if(structural) showTableCtx(x,y,e,null,{r:clickR,c:clickC});   // 행/열 수 바뀜 → 같은 자리에서 메뉴 갱신
   }));
 }
 function _tblCellProp(e,r,c,key,val){
@@ -2677,7 +2695,7 @@ function _tblCellAlign(e,r,c,align){
 }
 
 function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; }
-window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu')) hideCtx(); });
+window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu') && !e.target.closest('#fill-dd')) hideCtx(); });
 window.addEventListener('blur',hideCtx);
 
 // ── 페이지 맵 (노드 + 연결선) ──
