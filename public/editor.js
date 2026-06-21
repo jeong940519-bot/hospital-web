@@ -2489,7 +2489,9 @@ function _tdSelectAll(td){ try{ const rg=document.createRange(); rg.selectNodeCo
 function _editTd(e,td){
   if(!td) return;
   const r=+td.dataset.row, c=+td.dataset.col;
-  td.contentEditable=true; td.style.boxShadow=''; td.style.outline='2px solid var(--accent)'; td.focus(); _tdSelectAll(td);
+  const tdBg=getComputedStyle(td).backgroundColor;
+  const dark=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.test(tdBg)&&(+RegExp.$1*299+ +RegExp.$2*587+ +RegExp.$3*114)/1000<140;
+  td.contentEditable=true; td.style.boxShadow=''; td.style.outline='2px solid var(--accent)'; td.style.caretColor=dark?'#ffcc00':'#1a1a1a'; td.focus(); _tdSelectAll(td);
   const commit=()=>{
     td.contentEditable=false; td.style.outline='';
     const txt=td.textContent.trim();
