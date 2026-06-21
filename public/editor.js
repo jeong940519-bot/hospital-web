@@ -857,30 +857,57 @@ function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
 function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
 function addFixedTab(){
   const roots=hamburgerRootPages();
-  const t={ id:uid(), label:'예약', action:'top', link:(roots[0]&&roots[0].id)||'', url:'', corner:'br', dx:24, dy:24, w:118, h:46, bg:'#2b6cff', color:'#ffffff', fontSize:15, fontWeight:700, fontFamily:'Noto Sans KR', radius:23, device:'both' };
+  const p=page(), w=118, h=46;
+  // 스크롤을 옮기지 않고 "현재 보이는 영역"의 우하단에 생성 → 바로 보임
+  const st=document.getElementById('stage');
+  const visTop=st? st.scrollTop/zoom : 0;
+  const visH=st? st.clientHeight/zoom : p.h;
+  const left=_clamp(p.w-24-w, 0, p.w-w);
+  const top=_clamp(visTop+visH-h-24, 8, p.h-h-8);
+  const cx=left+w/2, cy=top+h/2;
+  const corner=(cy<p.h/2?'t':'b')+(cx<p.w/2?'l':'r');
+  const dx=Math.round(corner.indexOf('l')>=0?left:(p.w-(left+w)));
+  const dy=Math.round(corner.indexOf('t')>=0?top:(p.h-(top+h)));
+  const t={ id:uid(), items:[{ label:'예약', action:'top', link:(roots[0]&&roots[0].id)||'', url:'' }],
+    dir:'row', corner, dx, dy, w, h, bg:'#2b6cff', color:'#ffffff', fontSize:15, fontWeight:700, fontFamily:'Noto Sans KR', radius:23, device:'both' };
   fixedTabs().push(t); _fixTabSel=t.id; selId=null; selIds=new Set();
   renderCanvas(); renderProps(); snapshot();
-  // 우하단 기본 위치라 페이지가 길면 안 보임 → 그 지점으로 스크롤해 바로 보이게
-  const st=document.getElementById('stage'); if(st) st.scrollTop=st.scrollHeight;
-  toast('고정탭 추가 — 드래그로 위치, 모서리로 크기, 우클릭으로 내용·색·폰트');
+  toast('고정탭 추가 — 드래그=위치 · 8방향 모서리=크기 · 우클릭=항목·색·폰트');
+}
+// 레거시(단일 label) 탭을 items 배열 모델로 정규화
+function fixTabItemsOf(t){
+  if(t.items && t.items.length) return t.items;
+  t.items=[{ label:(t.label!=null?t.label:'예약'), action:(t.action||'top'), link:t.link||'', url:t.url||'' }];
+  return t.items;
 }
 function renderFixTabsOnCanvas(){
   canvas.querySelectorAll('.fixtab-edit').forEach(n=>n.remove());
   const R=(window.SiteRender&&SiteRender.fixTabResolve); if(!R) return;
   fixedTabs().forEach(t=>{
     const r=R(t), sel=(t.id===_fixTabSel && !selId && !selIds.size);
-    const right=(t.corner||'br').indexOf('r')>=0, bottom=(t.corner||'br').indexOf('b')>=0;
     const node=document.createElement('div'); node.className='fixtab-edit';
-    node.style.cssText='position:absolute;z-index:90;'+r.hx+';'+r.hy+';'+r.appearance+(sel?';outline:2px solid var(--accent);outline-offset:2px':'');
-    node.textContent=r.label;
-    node.title='드래그=위치 · 모서리=크기 · 우클릭=내용·색·폰트';
+    node.style.cssText='position:absolute;z-index:90;'+r.hx+';'+r.hy+';'+r.container+(sel?';outline:2px solid var(--accent);outline-offset:2px':'');
+    // 항목들을 발행본과 동일하게 시각적으로 표시(편집기에선 클릭 비활성, 컨테이너 단위로 선택)
+    r.items.forEach((it,i)=>{
+      const cell=document.createElement('div');
+      cell.style.cssText=r.itemCss+(i>0?';'+r.divCss:'')+';pointer-events:none;overflow:hidden;text-overflow:ellipsis';
+      cell.textContent=(it.label!=null?it.label:'')||' ';
+      node.appendChild(cell);
+    });
+    node.title='드래그=위치 · 8방향 모서리=크기 · 우클릭=항목·색·폰트';
     node.addEventListener('mousedown',ev=>{ ev.stopPropagation(); if(!sel){ _fixTabSel=t.id; selId=null; selIds=new Set(); renderCanvas(); renderProps(); } startFixTabDrag(ev,t); });
     node.addEventListener('contextmenu',ev=>{ ev.preventDefault(); ev.stopPropagation(); _fixTabSel=t.id; selId=null; selIds=new Set(); renderCanvas(); openFixTabPopup(t,ev.clientX,ev.clientY); });
     if(sel){
-      const h=document.createElement('div');
-      h.style.cssText=`position:absolute;${right?'left:-7px':'right:-7px'};${bottom?'top:-7px':'bottom:-7px'};width:13px;height:13px;background:var(--accent);border:2px solid #fff;border-radius:50%;cursor:${right===bottom?'nwse':'nesw'}-resize;z-index:91`;
-      h.addEventListener('mousedown',ev=>{ ev.stopPropagation(); startFixTabResize(ev,t); });
-      node.appendChild(h);
+      const CUR={nw:'nwse',ne:'nesw',sw:'nesw',se:'nwse',n:'ns',s:'ns',w:'ew',e:'ew'};
+      const POS={ // [left/right, top/bottom] in px offsets relative to container
+        nw:['left:-7px','top:-7px'], ne:['right:-7px','top:-7px'], sw:['left:-7px','bottom:-7px'], se:['right:-7px','bottom:-7px'],
+        n:['left:calc(50% - 6px)','top:-7px'], s:['left:calc(50% - 6px)','bottom:-7px'], w:['left:-7px','top:calc(50% - 6px)'], e:['right:-7px','top:calc(50% - 6px)'] };
+      Object.keys(POS).forEach(pos=>{
+        const h=document.createElement('div');
+        h.style.cssText=`position:absolute;${POS[pos][0]};${POS[pos][1]};width:12px;height:12px;background:var(--accent);border:2px solid #fff;border-radius:50%;cursor:${CUR[pos]}-resize;z-index:91`;
+        h.addEventListener('mousedown',ev=>{ ev.stopPropagation(); startFixTabResize(ev,t,pos); });
+        node.appendChild(h);
+      });
     }
     canvas.appendChild(node);
   });
@@ -902,14 +929,27 @@ function startFixTabDrag(ev,t){
   function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
   window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
 }
-function startFixTabResize(ev,t){
+function startFixTabResize(ev,t,pos){
   ev.preventDefault();
+  pos=pos||'se';
   const p=page(), rect=canvas.getBoundingClientRect();
-  const right=(t.corner||'br').indexOf('r')>=0, bottom=(t.corner||'br').indexOf('b')>=0;
+  const corner=t.corner||'br', hasL=corner.indexOf('l')>=0, hasT=corner.indexOf('t')>=0;
+  // 현재 절대 박스
+  const left0=hasL? t.dx : (p.w - t.dx - t.w);
+  const top0 =hasT? t.dy : (p.h - t.dy - t.h);
+  const right0=left0+t.w, bottom0=top0+t.h;
+  const MINW=40, MINH=24;
   function mv(ev2){
     const mx=(ev2.clientX-rect.left)/zoom, my=(ev2.clientY-rect.top)/zoom;
-    t.w=Math.round(_clamp(right?((p.w-t.dx)-mx):(mx-t.dx), 50, 400));
-    t.h=Math.round(_clamp(bottom?((p.h-t.dy)-my):(my-t.dy), 28, 200));
+    let left=left0, right=right0, top=top0, bottom=bottom0;
+    if(pos.indexOf('w')>=0) left =_clamp(mx, 0, right0-MINW);
+    if(pos.indexOf('e')>=0) right=_clamp(mx, left0+MINW, p.w);
+    if(pos.indexOf('n')>=0) top  =_clamp(my, 0, bottom0-MINH);
+    if(pos.indexOf('s')>=0) bottom=_clamp(my, top0+MINH, p.h);
+    // 같은 corner 기준으로 dx/dy 재계산(앵커 고정 → 튐 없음)
+    t.dx=Math.round(hasL? left : (p.w-right));
+    t.dy=Math.round(hasT? top : (p.h-bottom));
+    t.w=Math.round(right-left); t.h=Math.round(bottom-top);
     _fixSave();
   }
   function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
@@ -917,41 +957,72 @@ function startFixTabResize(ev,t){
 }
 function openFixTabPopup(t,x,y){
   document.getElementById('fixtab-popup')?.remove();
+  const items=fixTabItemsOf(t), dir=(t.dir==='col')?'col':'row';
+  const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  const roots=hamburgerRootPages();
+  const IN='padding:5px 7px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);color:var(--text,#222);font-size:12px;outline:none;box-sizing:border-box';
+  const SL='font-size:11px;font-weight:700;color:var(--sub,#8a8aa0);margin:0 0 6px;letter-spacing:.02em';
+  const pageOptsSel=sel=>roots.map(p=>`<option value="${p.id}"${sel===p.id?' selected':''}>${ea(p.name||'페이지')}</option>`).join('');
+  const fontOpts=FONTS.map(f=>`<option value="${ea(f[0])}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${ea(f[1])}</option>`).join('');
+  const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택" style="display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);cursor:pointer;flex:1"><span style="width:16px;height:16px;border-radius:4px;border:1px solid rgba(0,0,0,.15);background:${col||'#ffffff'}"></span><span style="font-size:11px;color:var(--sub,#888)">색</span></button>`;
+  const dbtn=(val,lbl)=>`<button type="button" class="ft-dir" data-d="${val}" style="flex:1;padding:6px;border:1px solid ${dir===val?'var(--accent,#2b6cff)':'var(--border,#dcdce8)'};border-radius:7px;background:${dir===val?'var(--accent,#2b6cff)':'transparent'};color:${dir===val?'#fff':'var(--text,#333)'};cursor:pointer;font-size:11px;font-weight:600">${lbl}</button>`;
+  const itemHtml=items.map((it,i)=>`
+    <div style="border:1px solid var(--border,#e7e7f1);border-radius:9px;padding:7px;margin-bottom:6px;background:rgba(127,127,170,.05)">
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="ft-l" data-i="${i}" type="text" value="${ea(it.label)}" placeholder="항목 이름" style="${IN};flex:1">
+        ${items.length>1?`<button class="ft-rm" data-i="${i}" title="항목 삭제" style="border:none;background:transparent;cursor:pointer;font-size:13px;color:#e36;padding:3px">🗑</button>`:''}
+      </div>
+      <div style="display:flex;gap:6px;margin-top:6px">
+        <select class="ft-act" data-i="${i}" style="${IN};flex:1">
+          <option value="top"${it.action==='top'?' selected':''}>맨 위로</option>
+          <option value="link"${it.action==='link'?' selected':''}>내부 페이지</option>
+          <option value="url"${it.action==='url'?' selected':''}>외부 링크</option>
+        </select>
+        ${it.action==='link'?`<select class="ft-lk" data-i="${i}" style="${IN};flex:1.2">${pageOptsSel(it.link)}</select>`:''}
+      </div>
+      ${it.action==='url'?`<input class="ft-u" data-i="${i}" type="text" value="${ea(it.url)}" placeholder="https://" style="${IN};width:100%;margin-top:6px">`:''}
+    </div>`).join('');
   const pop=document.createElement('div'); pop.id='fixtab-popup';
-  pop.style.cssText=`position:fixed;left:${Math.min(x,innerWidth-250)}px;top:${Math.min(y,innerHeight-380)}px;z-index:99999;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#ccc);border-radius:10px;box-shadow:0 10px 34px rgba(0,0,0,.28);padding:11px 13px;width:228px;font-size:12px`;
+  pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:99999;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px`;
   pop.addEventListener('mousedown',ev=>ev.stopPropagation());
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
-  const row=(lbl,inner)=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0"><span style="color:var(--sub,#777);white-space:nowrap">${lbl}</span>${inner}</div>`;
-  const roots=hamburgerRootPages();
-  const pageOpts=roots.map(p=>`<option value="${p.id}"${t.link===p.id?' selected':''}>${(p.name||'페이지')}</option>`).join('');
-  const fontOpts=FONTS.map(f=>`<option value="${f[0]}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${f[1]}</option>`).join('');
-  const swatch=(key,col)=>`<button type="button" class="panel-cbtn" data-cpkey="${key}" title="색 선택"><span style="background:${col||'#ffffff'}"></span></button>`;
-  pop.innerHTML=`<div style="font-weight:700;margin-bottom:6px">📌 고정탭</div>`
-    +row('내용',`<input type="text" id="ft-label" value="${(t.label||'').replace(/"/g,'&quot;')}" style="width:120px">`)
-    +row('동작',`<select id="ft-action"><option value="top"${t.action==='top'?' selected':''}>맨 위로</option><option value="link"${t.action==='link'?' selected':''}>내부 페이지</option><option value="url"${t.action==='url'?' selected':''}>외부 링크</option></select>`)
-    +(t.action==='link'?row('페이지',`<select id="ft-link">${pageOpts}</select>`):'')
-    +(t.action==='url'?row('URL',`<input type="text" id="ft-url" value="${(t.url||'').replace(/"/g,'&quot;')}" placeholder="https://" style="width:120px">`):'')
-    +row('배경색',swatch('fixTabBg',t.bg||'#2b6cff'))
-    +row('글자색',swatch('fixTabColor',t.color||'#ffffff'))
-    +row('글자크기',`<input type="number" id="ft-fs" value="${t.fontSize||15}" min="9" max="40" style="width:62px">`)
-    +row('폰트',`<select id="ft-font" style="max-width:130px">${fontOpts}</select>`)
-    +row('굵기',`<select id="ft-fw"><option value="400"${(t.fontWeight||700)==400?' selected':''}>보통</option><option value="700"${(t.fontWeight||700)==700?' selected':''}>굵게</option><option value="900"${(t.fontWeight||700)==900?' selected':''}>매우굵게</option></select>`)
-    +row('모서리',`<input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" min="0" max="60" style="width:62px">`)
-    +row('표시',`<select id="ft-dev"><option value="both"${(t.device||'both')==='both'?' selected':''}>PC+모바일</option><option value="pc"${t.device==='pc'?' selected':''}>PC만</option><option value="mobile"${t.device==='mobile'?' selected':''}>모바일만</option></select>`)
-    +`<button id="ft-del" style="width:100%;margin-top:8px;padding:6px;border-radius:7px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer">🗑 고정탭 삭제</button>`;
+  pop.innerHTML=`
+    <div style="font-weight:800;font-size:14px">📌 고정탭</div>
+    <div style="color:var(--sub,#999);font-size:11px;margin:2px 0 11px">탭 하나에 여러 항목을 넣을 수 있어요</div>
+    <div style="${SL}">항목</div>
+    <div id="ft-items">${itemHtml}</div>
+    <button id="ft-add" style="width:100%;padding:7px;border:1px dashed var(--accent,#2b6cff);border-radius:8px;background:transparent;color:var(--accent,#2b6cff);cursor:pointer;font-size:12px;font-weight:600">＋ 항목 추가</button>
+    <div style="height:1px;background:var(--border,#ececf4);margin:12px 0"></div>
+    <div style="${SL}">스타일</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">${dbtn('row','가로 배열')}${dbtn('col','세로 배열')}</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">${swatch('fixTabBg',t.bg||'#2b6cff')}${swatch('fixTabColor',t.color||'#ffffff')}</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px">
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${t.fontSize||15}" min="9" max="40" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" min="0" max="60" style="${IN}"></label>
+    </div>
+    <label style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"><span style="font-size:10px;color:var(--sub,#999)">폰트</span><select id="ft-font" style="${IN};width:100%">${fontOpts}</select></label>
+    <div style="display:flex;gap:6px;margin-bottom:4px">
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">굵기</span><select id="ft-fw" style="${IN}"><option value="400"${(t.fontWeight||700)==400?' selected':''}>보통</option><option value="700"${(t.fontWeight||700)==700?' selected':''}>굵게</option><option value="900"${(t.fontWeight||700)==900?' selected':''}>매우굵게</option></select></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">표시</span><select id="ft-dev" style="${IN}"><option value="both"${(t.device||'both')==='both'?' selected':''}>PC+모바일</option><option value="pc"${t.device==='pc'?' selected':''}>PC만</option><option value="mobile"${t.device==='mobile'?' selected':''}>모바일만</option></select></label>
+    </div>
+    <button id="ft-del" style="width:100%;margin-top:11px;padding:7px;border-radius:8px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer;font-weight:600">🗑 이 고정탭 삭제</button>`;
   document.body.appendChild(pop);
   const q=id=>pop.querySelector('#'+id);
-  q('ft-label').addEventListener('input',()=>{ t.label=q('ft-label').value; _fixSave(); });
-  q('ft-label').addEventListener('change',()=>snapshot());
-  q('ft-action').addEventListener('change',()=>{ t.action=q('ft-action').value; _fixSave(); snapshot(); openFixTabPopup(t,x,y); });
-  if(q('ft-link')) q('ft-link').addEventListener('change',()=>{ t.link=q('ft-link').value; _fixSave(); snapshot(); });
-  if(q('ft-url')) q('ft-url').addEventListener('input',()=>{ t.url=q('ft-url').value; _fixSave(); });
+  const reopen=()=>openFixTabPopup(t,x,y);
+  // 항목별 핸들러
+  pop.querySelectorAll('.ft-l').forEach(inp=>{ inp.addEventListener('input',()=>{ items[+inp.dataset.i].label=inp.value; _fixSave(); }); inp.addEventListener('change',()=>snapshot()); });
+  pop.querySelectorAll('.ft-act').forEach(sel=>sel.addEventListener('change',()=>{ items[+sel.dataset.i].action=sel.value; _fixSave(); snapshot(); reopen(); }));
+  pop.querySelectorAll('.ft-lk').forEach(sel=>sel.addEventListener('change',()=>{ items[+sel.dataset.i].link=sel.value; _fixSave(); snapshot(); }));
+  pop.querySelectorAll('.ft-u').forEach(inp=>{ inp.addEventListener('input',()=>{ items[+inp.dataset.i].url=inp.value; _fixSave(); }); inp.addEventListener('change',()=>snapshot()); });
+  pop.querySelectorAll('.ft-rm').forEach(b=>b.addEventListener('click',()=>{ items.splice(+b.dataset.i,1); _fixSave(); snapshot(); reopen(); }));
+  q('ft-add').addEventListener('click',()=>{ items.push({ label:'메뉴', action:'top', link:(roots[0]&&roots[0].id)||'', url:'' }); _fixSave(); snapshot(); reopen(); });
+  pop.querySelectorAll('.ft-dir').forEach(b=>b.addEventListener('click',()=>{ t.dir=b.dataset.d; _fixSave(); snapshot(); reopen(); }));
   q('ft-fs').addEventListener('input',()=>{ t.fontSize=parseInt(q('ft-fs').value)||15; _fixSave(); });
   q('ft-fs').addEventListener('change',()=>snapshot());
-  q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
-  q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-rad').addEventListener('input',()=>{ t.radius=parseInt(q('ft-rad').value)||0; _fixSave(); });
   q('ft-rad').addEventListener('change',()=>snapshot());
+  q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
+  q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
   q('ft-del').addEventListener('click',()=>{ const a=fixedTabs(); const i=a.findIndex(x=>x.id===t.id); if(i>=0)a.splice(i,1); _fixTabSel=null; pop.remove(); renderCanvas(); save(true); snapshot(); toast('고정탭 삭제됨'); });
   const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ pop.remove(); document.removeEventListener('mousedown',closer); } };

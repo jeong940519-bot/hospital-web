@@ -31,7 +31,13 @@
         dotW:dotW, dotH:dotH, dotRadius:dotRadius, dotColor:dotColor, dotOn:dotOn, dotGap:dotGap, dotBottom:dotBottom, dotX:dotX, dotShape:dotShape, arrowShape:(fx.arrowShape||'circle'), prev:glyph[0], next:glyph[1] } };
   }
 
-  /* 고정탭(플로팅 탭) 스타일 해석 — 편집기·발행본 공유. corner=tl|tr|bl|br + dx/dy 오프셋. */
+  /* 고정탭 항목 정규화 — 신규(items[]) / 레거시(단일 label·action) 모두 items 배열로. */
+  function fixTabItems(t){
+    t=t||{};
+    if(t.items && t.items.length) return t.items;
+    return [{ label:(t.label!=null?t.label:'예약'), action:(t.action||'top'), link:t.link||'', url:t.url||'' }];
+  }
+  /* 고정탭(플로팅 탭) 스타일 해석 — 편집기·발행본 공유. corner=tl|tr|bl|br + dx/dy 오프셋, 항목 여러 개 가능. */
   function fixTabResolve(t){
     t=t||{};
     var corner=t.corner||'br';
@@ -40,19 +46,26 @@
     var hx=(corner.indexOf('l')>=0)?('left:'+dx+'px'):('right:'+dx+'px');
     var hy=(corner.indexOf('t')>=0)?('top:'+dy+'px'):('bottom:'+dy+'px');
     var radius=(t.radius!=null?+t.radius:23);
-    var appearance='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
+    var dir=(t.dir==='col')?'column':'row';
+    var container='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
       +';font-size:'+(+(t.fontSize||15))+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
-      +';border-radius:'+radius+'px;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2'
-      +';box-shadow:0 4px 14px rgba(0,0,0,.22);cursor:pointer;box-sizing:border-box;padding:4px 8px;text-decoration:none';
-    return { hx:hx, hy:hy, w:w, h:h, appearance:appearance, label:(t.label!=null?t.label:'예약'), action:(t.action||'top'), link:t.link||'', url:t.url||'', dev:(t.device||'both') };
+      +';border-radius:'+radius+'px;display:flex;flex-direction:'+dir+';align-items:stretch;line-height:1.2'
+      +';box-shadow:0 4px 14px rgba(0,0,0,.22);box-sizing:border-box;overflow:hidden';
+    var itemCss='flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;padding:2px 10px;white-space:nowrap;text-decoration:none;color:inherit';
+    var divCss=(dir==='column')?'border-top:1px solid rgba(255,255,255,.28)':'border-left:1px solid rgba(255,255,255,.28)';
+    return { hx:hx, hy:hy, w:w, h:h, container:container, itemCss:itemCss, divCss:divCss, dir:dir, radius:radius, items:fixTabItems(t), dev:(t.device||'both') };
   }
   function fixTabHtml(t){
     var r=fixTabResolve(t);
-    var common=' class="fixtab" data-dev="'+r.dev+'" style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.appearance+'"';
-    var inner=esc(r.label);
-    if(r.action==='url') return '<a href="'+esc(r.url||'#')+'" target="_blank" rel="noopener"'+common+'>'+inner+'</a>';
-    if(r.action==='link') return '<div data-link="'+esc(r.link)+'"'+common+'>'+inner+'</div>';
-    return '<div data-fixtab="top"'+common+'>'+inner+'</div>';
+    var inner=r.items.map(function(it,i){
+      var css=r.itemCss+(i>0?';'+r.divCss:'');
+      var attr=' class="fixtab-item" style="'+css+'"';
+      var lbl=esc(it.label!=null?it.label:'');
+      if(it.action==='url') return '<a href="'+esc(it.url||'#')+'" target="_blank" rel="noopener"'+attr+'>'+lbl+'</a>';
+      if(it.action==='link') return '<div data-link="'+esc(it.link||'')+'"'+attr+'>'+lbl+'</div>';
+      return '<div data-fixtab="top"'+attr+'>'+lbl+'</div>';
+    }).join('');
+    return '<div class="fixtab" data-dev="'+r.dev+'" style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.container+'">'+inner+'</div>';
   }
 
   /* ── 효과 CSS ── */
