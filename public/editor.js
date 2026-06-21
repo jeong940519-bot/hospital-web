@@ -983,7 +983,7 @@ function openFixTabPopup(t,x,y){
       ${it.action==='url'?`<input class="ft-u" data-i="${i}" type="text" value="${ea(it.url)}" placeholder="https://" style="${IN};width:100%;margin-top:6px">`:''}
     </div>`).join('');
   const pop=document.createElement('div'); pop.id='fixtab-popup';
-  pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:99999;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px`;
+  pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:9500;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px`;
   pop.addEventListener('mousedown',ev=>ev.stopPropagation());
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
   pop.innerHTML=`
