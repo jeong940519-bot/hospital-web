@@ -987,8 +987,11 @@ function openFixTabPopup(t,x,y){
   pop.addEventListener('mousedown',ev=>ev.stopPropagation());
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
   pop.innerHTML=`
-    <div style="font-weight:800;font-size:14px">📌 고정탭</div>
-    <div style="color:var(--sub,#999);font-size:11px;margin:2px 0 11px">탭 하나에 여러 항목을 넣을 수 있어요</div>
+    <div id="ft-head" style="display:flex;align-items:center;gap:7px;cursor:move;user-select:none;margin:-13px -14px 9px;padding:11px 14px 9px;border-bottom:1px solid var(--border,#ececf4);position:sticky;top:-13px;background:var(--panel,#fff);z-index:2;border-radius:13px 13px 0 0">
+      <span style="font-weight:800;font-size:14px">📌 고정탭</span>
+      <span style="color:var(--sub,#bbb);font-size:13px;margin-left:auto;letter-spacing:1px" title="드래그로 이동">⠿⠿</span>
+    </div>
+    <div style="color:var(--sub,#999);font-size:11px;margin:0 0 11px">탭 하나에 여러 항목 · 창은 드래그로 이동</div>
     <div style="${SL}">항목</div>
     <div id="ft-items">${itemHtml}</div>
     <button id="ft-add" style="width:100%;padding:7px;border:1px dashed var(--accent,#2b6cff);border-radius:8px;background:transparent;color:var(--accent,#2b6cff);cursor:pointer;font-size:12px;font-weight:600">＋ 항목 추가</button>
@@ -1007,8 +1010,23 @@ function openFixTabPopup(t,x,y){
     </div>
     <button id="ft-del" style="width:100%;margin-top:11px;padding:7px;border-radius:8px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer;font-weight:600">🗑 이 고정탭 삭제</button>`;
   document.body.appendChild(pop);
+  // 실제 높이 기준으로 화면 안에 들어오게 보정(아래 잘림 방지)
+  const rc=pop.getBoundingClientRect();
+  let px=Math.max(8,Math.min(x,innerWidth-rc.width-8));
+  let py=Math.max(8,Math.min(y,innerHeight-rc.height-8));
+  pop.style.left=px+'px'; pop.style.top=py+'px';
   const q=id=>pop.querySelector('#'+id);
-  const reopen=()=>openFixTabPopup(t,x,y);
+  // 재렌더(항목 추가/삭제/동작변경)해도 옮겨둔 위치 유지
+  const reopen=()=>{ const r=pop.getBoundingClientRect(); openFixTabPopup(t, r.left, r.top); };
+  // 헤더 드래그로 창 이동
+  const head=q('ft-head');
+  head.addEventListener('mousedown',ev=>{
+    ev.preventDefault();
+    const sx=ev.clientX, sy=ev.clientY, l0=pop.getBoundingClientRect().left, t0=pop.getBoundingClientRect().top;
+    const mv=e2=>{ pop.style.left=_clamp(l0+e2.clientX-sx,0,innerWidth-pop.offsetWidth)+'px'; pop.style.top=_clamp(t0+e2.clientY-sy,0,innerHeight-pop.offsetHeight)+'px'; };
+    const up=()=>{ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); };
+    window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
+  });
   // 항목별 핸들러
   pop.querySelectorAll('.ft-l').forEach(inp=>{ inp.addEventListener('input',()=>{ items[+inp.dataset.i].label=inp.value; _fixSave(); }); inp.addEventListener('change',()=>snapshot()); });
   pop.querySelectorAll('.ft-act').forEach(sel=>sel.addEventListener('change',()=>{ items[+sel.dataset.i].action=sel.value; _fixSave(); snapshot(); reopen(); }));
