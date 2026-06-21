@@ -344,6 +344,24 @@
       }
       return '<div class="el"'+lnk+ea+' style="'+base+'"><div style="'+bgStyle+'"></div>'+stxt+'</div>';
     }
+    if(e.type==='table'){
+      var tbStyle=base+'overflow:hidden;'+(e.radius?'border-radius:'+e.radius+'px;':'');
+      var thtml='<table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:\''+(e.fontFamily||'Noto Sans KR')+'\',sans-serif;font-size:'+(e.fontSize||14)+'px">';
+      var cellMap={};
+      (e.cells||[]).forEach(function(c){ cellMap[c.r+'_'+c.c]=c; });
+      for(var r=0;r<e.rows;r++){
+        thtml+='<tr>';
+        for(var c=0;c<e.cols;c++){
+          var cell=cellMap[r+'_'+c]||{};
+          var isHead=r===0;
+          var tdS='border:'+(e.borderW||1)+'px solid '+(e.borderColor||'#333')+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
+          thtml+='<td style="'+tdS+'">'+esc(cell.text||'')+'</td>';
+        }
+        thtml+='</tr>';
+      }
+      thtml+='</table>';
+      return '<div class="el"'+lnk+ea+' style="'+tbStyle+'">'+thtml+'</div>';
+    }
     return '';
   }
 

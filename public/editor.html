@@ -458,6 +458,7 @@
           <button class="rbtn" id="add-text" title="텍스트 추가 (T)"><span class="ri" style="font-size:20px;font-weight:900">T</span><span class="rl">텍스트</span></button>
           <button class="rbtn" id="add-image" title="이미지 추가"><span class="ri">🖼</span><span class="rl">이미지</span></button>
           <button class="rbtn" id="open-shape" title="도형 추가"><span class="ri">⬛</span><span class="rl">도형</span></button>
+          <button class="rbtn" id="add-table" title="표 추가"><span class="ri">▦</span><span class="rl">표</span></button>
           <div class="rgiv">
             <div class="rgi">
               <button class="rsm" id="rb-sfill-btn" title="도형 채우기" style="flex-direction:column;gap:0;padding:1px 4px"><span style="line-height:1">🪣</span><span id="rb-sfill-bar" style="display:block;height:3px;width:16px;background:#6c7bff"></span></button>
@@ -496,6 +497,7 @@
           <button class="rbtn" id="rb2-addtext"><span class="ri" style="font-size:20px;font-weight:900">T</span><span class="rl">텍스트</span></button>
           <button class="rbtn" id="rb2-addimg"><span class="ri">🖼</span><span class="rl">이미지</span></button>
           <button class="rbtn" id="rb2-addshape"><span class="ri">⬛</span><span class="rl">도형</span></button>
+          <button class="rbtn" id="rb2-addtable"><span class="ri">▦</span><span class="rl">표</span></button>
         </div>
         <div class="rgroup-lbl">개체</div>
       </div>
@@ -692,6 +694,23 @@
 <div id="ctx-menu" class="ctx" style="display:none"></div>
 
 <!-- 도형 피커 모달 -->
+<!-- 표 삽입 그리드 피커 -->
+<div class="modal-bg" id="table-modal" style="display:none">
+  <div class="modal" style="width:320px">
+    <div class="modal-head"><h3>▦ 표 삽입</h3><button class="sp-close" id="table-modal-close">✕</button></div>
+    <div class="modal-body" style="padding:16px">
+      <div style="margin-bottom:12px;font-size:12px;color:var(--sub)" id="table-grid-label">3 × 3</div>
+      <div id="table-grid" style="display:grid;grid-template-columns:repeat(8,28px);gap:3px"></div>
+      <div style="margin-top:14px;display:flex;gap:6px;align-items:center">
+        <input type="number" id="tbl-cols" value="3" min="1" max="20" style="width:50px;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text);text-align:center;font-size:13px">
+        <span style="color:var(--sub)">×</span>
+        <input type="number" id="tbl-rows" value="3" min="1" max="50" style="width:50px;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:5px;color:var(--text);text-align:center;font-size:13px">
+        <button class="tb-btn primary" id="tbl-insert" style="margin-left:auto">삽입</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="shape-modal" style="display:none">
   <div class="modal" style="width:520px;max-height:80vh;display:flex;flex-direction:column">
     <div class="modal-head"><h3>⬛ 도형</h3><button class="sp-close" id="shape-modal-close">✕</button></div>
