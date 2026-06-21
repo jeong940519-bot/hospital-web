@@ -365,9 +365,11 @@
         thtml+='<tr'+(trStyle?' style="'+trStyle+'"':'')+'>';
         for(var c=0;c<e.cols;c++){
           var cell=cellMap[r+'_'+c]||{};
+          if(cell.merged) continue;   // 병합으로 가려진 칸
           var isHead=r===0;
+          var spanAttr=cell.span?(' rowspan="'+cell.span.rs+'" colspan="'+cell.span.cs+'"'):'';
           var tdS=tblBorderCss(e,cell)+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
-          thtml+='<td style="'+tdS+'">'+esc(cell.text||'')+'</td>';
+          thtml+='<td'+spanAttr+' style="'+tdS+'">'+esc(cell.text||'')+'</td>';
         }
         thtml+='</tr>';
       }

@@ -745,9 +745,11 @@ function renderEl(e){
       const tr=document.createElement('tr');
       tr.style.height=(e.rowHeights[r]/e.h*100)+'%';
       for(let c=0;c<e.cols;c++){
-        const td=document.createElement('td');
         const cell=cellMap[r+'_'+c]||{};
+        if(cell.merged) continue;   // 병합으로 가려진 칸은 렌더 안 함
+        const td=document.createElement('td');
         const isHead=r===0;
+        if(cell.span){ td.rowSpan=cell.span.rs; td.colSpan=cell.span.cs; }
         td.style.cssText=`${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
         td.textContent=cell.text||'';
         td.dataset.row=r; td.dataset.col=c;
@@ -2596,6 +2598,9 @@ function showTableCtx(x,y,e,ev,rc){
   h+='<button class="ct-tbtn" data-ta="rows-even" title="선택 행 높이 같게(선택 없으면 전체)">행⇕같게</button>';
   h+='<button class="ct-tbtn" data-ta="cols-even" title="선택 열 너비 같게(선택 없으면 전체)">열⇔같게</button>';
   h+='<div class="ct-vsep"></div>';
+  h+='<button class="ct-tbtn" data-ta="merge" title="선택한 칸 병합">⊞ 병합</button>';
+  if(cell.span) h+='<button class="ct-tbtn" data-ta="unmerge" title="병합 해제">⊟ 해제</button>';
+  h+='<div class="ct-vsep"></div>';
   h+=`<button class="ct-tbtn" data-ta="clear-sel" title="${targets.length>1?'선택한 칸':'이 칸'} 내용 지우기">⌫ 지우기</button>`;
   h+='<div class="ct-vsep"></div>';
   h+=`<button class="ct-tbtn link" data-tl="link" title="${e.link?'링크 변경/해제':'클릭 시 페이지로 이동 링크'}">🔗 ${e.link?'링크됨':'링크'}</button>`;
@@ -2681,8 +2686,30 @@ function showTableCtx(x,y,e,ev,rc){
       const cs=[]; for(let c=n.c0;c<=n.c1;c++) cs.push(c);
       const tot=cs.reduce((s,c)=>s+(e.colWidths[c]||120),0), each=Math.max(40,Math.round(tot/cs.length));
       cs.forEach(c=>e.colWidths[c]=each); e.w=e.colWidths.reduce((s,v)=>s+v,0);
+    }else if(a==='merge'){
+      if(!_tblSel||_tblSel.id!==e.id){ toast('두 칸 이상 선택하세요'); return; }
+      const n=_tblNorm(_tblSel);
+      if(n.r0===n.r1&&n.c0===n.c1){ toast('두 칸 이상 선택하세요'); return; }
+      let tl=(e.cells||[]).find(x=>x.r===n.r0&&x.c===n.c0); if(!tl){ tl={r:n.r0,c:n.c0,text:''}; e.cells.push(tl); }
+      const txts=[];
+      for(let r=n.r0;r<=n.r1;r++) for(let c=n.c0;c<=n.c1;c++){
+        let cc=(e.cells||[]).find(x=>x.r===r&&x.c===c);
+        if(cc&&cc.text&&!(r===n.r0&&c===n.c0)) txts.push(cc.text);
+        if(r===n.r0&&c===n.c0) continue;
+        if(!cc){ cc={r,c,text:''}; e.cells.push(cc); }
+        cc.merged=true; delete cc.span; cc.text='';
+      }
+      tl.span={rs:n.r1-n.r0+1, cs:n.c1-n.c0+1};
+      if(!tl.text && txts.length) tl.text=txts.join(' ');   // 비어있으면 합쳐진 칸 내용 모음
+      _tblSel={ id:e.id, r0:n.r0, c0:n.c0, r1:n.r0, c1:n.c0 };
+    }else if(a==='unmerge'){
+      const tl=(e.cells||[]).find(x=>x.r===clickR&&x.c===clickC);
+      if(tl&&tl.span){ const rs=tl.span.rs, cs=tl.span.cs;
+        for(let r=clickR;r<clickR+rs;r++) for(let c=clickC;c<clickC+cs;c++){ const cc=(e.cells||[]).find(x=>x.r===r&&x.c===c); if(cc) delete cc.merged; }
+        delete tl.span;
+      }
     }
-    const structural = a.indexOf('ins-')===0 || a.indexOf('del-')===0;
+    const structural = a.indexOf('ins-')===0 || a.indexOf('del-')===0 || a==='merge' || a==='unmerge';
     afterMutate();   // 메뉴 유지(작업해도 안 닫힘) — 바깥 클릭으로만 닫힘
     if(structural) showTableCtx(x,y,e,null,{r:clickR,c:clickC});   // 행/열 수 바뀜 → 같은 자리에서 메뉴 갱신
   }));
