@@ -2887,10 +2887,12 @@ function showBorderDialog(e){
   let curStyle=TBL_LINE_STYLES[0];          // 선택된 선 스타일
   let curColor=e.borderColor||'#333333';    // 선택된 색
   const pend={top:undefined,bottom:undefined,left:undefined,right:undefined,innerH:undefined,innerV:undefined,d1:undefined,d2:undefined};
+  const presetOn={none:false,outer:false,inner:false};   // 프리셋 토글 상태
   const styleObj=()=>({w:curStyle.w, c:curColor, s:curStyle.s});
 
   const ov=document.createElement('div'); ov.id='tbl-bd-dlg';
-  ov.style.cssText='position:fixed;inset:0;z-index:9600;background:rgba(20,22,34,.34);display:flex;align-items:center;justify-content:center';
+  // z-index는 색상 팝업(.rdd=9600)보다 낮게 → 색 선택 시 팝업이 다이얼로그 위로 뜨도록
+  ov.style.cssText='position:fixed;inset:0;z-index:9400;background:rgba(20,22,34,.34);display:flex;align-items:center;justify-content:center';
   const SL='font-size:11px;font-weight:700;color:var(--sub,#8a8aa0);margin:0 0 6px';
   // 선 스타일 목록
   const styleRow=(st,i)=>{
@@ -2959,13 +2961,21 @@ function showBorderDialog(e){
   function cycle(edge){ const v=pend[edge]; pend[edge]= (v===undefined)?styleObj() : (v==='none'?undefined:'none'); renderPrev(); paintEdges(); }
   $$('.bd-edge').forEach(b=>b.addEventListener('click',()=>cycle(b.dataset.edge)));
 
-  // 미리 설정
+  // 미리 설정 — 다시 누르면 해제(토글)
+  function paintPresets(){ $$('.bd-preset').forEach(b=>{ const on=presetOn[b.dataset.p]; b.style.background=on?'rgba(43,108,255,.14)':'var(--bg,#fff)'; b.style.borderColor=on?'var(--accent,#2b6cff)':'var(--border,#dcdce8)'; }); }
   $$('.bd-preset').forEach(b=>b.addEventListener('click',()=>{
     const p=b.dataset.p, st=styleObj();
-    if(p==='none'){ Object.keys(pend).forEach(k=>pend[k]='none'); }
-    else if(p==='outer'){ pend.top=st;pend.bottom=st;pend.left=st;pend.right=st; }
-    else if(p==='inner'){ if(multiRow)pend.innerH=st; if(multiCol)pend.innerV=st; }
-    renderPrev(); paintEdges();
+    if(p==='none'){
+      if(presetOn.none){ Object.keys(pend).forEach(k=>pend[k]=undefined); presetOn.none=false; }
+      else { Object.keys(pend).forEach(k=>pend[k]='none'); presetOn.none=true; presetOn.outer=presetOn.inner=false; }
+    } else if(p==='outer'){
+      if(presetOn.outer){ pend.top=pend.bottom=pend.left=pend.right=undefined; presetOn.outer=false; }
+      else { pend.top=pend.bottom=pend.left=pend.right=st; presetOn.outer=true; presetOn.none=false; }
+    } else if(p==='inner'){
+      if(presetOn.inner){ pend.innerH=pend.innerV=undefined; presetOn.inner=false; }
+      else { if(multiRow)pend.innerH=st; if(multiCol)pend.innerV=st; presetOn.inner=true; presetOn.none=false; }
+    }
+    renderPrev(); paintEdges(); paintPresets();
   }));
 
   function edgeAttr(v){
@@ -3002,12 +3012,13 @@ function showBorderDialog(e){
     prev.querySelectorAll('[data-hit]').forEach(ln=>ln.addEventListener('click',()=>cycle(ln.dataset.hit)));
   }
 
-  function close(){ delete CP_TARGETS.tblBdDlgColor; document.getElementById('fill-dd')?.remove(); ov.remove(); }
+  function close(){ delete CP_TARGETS.tblBdDlgColor; try{ closeAllDD(); }catch(_){} ov.remove(); }
   $('#bd-x').onclick=close; $('#bd-cancel').onclick=close;
-  ov.addEventListener('mousedown',ev=>{ if(ev.target===ov) close(); });
+  // 색상 팝업 클릭은 닫지 않음(#fill-dd) — 배경(ov) 직접 클릭만 닫기
+  ov.addEventListener('mousedown',ev=>{ if(ev.target===ov && !ev.target.closest('#fill-dd')) close(); });
   $('#bd-ok').onclick=()=>{ _tblApplyBorders(e,range,pend); liveStyleEl(e); snapshot(); close(); toast('테두리 적용됨'); };
 
-  paintStyles(); paintEdges(); renderPrev();
+  paintStyles(); paintEdges(); paintPresets(); renderPrev();
 }
 // 미리 설정 아이콘
 function _bdPresetIcon(p){
