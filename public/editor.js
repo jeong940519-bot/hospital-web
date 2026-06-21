@@ -759,8 +759,10 @@ function renderEl(e){
         const td=document.createElement('td');
         const isHead=r===0;
         if(cell.span){ td.rowSpan=cell.span.rs; td.colSpan=cell.span.cs; }
-        td.style.cssText=`cursor:default;${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
+        const _diag=_tblDiagSvg(e,cell);
+        td.style.cssText=`cursor:default;${_diag?'position:relative;':''}${_tblBorderCss(e,cell)};padding:4px 8px;background:${cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff'))};color:${cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333'))};font-weight:${isHead?(e.headerWeight||700):(e.fontWeight||400)};text-align:${cell.align||'center'};vertical-align:middle;overflow:hidden;text-overflow:ellipsis`;
         td.textContent=cell.text||'';
+        if(_diag) td.insertAdjacentHTML('beforeend',_diag);
         td.dataset.row=r; td.dataset.col=c;
         if(_tblInSel(e.id,r,c)) td.style.boxShadow=_TBL_HL;
         tr.appendChild(td);
@@ -2730,34 +2732,91 @@ function _tblCellProp(e,r,c,key,val){
   if(!cell){ cell={r,c,text:''}; e.cells.push(cell); }
   cell[key]=val;
 }
-// 셀 4방향 테두리 CSS (cell.bd={t,r,b,l} 폭 오버라이드; 미지정=기본 e.borderW, 0=없음)
-function _tblBorderCss(e,cell){
-  const col=e.borderColor||'#333', def=(e.borderW!=null?e.borderW:1);
-  const sd=(s,css)=>{ const bd=cell&&cell.bd; const w=(bd&&bd[s]!=null)?bd[s]:def; return `border-${css}:${w>0?w+'px solid '+col:'0'}`; };
-  return [sd('t','top'),sd('r','right'),sd('b','bottom'),sd('l','left')].join(';');
+// 엑셀식 선 스타일 프리셋(스타일 목록 UI에 사용)
+const TBL_LINE_STYLES=[
+  {key:'thin',   s:'solid',  w:1, label:'가는 실선'},
+  {key:'medium', s:'solid',  w:2, label:'중간 실선'},
+  {key:'thick',  s:'solid',  w:3, label:'굵은 실선'},
+  {key:'dashed', s:'dashed', w:1, label:'파선'},
+  {key:'dashed2',s:'dashed', w:2, label:'굵은 파선'},
+  {key:'dotted', s:'dotted', w:1, label:'점선'},
+  {key:'double', s:'double', w:3, label:'이중선'},
+];
+// 한 변(side: t/r/b/l/d1/d2)의 테두리를 {w,c,s}로 정규화.
+//  - 미지정(null/undefined): 기본 e.borderW / e.borderColor / solid
+//  - 숫자(레거시): 폭만 지정, 색=e.borderColor, solid
+//  - 객체 {w,c,s}: 그대로
+function _tblBdResolve(e,cell,side){
+  const def=(e.borderW!=null?e.borderW:1), dc=e.borderColor||'#333';
+  const v=cell&&cell.bd&&cell.bd[side];
+  if(v==null) return {w:def,c:dc,s:'solid'};
+  if(typeof v==='number') return {w:v,c:dc,s:'solid'};
+  return {w:(v.w!=null?v.w:def), c:v.c||dc, s:v.s||'solid'};
 }
-// 엑셀/PPT식 테두리 프리셋을 선택 범위에 적용
-function _tblBorderPreset(e,targets,preset){
-  if(!targets||!targets.length) return;
-  const rs=targets.map(t=>t.r), cs=targets.map(t=>t.c);
-  const r0=Math.min(...rs),r1=Math.max(...rs),c0=Math.min(...cs),c1=Math.max(...cs);
-  const W=Math.max(1,e.borderW||1);
-  const setS=(r,c,s,v)=>{ let cell=(e.cells||[]).find(x=>x.r===r&&x.c===c); if(!cell){cell={r,c,text:''};e.cells.push(cell);} if(!cell.bd)cell.bd={}; if(v===undefined) delete cell.bd[s]; else cell.bd[s]=v; };
-  targets.forEach(({r,c})=>{
-    const top=r===r0,bot=r===r1,lft=c===c0,rgt=c===c1;
-    switch(preset){
-      case 'none': setS(r,c,'t',0);setS(r,c,'b',0);setS(r,c,'l',0);setS(r,c,'r',0); break;
-      case 'all': setS(r,c,'t',W);setS(r,c,'b',W);setS(r,c,'l',W);setS(r,c,'r',W); break;
-      case 'outer': setS(r,c,'t',top?W:0);setS(r,c,'b',bot?W:0);setS(r,c,'l',lft?W:0);setS(r,c,'r',rgt?W:0); break;
-      case 'inner': setS(r,c,'t',top?undefined:W);setS(r,c,'b',bot?undefined:W);setS(r,c,'l',lft?undefined:W);setS(r,c,'r',rgt?undefined:W); break;
-      case 'inner-h': setS(r,c,'t',top?undefined:W);setS(r,c,'b',bot?undefined:W); break;
-      case 'inner-v': setS(r,c,'l',lft?undefined:W);setS(r,c,'r',rgt?undefined:W); break;
-      case 'top': if(top) setS(r,c,'t',W); break;
-      case 'bottom': if(bot) setS(r,c,'b',W); break;
-      case 'left': if(lft) setS(r,c,'l',W); break;
-      case 'right': if(rgt) setS(r,c,'r',W); break;
-    }
-  });
+// 선 스타일 → SVG stroke-dasharray (대각선 그리기용)
+function _tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2) : s==='dotted'?w+','+(w*1.6) : ''; }
+// 셀 대각선(cell.bd.d1=╲, d2=╱) → 절대배치 SVG 오버레이 HTML(없으면 '')
+function _tblDiagSvg(e,cell){
+  if(!cell||!cell.bd||(!cell.bd.d1&&!cell.bd.d2)) return '';
+  const line=(v,x1,y1,x2,y2)=>{ const r=_tblBdResolve({borderColor:e.borderColor,borderW:e.borderW},{bd:{_:v}},'_'); return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${r.c}" stroke-width="${r.w}" stroke-dasharray="${_tblDash(r.s,r.w)}" vector-effect="non-scaling-stroke"/>`; };
+  let g='';
+  if(cell.bd.d1) g+=line(cell.bd.d1,0,0,100,100);
+  if(cell.bd.d2) g+=line(cell.bd.d2,0,100,100,0);
+  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">${g}</svg>`;
+}
+// 셀 4방향 테두리 CSS (cell.bd={t,r,b,l} 변별 폭/색/선스타일 오버라이드; 미지정=기본 e.borderW, 0=없음)
+function _tblBorderCss(e,cell){
+  const map={t:'top',r:'right',b:'bottom',l:'left'};
+  const sd=(s)=>{ const {w,c,s:st}=_tblBdResolve(e,cell,s); return `border-${map[s]}:${w>0?`${w}px ${st} ${c}`:'0'}`; };
+  return [sd('t'),sd('r'),sd('b'),sd('l')].join(';');
+}
+// 테두리 작업 대상 범위: 셀 범위선택이 있으면 그 범위, 없으면 표 전체
+function _tblBorderRange(e){
+  if(_tblSel && _tblSel.id===e.id){ const n=_tblNorm(_tblSel); return {r0:n.r0,c0:n.c0,r1:n.r1,c1:n.c1}; }
+  return {r0:0,c0:0,r1:e.rows-1,c1:e.cols-1};
+}
+// 한 칸의 한 변 설정. val: 스타일객체 {w,c,s} | {w:0}(없음) | null(기본으로 되돌림)
+function _tblSetSide(e,r,c,side,val){
+  if(r<0||c<0||r>=e.rows||c>=e.cols) return;
+  let cell=(e.cells||[]).find(x=>x.r===r&&x.c===c);
+  if(!cell){ cell={r,c,text:''}; (e.cells||(e.cells=[])).push(cell); }
+  if(!cell.bd) cell.bd={};
+  if(val==null) delete cell.bd[side]; else cell.bd[side]=val;
+}
+// 한 변 + 맞닿은 이웃 칸의 반대 변까지 동기화(border-collapse 일관성·없음 처리)
+function _tblApplyEdge(e,r,c,side,val){
+  _tblSetSide(e,r,c,side,val);
+  const nb={t:[r-1,c,'b'], b:[r+1,c,'t'], l:[r,c-1,'r'], r:[r,c+1,'l']}[side];
+  if(nb) _tblSetSide(e,nb[0],nb[1],nb[2],val);
+}
+// 범위에 테두리 스펙 적용. spec 키: top/bottom/left/right/innerH/innerV/d1/d2
+//  각 값: 스타일객체(적용) | 'none'(제거) | undefined/null(건드리지 않음)
+function _tblApplyBorders(e,range,spec){
+  const {r0,c0,r1,c1}=range, NONE={w:0};
+  const ev=v=> v==='none'?NONE : v;            // 변(edge)용: 없음=폭0
+  const dv=v=> v==='none'?null : v;            // 대각선용: 없음=삭제
+  if(spec.top!=null)    for(let c=c0;c<=c1;c++) _tblApplyEdge(e,r0,c,'t',ev(spec.top));
+  if(spec.bottom!=null) for(let c=c0;c<=c1;c++) _tblApplyEdge(e,r1,c,'b',ev(spec.bottom));
+  if(spec.left!=null)   for(let r=r0;r<=r1;r++) _tblApplyEdge(e,r,c0,'l',ev(spec.left));
+  if(spec.right!=null)  for(let r=r0;r<=r1;r++) _tblApplyEdge(e,r,c1,'r',ev(spec.right));
+  if(spec.innerH!=null) for(let r=r0;r<r1;r++) for(let c=c0;c<=c1;c++) _tblApplyEdge(e,r,c,'b',ev(spec.innerH));
+  if(spec.innerV!=null) for(let c=c0;c<c1;c++) for(let r=r0;r<=r1;r++) _tblApplyEdge(e,r,c,'r',ev(spec.innerV));
+  if(spec.d1!=null) for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) _tblSetSide(e,r,c,'d1',dv(spec.d1));
+  if(spec.d2!=null) for(let r=r0;r<=r1;r++) for(let c=c0;c<=c1;c++) _tblSetSide(e,r,c,'d2',dv(spec.d2));
+}
+// 빠른 프리셋(미니 툴바 드롭다운) — 현재 기본 선(e.borderW/Color, solid)으로 적용
+function _tblPresetApply(e,key){
+  const range=_tblBorderRange(e);
+  const st={w:Math.max(1,e.borderW||1), c:e.borderColor||'#333', s:'solid'};
+  const M={
+    all:{top:st,bottom:st,left:st,right:st,innerH:st,innerV:st},
+    outer:{top:st,bottom:st,left:st,right:st},
+    inner:{innerH:st,innerV:st},
+    'inner-h':{innerH:st}, 'inner-v':{innerV:st},
+    top:{top:st}, bottom:{bottom:st}, left:{left:st}, right:{right:st},
+    none:{top:'none',bottom:'none',left:'none',right:'none',innerH:'none',innerV:'none',d1:'none',d2:'none'},
+  };
+  if(M[key]) _tblApplyBorders(e,range,M[key]);
 }
 function _bdIcon(t){
   const F='#5b6b88', A='#3b82f6', L=2,T=2,R=14,B=14,M=8;
@@ -2777,21 +2836,186 @@ function _bdIcon(t){
 }
 function showBorderMenu(btn,e,clickR,clickC){
   document.getElementById('tbl-bd-pop')?.remove();
-  const targets=_tblTargets(e,clickR,clickC);
   const pop=document.createElement('div'); pop.id='tbl-bd-pop'; pop.className='ctx';
   pop.style.cssText+=';min-width:158px;width:max-content';
+  const rng=_tblBorderRange(e);
+  const scope=(rng.r0===0&&rng.c0===0&&rng.r1===e.rows-1&&rng.c1===e.cols-1)?'표 전체':`${rng.r1-rng.r0+1}×${rng.c1-rng.c0+1} 범위`;
   const items=[['all','모든 테두리'],['outer','바깥쪽 테두리'],['inner','안쪽 테두리'],['_sep'],
     ['top','위쪽 테두리'],['bottom','아래쪽 테두리'],['left','왼쪽 테두리'],['right','오른쪽 테두리'],['_sep'],
-    ['inner-h','안쪽 가로 테두리'],['inner-v','안쪽 세로 테두리'],['_sep'],['none','테두리 없음']];
-  pop.innerHTML=items.map(it=> it[0]==='_sep'?'<div class="sep"></div>'
+    ['inner-h','안쪽 가로 테두리'],['inner-v','안쪽 세로 테두리'],['_sep'],['none','테두리 없음'],['_sep'],['_more','테두리 상세… (두께·색·선스타일)']];
+  pop.innerHTML=`<div style="padding:5px 10px;font-size:11px;color:var(--sub,#888)">적용 대상: <b style="color:var(--accent)">${scope}</b></div><div class="sep"></div>`+
+    items.map(it=> it[0]==='_sep'?'<div class="sep"></div>'
+    : it[0]==='_more'?`<div class="ci" data-bd="_more" style="display:flex;align-items:center;gap:8px;font-weight:700;color:var(--accent)">⚙️<span>${it[1]}</span></div>`
     :`<div class="ci" data-bd="${it[0]}" style="display:flex;align-items:center;gap:8px">${_bdIcon(it[0])}<span>${it[1]}</span></div>`).join('');
   document.body.appendChild(pop);
   const r=btn.getBoundingClientRect();
   pop.style.left=Math.min(r.left, innerWidth-pop.offsetWidth-8)+'px';
   pop.style.top=Math.min(r.bottom+4, innerHeight-pop.offsetHeight-8)+'px';
-  pop.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{ _tblBorderPreset(e,targets,it.dataset.bd); liveStyleEl(e); snapshot(); pop.remove(); }));
+  pop.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
+    if(it.dataset.bd==='_more'){ pop.remove(); showBorderDialog(e); return; }
+    _tblPresetApply(e,it.dataset.bd); liveStyleEl(e); snapshot(); pop.remove();
+  }));
   const closer=ev=>{ if(!ev.target.closest('#tbl-bd-pop')&&ev.target!==btn){ pop.remove(); document.removeEventListener('mousedown',closer); } };
   setTimeout(()=>document.addEventListener('mousedown',closer),0);
+}
+// ════════ 엑셀식 "셀 서식 > 테두리" 상세 다이얼로그 ════════
+function showBorderDialog(e){
+  document.getElementById('tbl-bd-dlg')?.remove();
+  const range=_tblBorderRange(e);
+  const multiRow=range.r1>range.r0, multiCol=range.c1>range.c0;
+  const scope=(range.r0===0&&range.c0===0&&range.r1===e.rows-1&&range.c1===e.cols-1)?'표 전체':`${range.r1-range.r0+1}×${range.c1-range.c0+1} 범위`;
+  // ── 작업 상태 ──
+  let curStyle=TBL_LINE_STYLES[0];          // 선택된 선 스타일
+  let curColor=e.borderColor||'#333333';    // 선택된 색
+  const pend={top:undefined,bottom:undefined,left:undefined,right:undefined,innerH:undefined,innerV:undefined,d1:undefined,d2:undefined};
+  const styleObj=()=>({w:curStyle.w, c:curColor, s:curStyle.s});
+
+  const ov=document.createElement('div'); ov.id='tbl-bd-dlg';
+  ov.style.cssText='position:fixed;inset:0;z-index:9600;background:rgba(20,22,34,.34);display:flex;align-items:center;justify-content:center';
+  const SL='font-size:11px;font-weight:700;color:var(--sub,#8a8aa0);margin:0 0 6px';
+  // 선 스타일 목록
+  const styleRow=(st,i)=>{
+    const sample=`<svg width="56" height="12" viewBox="0 0 56 12" preserveAspectRatio="none"><line x1="2" y1="6" x2="54" y2="6" stroke="currentColor" stroke-width="${st.s==='double'?1:st.w*1.3}" stroke-dasharray="${_tblDash(st.s,st.w)}"/>${st.s==='double'?'<line x1="2" y1="3" x2="54" y2="3" stroke="currentColor" stroke-width="1"/><line x1="2" y1="9" x2="54" y2="9" stroke="currentColor" stroke-width="1"/>':''}</svg>`;
+    return `<div class="bd-st" data-i="${i}" style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;cursor:pointer;border:1.5px solid transparent"><span style="width:18px;font-size:10px;color:var(--sub,#999)">${st.s==='solid'?'':''}</span><span class="bd-st-line" style="color:#333">${sample}</span><span style="font-size:11px;color:var(--text,#333);margin-left:auto">${st.label}</span></div>`;
+  };
+  const card=document.createElement('div');
+  card.style.cssText='width:560px;max-width:94vw;max-height:92vh;overflow:auto;background:var(--panel,#fff);color:var(--text,#222);border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,.4);padding:0';
+  card.innerHTML=`
+    <div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid var(--border,#ececf4)">
+      <span style="font-weight:800;font-size:15px">⊞ 셀 테두리</span>
+      <span style="font-size:12px;color:var(--sub,#888)">적용 대상: <b style="color:var(--accent)">${scope}</b></span>
+      <button id="bd-x" style="margin-left:auto;border:none;background:transparent;font-size:18px;cursor:pointer;color:var(--sub,#999)">✕</button>
+    </div>
+    <div style="display:flex;gap:18px;padding:16px 18px">
+      <!-- 왼쪽: 선 스타일 + 색 -->
+      <div style="width:200px;flex-shrink:0">
+        <div style="${SL}">선 — 스타일(S)</div>
+        <div id="bd-styles" style="border:1px solid var(--border,#e2e2ee);border-radius:9px;padding:5px;max-height:210px;overflow:auto">${TBL_LINE_STYLES.map(styleRow).join('')}</div>
+        <div style="${SL};margin-top:12px">색(C)</div>
+        <button id="bd-color" class="panel-cbtn" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:1px solid var(--border,#dcdce8);border-radius:8px;background:var(--bg,#fff);cursor:pointer"><span id="bd-color-sw" style="width:18px;height:18px;border-radius:4px;border:1px solid rgba(0,0,0,.2);background:${curColor}"></span><span style="font-size:12px;color:var(--text,#333)">테두리 색 선택</span><span style="margin-left:auto;color:var(--sub,#aaa)">▾</span></button>
+      </div>
+      <!-- 오른쪽: 미리 설정 + 테두리 -->
+      <div style="flex:1;min-width:0">
+        <div style="${SL}">미리 설정</div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          ${[['none','없음(N)'],['outer','윤곽선(O)'],['inner','안쪽(I)']].map(p=>`<button class="bd-preset" data-p="${p[0]}" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:9px 4px;border:1px solid var(--border,#dcdce8);border-radius:9px;background:var(--bg,#fff);cursor:pointer"><span style="color:#5b6b88">${_bdPresetIcon(p[0])}</span><span style="font-size:11px;color:var(--text,#444)">${p[1]}</span></button>`).join('')}
+        </div>
+        <div style="${SL}">테두리 — 가장자리/안쪽을 클릭해 선택한 스타일 적용 (다시 클릭=제거)</div>
+        <div style="display:grid;grid-template-columns:34px 1fr 34px;grid-template-rows:34px 1fr 34px;gap:2px;align-items:center;justify-items:center;margin-top:6px">
+          <span></span>
+          <button class="bd-edge" data-edge="top" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('top')}</button>
+          <span></span>
+          <button class="bd-edge" data-edge="left" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('left')}</button>
+          <div id="bd-prev" style="width:100%;height:130px"></div>
+          <button class="bd-edge" data-edge="right" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('right')}</button>
+          <span></span>
+          <button class="bd-edge" data-edge="bottom" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('bottom')}</button>
+          <span></span>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
+          ${multiRow?`<button class="bd-edge" data-edge="innerH" title="안쪽 가로" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('innerH')}</button>`:''}
+          ${multiCol?`<button class="bd-edge" data-edge="innerV" title="안쪽 세로" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('innerV')}</button>`:''}
+          <button class="bd-edge" data-edge="d1" title="대각선 ╲" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('d1')}</button>
+          <button class="bd-edge" data-edge="d2" title="대각선 ╱" style="${_bdEdgeBtnCss}">${_bdEdgeIcon('d2')}</button>
+        </div>
+      </div>
+    </div>
+    <div style="padding:6px 18px 0;font-size:11px;color:var(--sub,#999)">파란 선=적용 · 빨간 점선=제거 · 회색=변경 안 함. [적용]을 누르면 ${scope}에 반영됩니다.</div>
+    <div style="display:flex;justify-content:flex-end;gap:8px;padding:14px 18px 16px">
+      <button id="bd-cancel" style="padding:8px 18px;border:1px solid var(--border,#dcdce8);border-radius:8px;background:var(--bg,#fff);cursor:pointer;font-size:13px">취소</button>
+      <button id="bd-ok" style="padding:8px 22px;border:none;border-radius:8px;background:var(--accent,#2b6cff);color:#fff;cursor:pointer;font-size:13px;font-weight:700">적용</button>
+    </div>`;
+  ov.appendChild(card); document.body.appendChild(ov);
+  const $=s=>card.querySelector(s), $$=s=>card.querySelectorAll(s);
+
+  // 선 스타일 선택 표시
+  function paintStyles(){ $$('.bd-st').forEach((el2,i)=>{ const on=TBL_LINE_STYLES[i]===curStyle; el2.style.borderColor=on?'var(--accent,#2b6cff)':'transparent'; el2.style.background=on?'rgba(43,108,255,.08)':'transparent'; const ln=el2.querySelector('.bd-st-line'); if(ln) ln.style.color=curColor; }); }
+  $$('.bd-st').forEach(el2=>el2.addEventListener('click',()=>{ curStyle=TBL_LINE_STYLES[+el2.dataset.i]; paintStyles(); }));
+
+  // 색 선택 — 앱 공용 색상 팝업 사용
+  CP_TARGETS.tblBdDlgColor={ label:'테두리 색', rich:false, current:()=>curColor, set:v=>{ curColor=v; $('#bd-color-sw').style.background=v; paintStyles(); } };
+  $('#bd-color').addEventListener('click',ev=>{ ev.stopPropagation(); toggleColorPopup('tblBdDlgColor', $('#bd-color')); });
+
+  // 가장자리 토글: 미설정 → 적용 → 제거 → 미설정
+  function cycle(edge){ const v=pend[edge]; pend[edge]= (v===undefined)?styleObj() : (v==='none'?undefined:'none'); renderPrev(); paintEdges(); }
+  $$('.bd-edge').forEach(b=>b.addEventListener('click',()=>cycle(b.dataset.edge)));
+
+  // 미리 설정
+  $$('.bd-preset').forEach(b=>b.addEventListener('click',()=>{
+    const p=b.dataset.p, st=styleObj();
+    if(p==='none'){ Object.keys(pend).forEach(k=>pend[k]='none'); }
+    else if(p==='outer'){ pend.top=st;pend.bottom=st;pend.left=st;pend.right=st; }
+    else if(p==='inner'){ if(multiRow)pend.innerH=st; if(multiCol)pend.innerV=st; }
+    renderPrev(); paintEdges();
+  }));
+
+  function edgeAttr(v){
+    if(v==='none') return {stroke:'#e3506b', sw:1.6, dash:'3,3'};
+    if(v) return {stroke:v.c, sw:Math.max(1.6,v.w), dash:_tblDash(v.s,v.w)};
+    return {stroke:'#ccccd6', sw:1, dash:''};
+  }
+  function paintEdges(){ $$('.bd-edge').forEach(b=>{ const v=pend[b.dataset.edge]; b.style.background=v?(v==='none'?'rgba(227,80,107,.12)':'rgba(43,108,255,.14)'):'var(--bg,#fff)'; b.style.borderColor=v?(v==='none'?'#e3506b':'var(--accent,#2b6cff)'):'var(--border,#dcdce8)'; }); }
+  function renderPrev(){
+    const W=240,H=130,m=16,x0=m,x1=W-m,y0=m,y1=H-m,xm=W/2,ym=H/2;
+    const seg=(x1_,y1_,x2_,y2_,v)=>{ const a=edgeAttr(v); return `<line x1="${x1_}" y1="${y1_}" x2="${x2_}" y2="${y2_}" stroke="${a.stroke}" stroke-width="${a.sw}" stroke-dasharray="${a.dash}" stroke-linecap="round"/>`; };
+    const hit=(x1_,y1_,x2_,y2_,edge)=>`<line x1="${x1_}" y1="${y1_}" x2="${x2_}" y2="${y2_}" stroke="transparent" stroke-width="14" data-hit="${edge}" style="cursor:pointer"/>`;
+    let g='';
+    // 안쪽 채움 텍스트
+    const txt=(x,y)=>`<text x="${x}" y="${y}" font-size="11" fill="#9aa" text-anchor="middle" dominant-baseline="middle">텍스트</text>`;
+    if(multiRow&&multiCol) g+=txt((x0+xm)/2,(y0+ym)/2)+txt((xm+x1)/2,(y0+ym)/2)+txt((x0+xm)/2,(ym+y1)/2)+txt((xm+x1)/2,(ym+y1)/2);
+    else if(multiCol) g+=txt((x0+xm)/2,ym)+txt((xm+x1)/2,ym);
+    else if(multiRow) g+=txt(xm,(y0+ym)/2)+txt(xm,(ym+y1)/2);
+    else g+=txt(xm,ym);
+    // 대각선(맨 아래에 깔기)
+    if(pend.d1!==undefined) g+=seg(x0,y0,x1,y1,pend.d1);
+    if(pend.d2!==undefined) g+=seg(x0,y1,x1,y0,pend.d2);
+    // 안쪽선
+    if(multiRow) g+=seg(x0,ym,x1,ym,pend.innerH);
+    if(multiCol) g+=seg(xm,y0,xm,y1,pend.innerV);
+    // 바깥선
+    g+=seg(x0,y0,x1,y0,pend.top)+seg(x0,y1,x1,y1,pend.bottom)+seg(x0,y0,x0,y1,pend.left)+seg(x1,y0,x1,y1,pend.right);
+    // 클릭 핫존(선 위에 투명 두꺼운 라인)
+    g+=hit(x0,y0,x1,y0,'top')+hit(x0,y1,x1,y1,'bottom')+hit(x0,y0,x0,y1,'left')+hit(x1,y0,x1,y1,'right');
+    if(multiRow) g+=hit(x0,ym,x1,ym,'innerH');
+    if(multiCol) g+=hit(xm,y0,xm,y1,'innerV');
+    const prev=$('#bd-prev');
+    prev.innerHTML=`<svg viewBox="0 0 ${W} ${H}" width="100%" height="100%" style="background:var(--panel2,#f6f6fb);border-radius:8px">${g}</svg>`;
+    prev.querySelectorAll('[data-hit]').forEach(ln=>ln.addEventListener('click',()=>cycle(ln.dataset.hit)));
+  }
+
+  function close(){ delete CP_TARGETS.tblBdDlgColor; document.getElementById('fill-dd')?.remove(); ov.remove(); }
+  $('#bd-x').onclick=close; $('#bd-cancel').onclick=close;
+  ov.addEventListener('mousedown',ev=>{ if(ev.target===ov) close(); });
+  $('#bd-ok').onclick=()=>{ _tblApplyBorders(e,range,pend); liveStyleEl(e); snapshot(); close(); toast('테두리 적용됨'); };
+
+  paintStyles(); paintEdges(); renderPrev();
+}
+// 미리 설정 아이콘
+function _bdPresetIcon(p){
+  const L=2,T=2,R=22,B=18,xm=12,ym=10, F='#aab', A='#3b82f6';
+  const ln=(a,b,c,d,col,w)=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${col}" stroke-width="${w||1.4}"/>`;
+  let g=ln(L,T,R,T,F)+ln(L,B,R,B,F)+ln(L,T,L,B,F)+ln(R,T,R,B,F)+ln(L,ym,R,ym,F)+ln(xm,T,xm,B,F);
+  if(p==='none') return `<svg width="26" height="22" viewBox="0 0 24 20">${g}<line x1="3" y1="3" x2="21" y2="17" stroke="#e3506b" stroke-width="1.6"/></svg>`;
+  if(p==='outer') g+=ln(L,T,R,T,A,1.8)+ln(L,B,R,B,A,1.8)+ln(L,T,L,B,A,1.8)+ln(R,T,R,B,A,1.8);
+  if(p==='inner') g+=ln(L,ym,R,ym,A,1.8)+ln(xm,T,xm,B,A,1.8);
+  return `<svg width="26" height="22" viewBox="0 0 24 20">${g}</svg>`;
+}
+// 가장자리 버튼 공통 CSS + 아이콘
+const _bdEdgeBtnCss='width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);cursor:pointer;padding:0';
+function _bdEdgeIcon(edge){
+  const A='#3b82f6', F='#c4c4d2';
+  const ln=(a,b,c,d,col,w)=>`<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${col}" stroke-width="${w||1.4}" stroke-linecap="round"/>`;
+  const box=ln(3,3,17,3,F)+ln(3,17,17,17,F)+ln(3,3,3,17,F)+ln(17,3,17,17,F);
+  let a='';
+  if(edge==='top')a=ln(3,3,17,3,A,2);
+  else if(edge==='bottom')a=ln(3,17,17,17,A,2);
+  else if(edge==='left')a=ln(3,3,3,17,A,2);
+  else if(edge==='right')a=ln(17,3,17,17,A,2);
+  else if(edge==='innerH')a=ln(3,10,17,10,A,2);
+  else if(edge==='innerV')a=ln(10,3,10,17,A,2);
+  else if(edge==='d1')a=ln(3,3,17,17,A,2);
+  else if(edge==='d2')a=ln(3,17,17,3,A,2);
+  return `<svg width="20" height="20" viewBox="0 0 20 20">${box}${a}</svg>`;
 }
 function _tblCellAlign(e,r,c,align){
   _tblCellProp(e,r,c,'align',align);

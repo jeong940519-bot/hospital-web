@@ -1,11 +1,26 @@
 /* 발행 렌더링 공유 모듈 — 편집기(미리보기)와 공개 페이지(index.html)가 동일하게 사용. */
 (function(){
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-  // 표 셀 4방향 테두리 (cell.bd={t,r,b,l} 폭 오버라이드; 미지정=기본 e.borderW, 0=없음) — 편집기와 동일 규칙
+  // 표 셀 4방향 테두리 — 변별 폭/색/선스타일(cell.bd[side]= 숫자(레거시) | {w,c,s} | 0/{w:0}없음) — 편집기와 동일 규칙
+  function tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2):s==='dotted'?w+','+(w*1.6):''; }
+  function tblBdResolve(e,cell,side){
+    var def=(e.borderW!=null?e.borderW:1), dc=e.borderColor||'#333';
+    var v=cell&&cell.bd&&cell.bd[side];
+    if(v==null) return {w:def,c:dc,s:'solid'};
+    if(typeof v==='number') return {w:v,c:dc,s:'solid'};
+    return {w:(v.w!=null?v.w:def), c:v.c||dc, s:v.s||'solid'};
+  }
   function tblBorderCss(e,cell){
-    var col=e.borderColor||'#333', def=(e.borderW!=null?e.borderW:1);
-    function sd(s,css){ var bd=cell&&cell.bd; var w=(bd&&bd[s]!=null)?bd[s]:def; return 'border-'+css+':'+(w>0?(w+'px solid '+col):'0'); }
-    return [sd('t','top'),sd('r','right'),sd('b','bottom'),sd('l','left')].join(';');
+    var map={t:'top',r:'right',b:'bottom',l:'left'};
+    function sd(s){ var r=tblBdResolve(e,cell,s); return 'border-'+map[s]+':'+(r.w>0?(r.w+'px '+r.s+' '+r.c):'0'); }
+    return [sd('t'),sd('r'),sd('b'),sd('l')].join(';');
+  }
+  // 셀 대각선 SVG 오버레이(없으면 '')
+  function tblDiagSvg(e,cell){
+    if(!cell||!cell.bd||(!cell.bd.d1&&!cell.bd.d2)) return '';
+    function ln(v,x1,y1,x2,y2){ var r=tblBdResolve(e,{bd:{_:v}},'_'); return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+r.c+'" stroke-width="'+r.w+'" stroke-dasharray="'+tblDash(r.s,r.w)+'" vector-effect="non-scaling-stroke"/>'; }
+    var g=''; if(cell.bd.d1)g+=ln(cell.bd.d1,0,0,100,100); if(cell.bd.d2)g+=ln(cell.bd.d2,0,100,100,0);
+    return '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none">'+g+'</svg>';
   }
 
   /* 슬라이더 화살표/점 스타일 해석 — 편집기 미리보기와 발행본이 동일하게 사용(드리프트 방지).
@@ -369,8 +384,9 @@
           if(cell.merged) continue;   // 병합으로 가려진 칸
           var isHead=r===0;
           var spanAttr=cell.span?(' rowspan="'+cell.span.rs+'" colspan="'+cell.span.cs+'"'):'';
-          var tdS=tblBorderCss(e,cell)+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
-          thtml+='<td'+spanAttr+' style="'+tdS+'">'+esc(cell.text||'')+'</td>';
+          var diag=tblDiagSvg(e,cell);
+          var tdS=(diag?'position:relative;':'')+tblBorderCss(e,cell)+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
+          thtml+='<td'+spanAttr+' style="'+tdS+'">'+esc(cell.text||'')+diag+'</td>';
         }
         thtml+='</tr>';
       }
