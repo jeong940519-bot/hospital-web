@@ -2559,6 +2559,9 @@ function showTableCtx(x,y,e,ev){
   h+='<div class="ci" data-ta="clear-row">⌫ 이 행 내용 지우기</div>';
   h+='<div class="ci" data-ta="clear-col">⌫ 이 열 내용 지우기</div>';
   h+='<div class="ci" data-ta="clear-all">⌫ 표 전체 내용 지우기</div>';
+  // ─ 링크 (표 전체를 클릭 시 페이지 이동) ─
+  h+='<div class="sep"></div>';
+  h+=`<div class="ci" data-tl="link">🔗 ${e.link?`링크됨: ${escapeHtml((pageById(e.link)||{}).name||'페이지')} (변경/해제)`:'클릭 시 페이지 연결…'}</div>`;
 
   m.innerHTML=h; m.style.display='block';
   m.style.left=Math.min(x, window.innerWidth - m.offsetWidth - 8)+'px';
@@ -2595,6 +2598,7 @@ function showTableCtx(x,y,e,ev){
 
   // ─ 테이블 액션 바인딩 ─
   m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
+    if(it.dataset.tl==='link'){ showLinkMenu(x,y,e); return; }   // 기존 링크 메뉴(연결/변경/이동/해제)를 그대로 띄움
     const a=it.dataset.ta; if(!a) return;
     _tblEnsureWH(e);
     if(a==='ins-row-above'){
