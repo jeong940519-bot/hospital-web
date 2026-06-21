@@ -28,7 +28,7 @@ const auth = getAuth(fbApp);
 const functions = getFunctions(fbApp, 'asia-northeast3');
 const aiProxy = httpsCallable(functions, 'aiProxy');
 const fetchSite = httpsCallable(functions, 'fetchSite');
-const DOC_PATH = ['site','editorProject']; // 구 저장 경로 (마이그레이션용)
+const DOC_PATH = ['site','editorProject']; // 공개 홈(도메인 루트)이 읽는 발행본 문서 (🚀 발행이 여기에 씀 / 구 저장 마이그레이션도 겸함)
 let isAdmin = false, DEFAULT_AI_KEY = '';
 let _prjId = localStorage.getItem('hw_prj_id') || null; // 현재 활성 프로젝트 ID
 
@@ -2386,6 +2386,22 @@ async function cloudSave(name, targetId){
   }catch(e){ toast('클라우드 저장 실패: '+(e.message||e)); }
   finally{ btn.textContent=prev; }
 }
+// 발행 — 현재 프로젝트를 공개 홈(site/editorProject)에 덮어씀. 도메인 루트(/)가 이걸 읽는다.
+async function publishSite(){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  if(!confirm('현재 편집 중인 프로젝트를 공개 홈페이지로 발행할까요?\n도메인 루트(/)에 즉시 반영됩니다. (기존 공개본은 대체됩니다)')) return;
+  const btn=document.getElementById('btn-publish'); const prev=btn?btn.textContent:'';
+  if(btn){ btn.textContent='발행 중…'; btn.disabled=true; }
+  try{
+    await uploadEmbeddedImages();
+    const payload={ name: project.name||'홈페이지', data: JSON.stringify(project), updatedAt: new Date().toISOString() };
+    await setDoc(doc(db, DOC_PATH[0], DOC_PATH[1]), payload, {merge:true});
+    save(true); renderCanvas();
+    toast('🚀 발행 완료 — 공개 홈에 반영되었습니다');
+  }catch(e){ toast('발행 실패: '+(e.message||e)); }
+  finally{ if(btn){ btn.textContent=prev; btn.disabled=false; } }
+}
+document.getElementById('btn-publish')?.addEventListener('click', publishSite);
 async function loadCloud(){
   try{
     let snap;
