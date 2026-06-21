@@ -106,6 +106,12 @@
   .ctx-tbar .ct-vsep{width:1px;height:18px;background:var(--border);margin:0 1px;flex-shrink:0}
   .ctx-tbar .ct-color{width:26px;height:26px;border:1px solid var(--border);background:transparent;cursor:pointer;border-radius:4px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font-size:12px;line-height:1;position:relative}
   .ctx-tbar .ct-color .ct-bar{display:block;width:14px;height:3px;border-radius:1px}
+  /* 표 구조 버튼(2번째 줄) — 작은 라벨 버튼 */
+  .ctx-tbar .ct-tbtn{height:26px;padding:0 8px;border:none;background:transparent;color:var(--text);cursor:pointer;border-radius:4px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:3px;font-family:inherit;white-space:nowrap}
+  .ctx-tbar .ct-tbtn:hover{background:var(--panel2)}
+  .ctx-tbar .ct-tbtn.danger:hover{background:rgba(227,51,102,.16);color:#e36}
+  .ctx-tbar .ct-tbtn.link:hover{background:rgba(108,123,255,.16);color:var(--accent)}
+  .ctx-tbar.row2{border-top:1px solid var(--border);margin-top:2px;padding-top:5px}
 
   /* selection handles */
   .handle{position:absolute;width:11px;height:11px;background:#fff;border:2px solid var(--accent);border-radius:2px;z-index:50}

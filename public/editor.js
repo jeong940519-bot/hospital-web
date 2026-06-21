@@ -2579,22 +2579,20 @@ function showTableCtx(x,y,e,ev){
   h+=`<button class="ct-btn" id="ct-bw-dn" title="테두리 −" style="font-size:9px">▬</button>`;
   h+='</div>';
 
-  // ─ 테이블 액션 메뉴 ─
-  h+='<div class="sep"></div>';
-  h+='<div class="ci" data-ta="ins-row-above">↑ 위에 행 삽입</div>';
-  h+='<div class="ci" data-ta="ins-row-below">↓ 아래에 행 삽입</div>';
-  h+='<div class="ci" data-ta="ins-col-left">← 왼쪽에 열 삽입</div>';
-  h+='<div class="ci" data-ta="ins-col-right">→ 오른쪽에 열 삽입</div>';
-  h+='<div class="sep"></div>';
-  if(e.rows>1) h+='<div class="ci" data-ta="del-row">🗑 이 행 삭제</div>';
-  if(e.cols>1) h+='<div class="ci" data-ta="del-col">🗑 이 열 삭제</div>';
-  if(e.rows>1||e.cols>1) h+='<div class="sep"></div>';
-  h+='<div class="ci" data-ta="clear-row">⌫ 이 행 내용 지우기</div>';
-  h+='<div class="ci" data-ta="clear-col">⌫ 이 열 내용 지우기</div>';
-  h+='<div class="ci" data-ta="clear-all">⌫ 표 전체 내용 지우기</div>';
-  // ─ 링크 (표 전체를 클릭 시 페이지 이동) ─
-  h+='<div class="sep"></div>';
-  h+=`<div class="ci" data-tl="link">🔗 ${e.link?`링크됨: ${escapeHtml((pageById(e.link)||{}).name||'페이지')} (변경/해제)`:'클릭 시 페이지 연결…'}</div>`;
+  // ─ 표 구조 (2번째 줄, PPT식 아이콘 툴바) ─
+  h+='<div class="ctx-tbar row2">';
+  h+='<button class="ct-tbtn" data-ta="ins-row-above" title="위에 행 삽입">＋행<span style="font-size:9px">▲</span></button>';
+  h+='<button class="ct-tbtn" data-ta="ins-row-below" title="아래에 행 삽입">＋행<span style="font-size:9px">▼</span></button>';
+  h+='<button class="ct-tbtn" data-ta="ins-col-left" title="왼쪽에 열 삽입">＋열<span style="font-size:9px">◀</span></button>';
+  h+='<button class="ct-tbtn" data-ta="ins-col-right" title="오른쪽에 열 삽입">＋열<span style="font-size:9px">▶</span></button>';
+  h+='<div class="ct-vsep"></div>';
+  if(e.rows>1) h+='<button class="ct-tbtn danger" data-ta="del-row" title="이 행 삭제">－행</button>';
+  if(e.cols>1) h+='<button class="ct-tbtn danger" data-ta="del-col" title="이 열 삭제">－열</button>';
+  h+='<div class="ct-vsep"></div>';
+  h+=`<button class="ct-tbtn" data-ta="clear-sel" title="${targets.length>1?'선택한 칸':'이 칸'} 내용 지우기">⌫ 지우기</button>`;
+  h+='<div class="ct-vsep"></div>';
+  h+=`<button class="ct-tbtn link" data-tl="link" title="${e.link?'링크 변경/해제':'클릭 시 페이지로 이동 링크'}">🔗 ${e.link?'링크됨':'링크'}</button>`;
+  h+='</div>';
 
   m.innerHTML=h; m.style.display='block';
   m.style.left=Math.min(x, window.innerWidth - m.offsetWidth - 8)+'px';
@@ -2630,7 +2628,7 @@ function showTableCtx(x,y,e,ev){
   $c('ct-bw-dn').onclick=()=>{ e.borderW=Math.max(0,(e.borderW||1)-1); _live(); };
 
   // ─ 테이블 액션 바인딩 ─
-  m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
+  m.querySelectorAll('[data-ta],[data-tl]').forEach(it=>it.addEventListener('click',()=>{
     if(it.dataset.tl==='link'){ showLinkMenu(x,y,e); return; }   // 기존 링크 메뉴(연결/변경/이동/해제)를 그대로 띄움
     const a=it.dataset.ta; if(!a) return;
     _tblEnsureWH(e);
@@ -2662,12 +2660,9 @@ function showTableCtx(x,y,e,ev){
       e.cells=e.cells.filter(c=>c.c!==clickC);
       e.cells.forEach(c=>{ if(c.c>clickC) c.c--; });
       e.colWidths.splice(clickC,1); e.cols--; e.w=Math.max(120,e.w-cw);
-    }else if(a==='clear-row'){
-      e.cells.forEach(c=>{ if(c.r===clickR) c.text=''; });
-    }else if(a==='clear-col'){
-      e.cells.forEach(c=>{ if(c.c===clickC) c.text=''; });
-    }else if(a==='clear-all'){
-      e.cells.forEach(c=>{ c.text=''; });
+    }else if(a==='clear-sel'){
+      const tg=_tblTargets(e,clickR,clickC); const set=new Set(tg.map(t=>t.r+'_'+t.c));
+      e.cells.forEach(c=>{ if(set.has(c.r+'_'+c.c)) c.text=''; });
     }
     afterMutate(); hideCtx();
   }));
