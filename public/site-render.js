@@ -54,7 +54,7 @@
     var bw=(t.borderW!=null?+t.borderW:0);
     var gap=(t.gap!=null?+t.gap:(pill?6:0));     // 항목 사이 간격(독립 조절)
     var pad=(t.pad!=null?+t.pad:(pill?6:0));
-    var innerR=pill?Math.max(4,radius-pad):0;
+    var itemR=(t.itemRadius!=null?+t.itemRadius:(pill?Math.max(4,radius-pad):0));   // 칸(글자 박스) 둥글기
     var container='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
       +';font-size:'+(+(t.fontSize||15))+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
       +';border-radius:'+radius+'px;display:flex;flex-direction:'+dir+';align-items:stretch'
@@ -66,9 +66,8 @@
     var itemBase='flex:1 1 0;min-width:0;display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer;padding:2px 8px;white-space:pre-line;text-decoration:none;color:inherit;overflow:hidden';
     var divCss=(dir==='column')?'border-top:1px solid rgba(255,255,255,.28)':'border-left:1px solid rgba(255,255,255,.28)';
     function itemStyle(it,i){
-      var s=itemBase;
-      if(pill){ s+=';border-radius:'+innerR+'px'; }
-      else if(i>0 && gap<=0){ s+=';'+divCss; }   // 간격이 있으면 구분선 대신 여백
+      var s=itemBase+';border-radius:'+itemR+'px';
+      if(!pill && i>0 && gap<=0){ s+=';'+divCss; }   // 간격이 있으면 구분선 대신 여백
       if(it&&it.bg) s+=';background:'+it.bg;
       if(it&&it.color) s+=';color:'+it.color;
       return s;

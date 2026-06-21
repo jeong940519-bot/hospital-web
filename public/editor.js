@@ -855,7 +855,7 @@ let _fixTabSel=null;
 let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
 let _fixPopupT=null; // 현재 열린 고정탭 팝업의 대상 탭(색 선택 후 스와치 갱신용)
 // 색 선택 직후 고정탭 팝업의 스와치를 즉시 갱신(위치 유지). 팝업이 없으면 무시.
-function _fixRefreshPopup(){ const p=document.getElementById('fixtab-popup'); if(p&&_fixPopupT){ const r=p.getBoundingClientRect(); openFixTabPopup(_fixPopupT, r.left, r.top); } }
+function _fixRefreshPopup(){ const p=document.getElementById('fixtab-popup'); if(p&&_fixPopupT){ const r=p.getBoundingClientRect(); openFixTabPopup(_fixPopupT, r.left, r.top, r.width, r.height); } }
 function fixedTabs(){ if(!project.fixedTabs) project.fixedTabs=[]; return project.fixedTabs; }
 function _fixTab(){ return fixedTabs().find(t=>t.id===_fixTabSel)||null; }
 function _fixSave(){ renderFixTabsOnCanvas(); save(true); }
@@ -959,7 +959,7 @@ function startFixTabResize(ev,t,pos){
   function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
   window.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
 }
-function openFixTabPopup(t,x,y){
+function openFixTabPopup(t,x,y,pw,ph){
   document.getElementById('fixtab-popup')?.remove();
   _fixPopupT=t;
   const items=fixTabItemsOf(t), dir=(t.dir==='col')?'col':'row';
@@ -991,7 +991,7 @@ function openFixTabPopup(t,x,y){
       <div style="display:flex;gap:6px;margin-top:6px">${isw(i,'bg',it.bg,'배경')}${isw(i,'color',it.color,'글자')}</div>
     </div>`).join('');
   const pop=document.createElement('div'); pop.id='fixtab-popup';
-  pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:9500;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px`;
+  pop.style.cssText=`position:fixed;left:${Math.max(8,Math.min(x,innerWidth-296))}px;top:${Math.max(8,Math.min(y,innerHeight-440))}px;z-index:9500;background:var(--panel,#fff);color:var(--text,#222);border:1px solid var(--border,#e2e2ee);border-radius:13px;box-shadow:0 14px 44px rgba(0,0,0,.26);padding:13px 14px;width:276px;max-height:84vh;overflow:auto;font-size:12px;resize:both;min-width:240px;min-height:150px`;
   pop.addEventListener('mousedown',ev=>ev.stopPropagation());
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
   pop.innerHTML=`
@@ -1017,6 +1017,7 @@ function openFixTabPopup(t,x,y){
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">항목 간격</span><input type="number" id="ft-gap" value="${t.gap!=null?t.gap:''}" placeholder="자동" style="${IN}"></label>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-end">
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">칸 둥글기</span><input type="number" id="ft-irad" value="${t.itemRadius!=null?t.itemRadius:''}" placeholder="자동" style="${IN}"></label>
       <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${t.borderW||0}" style="${IN}"></label>
       <div style="flex:1.2;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 색</span>${swatch('fixTabBorder',t.borderColor||'#e2e2ee')}</div>
     </div>
@@ -1027,14 +1028,17 @@ function openFixTabPopup(t,x,y){
     </div>
     <button id="ft-del" style="width:100%;margin-top:11px;padding:7px;border-radius:8px;border:1px solid #e36;background:transparent;color:#e36;cursor:pointer;font-weight:600">🗑 이 고정탭 삭제</button>`;
   document.body.appendChild(pop);
-  // 실제 높이 기준으로 화면 안에 들어오게 보정(아래 잘림 방지)
+  // 사용자가 조절한 크기 유지(재오픈 시)
+  if(pw){ pop.style.width=pw+'px'; }
+  if(ph){ pop.style.height=ph+'px'; pop.style.maxHeight='none'; }
+  // 실제 크기 기준으로 화면 안에 들어오게 보정(아래 잘림 방지)
   const rc=pop.getBoundingClientRect();
   let px=Math.max(8,Math.min(x,innerWidth-rc.width-8));
   let py=Math.max(8,Math.min(y,innerHeight-rc.height-8));
   pop.style.left=px+'px'; pop.style.top=py+'px';
   const q=id=>pop.querySelector('#'+id);
   // 재렌더(항목 추가/삭제/동작변경)해도 옮겨둔 위치 유지
-  const reopen=()=>{ const r=pop.getBoundingClientRect(); openFixTabPopup(t, r.left, r.top); };
+  const reopen=()=>{ const r=pop.getBoundingClientRect(); openFixTabPopup(t, r.left, r.top, r.width, r.height); };
   // 헤더 드래그로 창 이동
   const head=q('ft-head');
   head.addEventListener('mousedown',ev=>{
@@ -1064,6 +1068,8 @@ function openFixTabPopup(t,x,y){
   q('ft-bw').addEventListener('change',()=>snapshot());
   q('ft-gap').addEventListener('input',()=>{ const v=q('ft-gap').value.trim(); t.gap=(v===''?null:(parseInt(v)||0)); _fixSave(); });
   q('ft-gap').addEventListener('change',()=>snapshot());
+  q('ft-irad').addEventListener('input',()=>{ const v=q('ft-irad').value.trim(); t.itemRadius=(v===''?null:(parseInt(v)||0)); _fixSave(); });
+  q('ft-irad').addEventListener('change',()=>snapshot());
   // 항목별 색 스와치: 클릭 시 대상 항목 인덱스 지정 + 토글 모호성 제거(항상 새로 열기)
   pop.querySelectorAll('.ft-isw').forEach(b=>b.addEventListener('click',()=>{ _fixItemIdx=+b.dataset.i; _cpTarget=null; }));
   q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
