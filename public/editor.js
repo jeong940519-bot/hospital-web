@@ -731,7 +731,6 @@ function renderEl(e){
   }
   if(e.type==='table'){
     node.style.overflow='visible'; node.style.position='absolute';
-    if(e.radius) node.style.borderRadius=e.radius+'px';
     if(!e.colWidths||e.colWidths.length!==e.cols){ e.colWidths=Array(e.cols).fill(Math.round(e.w/e.cols)); }
     if(!e.rowHeights||e.rowHeights.length!==e.rows){ e.rowHeights=Array(e.rows).fill(Math.round(e.h/e.rows)); }
     // colWidths/rowHeights 합을 e.w/e.h에 정규화
@@ -739,6 +738,9 @@ function renderEl(e){
     if(cwSum>0&&cwSum!==e.w){ const s=e.w/cwSum; e.colWidths=e.colWidths.map((v,i,a)=>i<a.length-1?Math.round(v*s):0); e.colWidths[e.colWidths.length-1]=e.w-e.colWidths.slice(0,-1).reduce((a,b)=>a+b,0); }
     const rhSum=e.rowHeights.reduce((a,b)=>a+b,0);
     if(rhSum>0&&rhSum!==e.h){ const s=e.h/rhSum; e.rowHeights=e.rowHeights.map((v,i,a)=>i<a.length-1?Math.round(v*s):0); e.rowHeights[e.rowHeights.length-1]=e.h-e.rowHeights.slice(0,-1).reduce((a,b)=>a+b,0); }
+    // 둥근 모서리: 래퍼가 표를 클리핑(node는 핸들 때문에 overflow:visible 유지)
+    const wrap=document.createElement('div');
+    wrap.style.cssText=`position:absolute;inset:0;overflow:hidden${e.radius?`;border-radius:${e.radius}px`:''}`;
     const tbl=document.createElement('table');
     tbl.style.cssText=`width:100%;height:100%;border-collapse:collapse;table-layout:fixed;cursor:default;font-family:'${e.fontFamily||'Noto Sans KR'}',sans-serif;font-size:${e.fontSize||14}px`;
     const cg=document.createElement('colgroup');
@@ -763,7 +765,7 @@ function renderEl(e){
       }
       tbl.appendChild(tr);
     }
-    node.appendChild(tbl);
+    wrap.appendChild(tbl); node.appendChild(wrap);
     // column resize handles — px 기준으로 정확히 배치
     let cx=0;
     for(let c=0;c<e.cols-1;c++){
