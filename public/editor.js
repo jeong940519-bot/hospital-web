@@ -753,7 +753,7 @@ function renderEl(e){
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=> startDrag(ev,e));
   node.addEventListener('dblclick', ev=>{ if(e.type==='text'||e.type==='shape') startEdit(node,e); else if(e.type==='table') startTableEdit(node,e,ev); });
-  node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); showLinkMenu(ev.clientX, ev.clientY, e); });
+  node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); if(e.type==='table') showTableCtx(ev.clientX, ev.clientY, e, ev); else showLinkMenu(ev.clientX, ev.clientY, e); });
   return node;
 }
 
@@ -2337,14 +2337,22 @@ function shapeIconStyle(k){
   const grid=document.getElementById('table-grid');
   const label=document.getElementById('table-grid-label');
   let hCols=3,hRows=3;
+  function updateHighlight(){
+    grid.querySelectorAll('[data-gr]').forEach(cell=>{
+      const r=+cell.dataset.gr, c=+cell.dataset.gc;
+      const on=r<hRows&&c<hCols;
+      cell.style.background=on?'var(--accent)':'';
+      cell.style.borderColor=on?'var(--accent)':'var(--border)';
+    });
+    label.textContent=`${hCols} × ${hRows}`;
+  }
   function buildGrid(){
     let html='';
     for(let r=0;r<6;r++) for(let c=0;c<8;c++){
-      const on=(r<hRows&&c<hCols)?'background:var(--accent);border-color:var(--accent)':'';
-      html+=`<div data-gr="${r}" data-gc="${c}" style="width:28px;height:20px;border:1px solid var(--border);border-radius:3px;cursor:pointer;${on}"></div>`;
+      html+=`<div data-gr="${r}" data-gc="${c}" style="width:28px;height:20px;border:1px solid var(--border);border-radius:3px;cursor:pointer"></div>`;
     }
     grid.innerHTML=html;
-    label.textContent=`${hCols} × ${hRows}`;
+    updateHighlight();
   }
   buildGrid();
   grid.addEventListener('mouseover',ev=>{
@@ -2352,7 +2360,7 @@ function shapeIconStyle(k){
     hRows=+t.dataset.gr+1; hCols=+t.dataset.gc+1;
     document.getElementById('tbl-cols').value=hCols;
     document.getElementById('tbl-rows').value=hRows;
-    buildGrid();
+    updateHighlight();
   });
   grid.addEventListener('click',ev=>{
     if(ev.target.dataset.gr==null) return;
@@ -2441,6 +2449,74 @@ function showLinkMenu(x,y,e){
     hideCtx();
   }));
 }
+// ── 표 전용 우클릭 메뉴 (PPT식) ──
+function showTableCtx(x,y,e,ev){
+  const m=document.getElementById('ctx-menu');
+  const td=ev.target.closest('td');
+  const clickR=td?+td.dataset.row:0, clickC=td?+td.dataset.col:0;
+  let h='<div class="head">▦ 표 편집</div>';
+  h+='<div class="ci" data-ta="ins-row-above">↑ 위에 행 삽입</div>';
+  h+='<div class="ci" data-ta="ins-row-below">↓ 아래에 행 삽입</div>';
+  h+='<div class="ci" data-ta="ins-col-left">← 왼쪽에 열 삽입</div>';
+  h+='<div class="ci" data-ta="ins-col-right">→ 오른쪽에 열 삽입</div>';
+  h+='<div class="sep"></div>';
+  if(e.rows>1) h+='<div class="ci" data-ta="del-row">🗑 이 행 삭제</div>';
+  if(e.cols>1) h+='<div class="ci" data-ta="del-col">🗑 이 열 삭제</div>';
+  h+='<div class="sep"></div>';
+  h+='<div class="ci" data-ta="clear-row">⌫ 이 행 내용 지우기</div>';
+  h+='<div class="ci" data-ta="clear-col">⌫ 이 열 내용 지우기</div>';
+  h+='<div class="ci" data-ta="clear-all">⌫ 표 전체 내용 지우기</div>';
+  h+='<div class="sep"></div>';
+  h+='<div class="ci" data-ta="add-row">＋ 맨 아래 행 추가</div>';
+  h+='<div class="ci" data-ta="add-col">＋ 맨 오른쪽 열 추가</div>';
+  m.innerHTML=h; m.style.display='block';
+  m.style.left=Math.min(x, window.innerWidth - m.offsetWidth - 8)+'px';
+  m.style.top=Math.min(y, window.innerHeight - m.offsetHeight - 8)+'px';
+  m.querySelectorAll('.ci').forEach(it=>it.addEventListener('click',()=>{
+    const a=it.dataset.ta;
+    if(a==='ins-row-above'){
+      e.cells.forEach(c=>{ if(c.r>=clickR) c.r++; });
+      for(let c=0;c<e.cols;c++) e.cells.push({r:clickR,c,text:''});
+      e.rows++; e.h+=40;
+    }else if(a==='ins-row-below'){
+      const nr=clickR+1;
+      e.cells.forEach(c=>{ if(c.r>=nr) c.r++; });
+      for(let c=0;c<e.cols;c++) e.cells.push({r:nr,c,text:''});
+      e.rows++; e.h+=40;
+    }else if(a==='ins-col-left'){
+      e.cells.forEach(c=>{ if(c.c>=clickC) c.c++; });
+      for(let r=0;r<e.rows;r++) e.cells.push({r,c:clickC,text:''});
+      e.cols++; e.w+=120;
+    }else if(a==='ins-col-right'){
+      const nc=clickC+1;
+      e.cells.forEach(c=>{ if(c.c>=nc) c.c++; });
+      for(let r=0;r<e.rows;r++) e.cells.push({r,c:nc,text:''});
+      e.cols++; e.w+=120;
+    }else if(a==='del-row'&&e.rows>1){
+      e.cells=e.cells.filter(c=>c.r!==clickR);
+      e.cells.forEach(c=>{ if(c.r>clickR) c.r--; });
+      e.rows--; e.h=Math.max(40,e.h-40);
+    }else if(a==='del-col'&&e.cols>1){
+      e.cells=e.cells.filter(c=>c.c!==clickC);
+      e.cells.forEach(c=>{ if(c.c>clickC) c.c--; });
+      e.cols--; e.w=Math.max(120,e.w-120);
+    }else if(a==='clear-row'){
+      e.cells.forEach(c=>{ if(c.r===clickR) c.text=''; });
+    }else if(a==='clear-col'){
+      e.cells.forEach(c=>{ if(c.c===clickC) c.text=''; });
+    }else if(a==='clear-all'){
+      e.cells.forEach(c=>{ c.text=''; });
+    }else if(a==='add-row'){
+      for(let c=0;c<e.cols;c++) e.cells.push({r:e.rows,c,text:''});
+      e.rows++; e.h+=40;
+    }else if(a==='add-col'){
+      for(let r=0;r<e.rows;r++) e.cells.push({r,c:e.cols,text:''});
+      e.cols++; e.w+=120;
+    }
+    afterMutate(); hideCtx();
+  }));
+}
+
 function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; }
 window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu')) hideCtx(); });
 window.addEventListener('blur',hideCtx);
