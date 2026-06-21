@@ -3176,7 +3176,7 @@ document.getElementById('ai-go').onclick=async()=>{
 - text: {"type":"text","x","y","w","h","text":"실제 문구","fontSize":숫자,"fontWeight":300~900,"color":"#hex","align":"left|center|right"}
 - shape: {"type":"shape","x","y","w","h","shape":"rect|rrect|circle","fill":"#hex","radius":숫자} ← 섹션 배경·카드·버튼 박스에 사용
 - image: {"type":"image","x","y","w","h"} ← src는 넣지 마라(자동으로 사진 자리표시자가 들어간다)
-- table: {"type":"table","x","y","w","h","cols":열수,"rows":행수,"cells":[{"r":0,"c":0,"text":"머리행항목"},...],"headerBg":"#hex","headerColor":"#fff","cellBg":"#fff","cellColor":"#333","fontSize":14,"borderW":1,"borderColor":"#ddd"} ← 진료시간·의료진·가격 등 표가 필요할 때. 첫 행(r:0)이 머리행.
+- table: {"type":"table","x","y","w","h","cols":열수,"rows":행수,"cells":[{"r":0,"c":0,"text":"머리행항목"},...],"headerBg":"#hex","headerColor":"#fff","cellBg":"#fff","cellColor":"#333","fontSize":14,"borderW":1,"borderColor":"#ddd"} ← 진료시간·의료진·진료과목·가격·오시는길 안내 등 정보가 표로 정리되면 좋을 때 적극 활용. 첫 행(r:0)이 머리행. cells는 실제 한국어 내용으로 빠짐없이 채워라(placeholder 금지). w≈cols×140, h≈rows×44.
 규칙:
 - 색상(bg, fill, color)은 참고 자료의 톤에 맞춰라.
 - 문구는 참고 자료에 있으면 반영하고, 없으면 병원에 어울리는 **자연스러운 한국어 문구를 직접 작성**하라. "제목","본문" 같은 자리표시자는 쓰지 마라.
@@ -3184,7 +3184,8 @@ document.getElementById('ai-go').onclick=async()=>{
 - fontFamily는 보통 생략(기본 본고딕). 강조 제목엔 "Black Han Sans","Do Hyeon" 등을 써도 된다.
 - **맨 아래에 푸터 섹션**을 넣어라: 어두운 배경 띠(폭 전체 shape) 위에 병원명·주소·전화·진료시간·저작권(© 2026 …)을 흰/연한 글자로.
 - **주요 요소에 진입 효과를 절제해서 "fx"로 넣어도 된다**(없어도 됨): 큰 제목 {"type":"char-reveal"}, 히어로/큰 사진 {"type":"mask-wipe"} 또는 {"type":"blur-in"}, 같은 줄 카드들 {"type":"scroll-reveal","dir":"up","delay":0/100/200}(스태거). 과하지 않게, 본문·작은 글자엔 금지.
-출력: 오직 {"name":"..","bg":"#hex","elements":[..]} JSON 하나. 마크다운/설명/주석 금지. 큰따옴표·정수·트레일링콤마 없음·끝까지 완성된 유효 JSON.
+- **고정탭(선택)**: 최상위에 "fixedTabs":[{"corner":"br","dir":"col","bg":"#hex","color":"#fff","radius":26,"items":[{"label":"📞 전화상담","action":"url","url":"tel:"},{"label":"예약하기","action":"top"}]}] 를 넣으면 화면 모서리에 항상 떠 있는 플로팅 버튼이 생긴다(전 페이지 공통). 병원 페이지엔 전화/예약 같은 상시 버튼이 유용하니 1개 정도 권장(과하면 생략). corner=tl|tr|bl|br, action=top(맨위로)|url(외부·tel:전화)|link(내부페이지).
+출력: 오직 {"name":"..","bg":"#hex","elements":[..],"fixedTabs":[..](선택)} JSON 하나. 마크다운/설명/주석 금지. 큰따옴표·정수·트레일링콤마 없음·끝까지 완성된 유효 JSON.
 스키마 예시(형식 참고용, 그대로 베끼지 말 것):
 ${SCHEMA_EXAMPLE}`;
   let userText = desc ? `요청: ${desc}` : '참고 자료의 분위기에 맞춰 보기 좋은 병원 페이지를 만들어줘.';
@@ -3232,6 +3233,10 @@ ${SCHEMA_EXAMPLE}`;
       if(spec.name) p.name=spec.name;
       if(spec.bg) p.bg=spec.bg;
       p.elements=newEls; selId=null; selIds=new Set();
+      // 고정탭(선택) — 전 페이지 공통이라 이미 있으면 중복 생성 방지
+      if(Array.isArray(spec.fixedTabs) && spec.fixedTabs.length && !(project.fixedTabs&&project.fixedTabs.length)){
+        applyAiActions(spec.fixedTabs.map(ft=>({type:'add_fixtab',fixtab:ft})));
+      }
     }
     document.getElementById('ai-modal').style.display='none';
     aiRefImgs=[]; renderAiThumbs();
@@ -3341,7 +3346,15 @@ function buildAiCtx(scope){
   const head = scoped
     ? `페이지 "${p.name}"${dev} 중 ★선택된 섹션★ ${list.length}개 요소만 대상 (이 요소들 외엔 절대 건드리지 말 것). 캔버스 ${p.w}×${p.h}px:\n`
     : `페이지: "${p.name}"${dev} ${p.w}×${p.h}px 배경=${p.bg}\n요소(${p.elements.length}개):\n`;
-  return head+rows.join('\n');
+  let out = head+rows.join('\n');
+  // 고정탭(모든 페이지 공통, 페이지 요소 아님)
+  if(!scoped && project.fixedTabs && project.fixedTabs.length){
+    out += '\n\n[고정탭 — 전 페이지 공통 플로팅 탭] '+project.fixedTabs.map(t=>{
+      const its=(t.items||[]).map(i=>i.label).filter(Boolean).join('/');
+      return `id="${t.id}" 위치=${t.corner||'br'} 항목=[${its}]`;
+    }).join(' · ');
+  }
+  return out;
 }
 
 function applyAiActions(actions){
@@ -3399,6 +3412,33 @@ function applyAiActions(actions){
       }
     } else if(a.type==='group'){ const ids=a.ids||[]; if(ids.length>=2){ const gid='grp_'+uid(); ids.forEach(id=>{const e=el(id);if(e)e.groupId=gid;}); changed=true; } }
     else if(a.type==='ungroup'){ (a.ids||[]).forEach(id=>{const e=el(id);if(e&&e.groupId){delete e.groupId;changed=true;}}); }
+    else if(a.type==='add_fixtab'){
+      // 고정탭(플로팅 탭) 생성 — project.fixedTabs에 추가. 페이지 요소가 아님.
+      const ft=a.fixtab||{};
+      const roots=hamburgerRootPages();
+      const items=(Array.isArray(ft.items)&&ft.items.length?ft.items:[{label:'예약',action:'top'}]).map(it=>{
+        const o={ label:(it.label!=null?it.label:'메뉴'), action:(it.action==='link'||it.action==='url')?it.action:'top',
+          link:it.link||(roots[0]&&roots[0].id)||'', url:it.url||'' };
+        if(it.bg) o.bg=it.bg; if(it.color) o.color=it.color; return o;
+      });
+      const corner=/^[tb][lr]$/.test(ft.corner)?ft.corner:'br';
+      const t={ id:uid(), items, dir:(ft.dir==='col'?'col':'row'), corner,
+        dx:(ft.dx!=null?ft.dx:24), dy:(ft.dy!=null?ft.dy:24),
+        w:ft.w||118, h:ft.h||46, bg:ft.bg||'#2b6cff', color:ft.color||'#ffffff',
+        fontSize:ft.fontSize||15, fontWeight:ft.fontWeight||700, fontFamily:ft.fontFamily||'Noto Sans KR',
+        radius:(ft.radius!=null?ft.radius:23), device:ft.device||'both' };
+      if(ft.borderW) t.borderW=ft.borderW; if(ft.borderColor) t.borderColor=ft.borderColor;
+      if(ft.fx&&ft.fx.type) t.fx=ft.fx;
+      if(!project.fixedTabs) project.fixedTabs=[];
+      project.fixedTabs.push(t); changed=true;
+    }
+    else if(a.type==='delete_fixtab'){
+      if(project.fixedTabs&&a.id){ const i=project.fixedTabs.findIndex(x=>x.id===a.id); if(i>=0){ project.fixedTabs.splice(i,1); changed=true; } }
+    }
+    else if(a.type==='update_fixtab'){
+      const t=(project.fixedTabs||[]).find(x=>x.id===a.id);
+      if(t&&a.props&&typeof a.props==='object'){ const pr={...a.props}; delete pr.id; Object.assign(t,pr); changed=true; }
+    }
   }
   return changed;
 }
@@ -3444,12 +3484,15 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 6. {"type":"align_elements","ids":["id1","id2",...],"mode":"left"|"cx"|"right"|"top"|"cy"|"bottom","to":"page"|"selection"} ← 정렬(가운데=cx/cy). 페이지 기준 또는 선택개체끼리
 7. {"type":"distribute_elements","ids":[...],"axis":"h"|"v"} ← 3개 이상 균등 간격
 8. {"type":"group","ids":[...]} / {"type":"ungroup","ids":[...]} ← 그룹 묶기/풀기
+9. {"type":"add_fixtab","fixtab":{corner,dx,dy,w,h,bg,color,fontSize,fontWeight,radius,dir,device,items:[{label,action,link,url,bg,color}],fx}} ← 고정탭(화면 모서리 플로팅 버튼·전 페이지 공통)
+   {"type":"update_fixtab","id":"탭ID","props":{...}} / {"type":"delete_fixtab","id":"탭ID"}
 
 속성 참고:
 텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right|justify), valign(top|middle|bottom), lineHeight(0.8~2.5), letterSpacing, italic/underline/strike(bool), highlight(#hex|null), bullet(none|disc|number)
 도형: fill(#hex), shape(rect|rrect|circle|line|line-arrow 등), radius, borderW, borderColor(#hex), fillOpacity(0~100), 내부글자=stext/stColor/stSize
 이미지: fit(cover|contain), clip(none|circle), radius, borderW, borderColor (src는 바꾸지 마라)
-표: cols(열수), rows(행수), cells:[{r:행,c:열,text:"셀내용"},...], headerBg(#hex 머리행배경), headerColor(#hex 머리행글자), cellBg(#hex 본문배경), cellColor(#hex 본문글자), fontSize, fontWeight, headerWeight, borderW, borderColor, radius. 사용자가 표를 붙여넣거나 "표 만들어줘"라고 하면 type:"table"로 add_element. 첫 행(r:0)은 머리행.
+표(type:"table"): cols(열수), rows(행수), cells:[{r:행,c:열,text:"셀내용",bg,color,align},...], colWidths:[열별px] rowHeights:[행별px](생략 시 균등), headerBg(#hex 머리행배경), headerColor(#hex 머리행글자), cellBg(#hex 본문배경), cellColor(#hex 본문글자), fontSize, fontWeight, headerWeight, borderW, borderColor, radius. 첫 행(r:0)은 머리행. 사용자가 표를 붙여넣거나 "표/진료시간표/가격표/의료진표 만들어줘"라고 하면 type:"table"로 add_element하고, 붙여넣은 데이터를 cells에 빠짐없이 채워라(빈 placeholder 금지). cols×rows는 실제 데이터에 맞추고, w는 cols×약140, h는 rows×약44로 잡아라.
+고정탭(fixtab): corner(tl|tr|bl|br 화면 모서리), dx/dy(모서리에서 px 여백·기본24), w/h, bg/color(탭 배경·글자색), radius(둥글기·기본23이면 알약형), fontSize/fontWeight, dir(row 가로|col 세로 여러 항목), device(both|pc|mobile), items[]=항목들. 각 item: label(글자), action("top"=맨위로 | "link"=내부페이지(link=페이지ID) | "url"=외부링크(url)), 항목별 bg/color 가능. 전화상담·예약·카카오톡·맨위로 같은 상시 버튼에 쓴다. fx로 등장/펄스 효과도 가능.
 이펙트 fx: {type:"scroll-reveal",dir:"up"|"left"|"right"|"fade",delay:ms} | {type:"char-reveal",mode:"char"|"word",stagger:40}(텍스트 전용·글자 등장) | {type:"parallax",speed:0.15}(스크롤 패럴랙스) | {type:"scroll-scrub",mode:"both"|"scale"|"fade"}(스크롤 확대/페이드) | {type:"bg-video",src:"URL",kind:"mp4"|"youtube"|"vimeo"}(도형/이미지 배경영상) | {type:"sticky"}(상단 고정) | {type:"hover-expand",collapsedH:px} | {type:"hover-show"|"hover-hide",group:"ID"} | {type:"tab-trigger"|"tab-content",group:"ID",idx:0} | {type:"hover-zoom"} | {type:"counter",from:0,to:100,suffix:"",dur:2000} | {type:"slider",slides:[],auto:true,arrows:true,dots:true,interval:3000}
 진입(스크롤 시 1회): {type:"mask-wipe"|"mask-wipe-l"|"rotate-in"|"blur-in"|"skew-in"|"flip-in"|"zoom-in"|"zoom-out"|"bounce-in"|"fade-in"|"slide-down"|"slide-right"|"slide-left"|"flip-y"|"pop-in"} (옵션 없음)
 상시 루프: {type:"float"|"pulse"|"spin"|"wobble"|"shake"|"heartbeat"|"tada"|"swing"|"glow-loop"|"blink"} | {type:"gradient-flow"}(그라데이션 채운 도형) | {type:"marquee"}(텍스트만)
@@ -3470,12 +3513,22 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 - "가운데/정렬/같은 간격"은 각 요소의 x(또는 y)를 직접 계산해 update_element로 맞춰라(가로 가운데 x=(페이지폭-요소폭)/2). 여러 개면 한 번에 여러 action.
 - 색/문구만 바꾸라면 위치·크기는 그대로.
 
-[예시]
+[예시1] 버튼 추가
 사용자: "제목 키우고 가운데, 그 아래 파란 예약 버튼 추가"
 응답: {"reply":"제목을 키워 가운데 정렬하고 아래에 파란 예약 버튼을 추가했어요.","actions":[
  {"type":"update_element","id":"abc","props":{"fontSize":56,"align":"center","x":0,"w":${page().w}}},
  {"type":"add_element","element":{"type":"shape","shape":"rrect","x":${Math.round(page().w/2-120)},"y":300,"w":240,"h":64,"fill":"#2b6cff","radius":32}},
  {"type":"add_element","element":{"type":"text","x":${Math.round(page().w/2-120)},"y":300,"w":240,"h":64,"text":"진료 예약","fontSize":22,"fontWeight":700,"color":"#ffffff","align":"center","valign":"middle"}}
+]}
+[예시2] 표 만들기
+사용자: "진료시간표 만들어줘 평일 9~6, 토요일 9~1, 일요일 휴진"
+응답: {"reply":"진료시간표를 추가했어요.","actions":[
+ {"type":"add_element","element":{"type":"table","x":${Math.round(page().w/2-280)},"y":260,"w":560,"h":220,"cols":2,"rows":5,"headerBg":"#2b6cff","headerColor":"#ffffff","cellBg":"#ffffff","cellColor":"#333333","borderColor":"#e2e2ee","cells":[{"r":0,"c":0,"text":"요일"},{"r":0,"c":1,"text":"진료시간"},{"r":1,"c":0,"text":"평일"},{"r":1,"c":1,"text":"09:00 - 18:00"},{"r":2,"c":0,"text":"토요일"},{"r":2,"c":1,"text":"09:00 - 13:00"},{"r":3,"c":0,"text":"점심시간"},{"r":3,"c":1,"text":"13:00 - 14:00"},{"r":4,"c":0,"text":"일요일/공휴일"},{"r":4,"c":1,"text":"휴진"}]}}
+]}
+[예시3] 고정탭(플로팅 버튼)
+사용자: "오른쪽 아래에 전화상담이랑 예약 고정탭 만들어줘"
+응답: {"reply":"오른쪽 아래에 전화상담·예약 고정탭을 추가했어요.","actions":[
+ {"type":"add_fixtab","fixtab":{"corner":"br","dx":24,"dy":24,"dir":"col","bg":"#2b6cff","color":"#ffffff","radius":26,"fontSize":15,"fontWeight":700,"items":[{"label":"📞 전화상담","action":"url","url":"tel:"},{"label":"예약하기","action":"top"}]}}
 ]}
 
 반드시 JSON만 응답: {"reply":"한국어설명","actions":[...]}`+deviceHint();
