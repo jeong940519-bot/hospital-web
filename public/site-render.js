@@ -366,8 +366,9 @@
       return '<div class="el"'+lnk+ea+' style="'+base+'"><div style="'+bgStyle+'"></div>'+stxt+'</div>';
     }
     if(e.type==='table'){
-      var _bw=(e.borderW!=null?e.borderW:1), _bc=e.borderColor||'#333';
-      var tbStyle=base+'overflow:hidden;'+(e.radius?'border-radius:'+e.radius+'px;'+(_bw>0?'box-shadow:inset 0 0 0 '+_bw+'px '+_bc+';':''):'');
+      var _bw=(e.borderW!=null?e.borderW:1), _bc=e.borderColor||'#333', rounded=e.radius>0;
+      // 둥근 모서리: 컨테이너가 실제 둥근 테두리를 그리고, 셀 바깥쪽 테두리는 제거 → 모서리 안 잘림
+      var tbStyle=base+'overflow:hidden;box-sizing:border-box;'+(rounded?'border-radius:'+e.radius+'px;'+(_bw>0?'border:'+_bw+'px solid '+_bc+';':''):'');
       var thtml='<table style="width:100%;height:100%;border-collapse:collapse;table-layout:fixed;font-family:\''+(e.fontFamily||'Noto Sans KR')+'\',sans-serif;font-size:'+(e.fontSize||14)+'px">';
       if(e.colWidths&&e.colWidths.length===e.cols){
         thtml+='<colgroup>';
@@ -385,7 +386,10 @@
           var isHead=r===0;
           var spanAttr=cell.span?(' rowspan="'+cell.span.rs+'" colspan="'+cell.span.cs+'"'):'';
           var diag=tblDiagSvg(e,cell);
-          var tdS=(diag?'position:relative;':'')+tblBorderCss(e,cell)+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
+          var _cr1=r+(cell.span?cell.span.rs-1:0), _cc1=c+(cell.span?cell.span.cs-1:0);
+          var bcss=tblBorderCss(e,cell);
+          if(rounded){ if(r===0)bcss+=';border-top:0'; if(_cr1===e.rows-1)bcss+=';border-bottom:0'; if(c===0)bcss+=';border-left:0'; if(_cc1===e.cols-1)bcss+=';border-right:0'; }
+          var tdS=(diag?'position:relative;':'')+bcss+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
           thtml+='<td'+spanAttr+' style="'+tdS+'">'+esc(cell.text||'')+diag+'</td>';
         }
         thtml+='</tr>';
