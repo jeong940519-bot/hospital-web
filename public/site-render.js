@@ -484,7 +484,12 @@
 
     // 사용된 폰트만 수집 → Google Fonts URL 동적 생성
     var _usedFonts=['Noto Sans KR'];
-    project.pages.forEach(function(p){p.elements.forEach(function(e){if(e.type==='text'&&e.fontFamily&&_usedFonts.indexOf(e.fontFamily)<0)_usedFonts.push(e.fontFamily);});});
+    function _addUF(f){ if(f && _usedFonts.indexOf(f)<0) _usedFonts.push(f); }
+    project.pages.forEach(function(p){p.elements.forEach(function(e){
+      if((e.type==='text'||e.type==='table') && e.fontFamily) _addUF(e.fontFamily);
+      if(e.type==='shape' && e.stFont) _addUF(e.stFont);
+    });});
+    (project.fixedTabs||[]).forEach(function(t){ _addUF(t.fontFamily); });
     var _GFW={'Noto Sans KR':'wght@300;400;500;700;900','Noto Serif KR':'wght@400;700','Nanum Gothic':'wght@400;700;800','Nanum Myeongjo':'wght@400;700;800','Gaegu':'wght@400;700','Sunflower':'wght@300;500;700','Dancing Script':'wght@400;500;700','Open Sans':'wght@300;400;500;700;800','Inter':'wght@300;400;500;700;900','Roboto':'wght@300;400;500;700;900','Lato':'wght@300;400;700;900','Montserrat':'wght@300;400;500;700;900','Poppins':'wght@300;400;500;700;900','Oswald':'wght@300;400;500;700','Raleway':'wght@300;400;500;700;900','Nunito':'wght@300;400;500;700;900','Quicksand':'wght@300;400;500;700','Playfair Display':'wght@400;500;700;900','Merriweather':'wght@300;400;700;900'};
     var _noW=['Nanum Pen Script','Black Han Sans','Do Hyeon','Jua','Gowun Dodum','Song Myung','Cute Font','East Sea Dokdo','Pacifico','Bebas Neue'];
     // 가져온 폰트 파일(@font-face base64)과 Google 폰트 분리

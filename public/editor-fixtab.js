@@ -1,7 +1,7 @@
 // editor-fixtab.js — 고정탭(플로팅 탭) 기능 모듈. editor.js와 상호 import(순환, ESM 안전).
 // 최상위는 선언만 → init 시 editor.js 바인딩 미접근. 회귀 시 git으로 복구.
 import { _clamp } from './editor-shapes.js';
-import { page, zoom, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, project, selId, selIds, _clearSel, _resetCpTarget } from './editor.js';
+import { page, zoom, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, _fontOpts, project, selId, selIds, _clearSel, _resetCpTarget } from './editor.js';
 
 let _fixTabSel=null;
 let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
@@ -126,7 +126,7 @@ function openFixTabPopup(t,x,y,pw,ph){
   const IN='padding:5px 7px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);color:var(--text,#222);font-size:12px;outline:none;box-sizing:border-box';
   const SL='font-size:11px;font-weight:700;color:var(--sub,#8a8aa0);margin:0 0 6px;letter-spacing:.02em';
   const pageOptsSel=sel=>roots.map(p=>`<option value="${p.id}"${sel===p.id?' selected':''}>${ea(p.name||'페이지')}</option>`).join('');
-  const fontOpts=FONTS.map(f=>`<option value="${ea(f[0])}"${(t.fontFamily||'Noto Sans KR')===f[0]?' selected':''}>${ea(f[1])}</option>`).join('');
+  const fontOpts=_fontOpts(t.fontFamily||'Noto Sans KR');
   // 효과(이펙트) — 발행본 FX_ANIM/LOOP/HOVER 키와 동일. 미리보기·발행에서 재생.
   const curFx=(t.fx&&t.fx.type)||'';
   const fxOpt=(v,l)=>`<option value="${v}"${curFx===v?' selected':''}>${l}</option>`;

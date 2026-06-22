@@ -140,7 +140,7 @@ let zoom = 1;
 // ── editor-fixtab.js(분리 모듈)가 import로 읽는 바인딩/세터 + 재할당 션트 ──
 function _clearSel(){ selId=null; selIds=new Set(); }   // 모듈에서 코어 선택 let을 직접 못 바꾸므로 세터 경유
 function _resetCpTarget(){ _cpTarget=null; }            // 색상 팝업 토글 리셋(_cpTarget은 아래에서 선언)
-export { project, selId, selIds, zoom, page, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, _clearSel, _resetCpTarget };
+export { project, selId, selIds, zoom, page, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, _fontOpts, _clearSel, _resetCpTarget };
 let _thumbW = 184; // 페이지 썸네일 너비(스크롤로 조절)
 function pagesWidthPx(){ return (_thumbW+22)+'px'; }
 let _clipboard = null; // 복수 요소(배열) 저장 — MS식 멀티 복사/붙여넣기
@@ -1487,7 +1487,7 @@ function renderProps(){
     html += `<div class="grp"><label>열 × 행</label><div class="row">
       <div class="num-unit" style="flex:1"><span>열</span><input type="number" id="tb-cols" value="${e.cols}" min="1" max="20"></div>
       <div class="num-unit" style="flex:1"><span>행</span><input type="number" id="tb-rows" value="${e.rows}" min="1" max="50"></div></div></div>`;
-    html += `<div class="grp"><label>폰트</label><select id="tb-font">${FONTS.map(f=>`<option value="${f[0]}" ${e.fontFamily===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select></div>`;
+    html += `<div class="grp"><label>폰트</label><select id="tb-font">${_fontOpts(e.fontFamily)}</select></div>`;
     html += `<div class="grp"><label>글자 크기 / 굵기</label><div class="row">
       <div class="num-unit" style="flex:1"><input type="number" id="tb-fsize" value="${e.fontSize||14}"></div>
       <select id="tb-fw" style="flex:1">${[['300','얇게'],['400','보통'],['500','중간'],['700','굵게']].map(w=>`<option value="${w[0]}" ${String(e.fontWeight||400)===w[0]?'selected':''}>${w[1]}</option>`).join('')}</select></div></div>`;
@@ -2581,7 +2581,7 @@ function showTableCtx(x,y,e,ev,rc){
   // ─ 미니 툴바 (PPT 스타일) ─
   let h='<div class="ctx-tbar">';
   if(targets.length>1) h+=`<span style="font-size:11px;color:var(--accent);font-weight:700;padding:0 4px">${targets.length}칸 선택</span>`;
-  h+=`<select id="ct-font" style="max-width:110px">${FONTS.map(f=>`<option value="${f[0]}" ${e.fontFamily===f[0]?'selected':''}>${f[1]}</option>`).join('')}</select>`;
+  h+=`<select id="ct-font" style="max-width:110px">${_fontOpts(e.fontFamily)}</select>`;
   h+=`<input type="number" id="ct-fsize" value="${e.fontSize||14}" min="8" max="72">`;
   h+=`<button class="ct-btn${(isHead?(e.headerWeight||700):(e.fontWeight||400))>=700?' on':''}" id="ct-bold" title="굵게" style="font-weight:900">가</button>`;
   h+=`<div class="ct-vsep"></div>`;
@@ -4450,6 +4450,9 @@ document.getElementById('arr-to-page').addEventListener('change',e=>{ alignToPag
 
 // ── 홈탭 글꼴 피커 (검색·추가·파일가져오기) ──
 function _customFonts(){ try{ return JSON.parse(localStorage.getItem('hw_custom_fonts')||'[]'); }catch(e){ return []; } }
+// 기본 폰트 + 사용자가 삽입한 커스텀 폰트(중복 제거) — 표·고정탭 등 드롭다운 공용
+function _fontList(){ return [...FONTS, ..._customFonts().filter(cf=>!FONTS.find(f=>f[0]===cf[0]))]; }
+function _fontOpts(selected){ return _fontList().map(f=>`<option value="${f[0]}" ${selected===f[0]?'selected':''}>${f[1]}</option>`).join(''); }
 function fontLabel(fam){ const f=[...FONTS,..._customFonts()].find(x=>x[0]===fam); return f?f[1]:fam; }
 function setHomeFontLabel(fam){ const l=document.getElementById('rb-font-label'); if(l){ l.textContent=fontLabel(fam); l.style.fontFamily=`'${fam}',sans-serif`; } }
 function setupHomeFontPicker(){
