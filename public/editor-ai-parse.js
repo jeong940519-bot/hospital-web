@@ -21,8 +21,8 @@ function parseAiJson(text){
   fixed=fixed.replace(/,(\s*[}\]])/g,'$1');
   for(let k=stack.length-1;k>=0;k--) fixed+=stack[k];
   r=tryP(fixed); if(r!==undefined) return r;
-  // 3) elements 배열의 마지막 완성 객체까지만 살리기
-  const em=s.match(/"elements"\s*:\s*\[/);
+  // 3) elements/actions 배열의 마지막 완성 객체까지만 살리기(표처럼 긴 응답이 잘렸을 때)
+  const em=s.match(/"(?:elements|actions)"\s*:\s*\[/);
   if(em){
     const arrStart=em.index+em[0].length;
     let depth=0,inS=false,es=false,lastObjEnd=-1;

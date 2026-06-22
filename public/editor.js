@@ -3819,7 +3819,7 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
   const sendBtn=document.getElementById('ai-chat-send');
   sendBtn.disabled=true; sendBtn.textContent='…';
   try{
-    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:4000,system:sys,messages:_chatHistory.slice(-8)}});
+    const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:8000,system:sys,messages:_chatHistory.slice(-8)}});
     const raw=res.data?.content?.[0]?.text||'{}';
     const parsed=parseAiJson(raw);
     if(!parsed) throw new Error('AI 응답 JSON 해석 실패 (다시 시도해 주세요)');
