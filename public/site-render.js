@@ -1,5 +1,11 @@
 /* 발행 렌더링 공유 모듈 — 편집기(미리보기)와 공개 페이지(index.html)가 동일하게 사용. */
 (function(){
+  // 공개 CDN 웹폰트 맵 — 구글 폰트엔 없지만 인기 있는 한글 폰트를 파일 업로드 없이 모든 PC에서 렌더.
+  // 폰트 패밀리명(편집기에서 쓰는 이름) → jsDelivr woff2 URL. 새 폰트는 여기에 한 줄만 추가하면 됨.
+  var _CDN_FONTS={};
+  ['1Thin','2ExtraLight','3Light','4Regular','5Medium','6SemiBold','7Bold','8ExtraBold','9Black'].forEach(function(w){
+    _CDN_FONTS['Paperlogy '+w]='https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/Paperlogy-'+w+'.woff2';
+  });
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   // 표 셀 4방향 테두리 — 변별 폭/색/선스타일(cell.bd[side]= 숫자(레거시) | {w,c,s} | 0/{w:0}없음) — 편집기와 동일 규칙
   function tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2):s==='dotted'?w+','+(w*1.6):''; }
@@ -389,7 +395,7 @@
           var _cr1=r+(cell.span?cell.span.rs-1:0), _cc1=c+(cell.span?cell.span.cs-1:0);
           var bcss=tblBorderCss(e,cell);
           if(rounded){ if(r===0)bcss+=';border-top:0'; if(_cr1===e.rows-1)bcss+=';border-bottom:0'; if(c===0)bcss+=';border-left:0'; if(_cc1===e.cols-1)bcss+=';border-right:0'; }
-          var tdS=(diag?'position:relative;':'')+bcss+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle';
+          var tdS=(diag?'position:relative;':'')+bcss+';padding:4px 8px;background:'+(cell.bg||(isHead?(e.headerBg||'#4a5568'):(e.cellBg||'#fff')))+';color:'+(cell.color||(isHead?(e.headerColor||'#fff'):(e.cellColor||'#333')))+';font-weight:'+(isHead?(e.headerWeight||700):(e.fontWeight||400))+';text-align:'+(cell.align||'center')+';vertical-align:middle;white-space:pre-wrap;word-break:break-word';
           thtml+='<td'+spanAttr+' style="'+tdS+'">'+esc(cell.text||'')+diag+'</td>';
         }
         thtml+='</tr>';
@@ -492,12 +498,23 @@
     (project.fixedTabs||[]).forEach(function(t){ _addUF(t.fontFamily); });
     var _GFW={'Noto Sans KR':'wght@300;400;500;700;900','Noto Serif KR':'wght@400;700','Nanum Gothic':'wght@400;700;800','Nanum Myeongjo':'wght@400;700;800','Gaegu':'wght@400;700','Sunflower':'wght@300;500;700','Dancing Script':'wght@400;500;700','Open Sans':'wght@300;400;500;700;800','Inter':'wght@300;400;500;700;900','Roboto':'wght@300;400;500;700;900','Lato':'wght@300;400;700;900','Montserrat':'wght@300;400;500;700;900','Poppins':'wght@300;400;500;700;900','Oswald':'wght@300;400;500;700','Raleway':'wght@300;400;500;700;900','Nunito':'wght@300;400;500;700;900','Quicksand':'wght@300;400;500;700','Playfair Display':'wght@400;500;700;900','Merriweather':'wght@300;400;700;900'};
     var _noW=['Nanum Pen Script','Black Han Sans','Do Hyeon','Jua','Gowun Dodum','Song Myung','Cute Font','East Sea Dokdo','Pacifico','Bebas Neue'];
-    // 가져온 폰트 파일(@font-face base64)과 Google 폰트 분리
-    var _fileFonts={}; try{ _fileFonts=JSON.parse(localStorage.getItem('hw_font_files')||'{}'); }catch(e){}
+    // 폰트 소스 결정 (우선순위 — 안정성 순):
+    //  1순위: 공개 CDN(_CDN_FONTS) — HTTP 200 검증된 공개 주소. 가장 안정적이라 최우선.
+    //  2순위: project.fontFiles (Storage 공개 URL) — CDN에 없는 업로드 폰트.
+    //  3순위: localStorage base64 — 발행 전 편집기 미리보기용(브라우저 로컬).
+    //  ※ 깨진 src가 있으면 시스템 설치 폰트까지 가려버리므로(shadowing), 확실한 CDN을 먼저 쓴다.
+    var _cdnFonts=_CDN_FONTS;
+    var _urlFonts=(project && project.fontFiles)||{};
+    var _lsFonts={}; try{ _lsFonts=JSON.parse(localStorage.getItem('hw_font_files')||'{}'); }catch(e){}
     var _ff='', _gFonts=[];
     _usedFonts.forEach(function(f){
-      if(_fileFonts[f]){ var d=_fileFonts[f]; _ff+="@font-face{font-family:'"+f+"';src:url(data:"+(d.mime||'font/ttf')+";base64,"+d.b64+") format('"+d.fmt+"');font-display:swap;}"; }
-      else _gFonts.push(f);
+      if(_cdnFonts[f]){
+        _ff+="@font-face{font-family:'"+f+"';src:url("+_cdnFonts[f]+") format('woff2');font-display:swap;}";
+      } else if(_urlFonts[f] && _urlFonts[f].url){
+        _ff+="@font-face{font-family:'"+f+"';src:url("+_urlFonts[f].url+") format('"+(_urlFonts[f].fmt||'truetype')+"');font-display:swap;}";
+      } else if(_lsFonts[f]){
+        var d=_lsFonts[f]; _ff+="@font-face{font-family:'"+f+"';src:url(data:"+(d.mime||'font/ttf')+";base64,"+d.b64+") format('"+d.fmt+"');font-display:swap;}";
+      } else { _gFonts.push(f); }
     });
     var _fontsUrl='https://fonts.googleapis.com/css2?'+_gFonts.map(function(f){var slug=f.replace(/ /g,'+');return 'family='+slug+(_noW.indexOf(f)>=0?'':':'+(_GFW[f]||'wght@300;400;500;700;900'));}).join('&')+'&display=swap';
 
@@ -528,11 +545,13 @@
       +FX_CSS
       +'</style></head>'
       +'<body>'+topbarHtml+hamburgerHtml+(menu?'<nav class="topnav">'+menu+'</nav>':'')+pagesHtml+footerHtml+fixTabsHtml
-      +'<script>var PW='+PAGE_W+';'+(opts.forceDevice?'window.__forceDev="'+opts.forceDevice+'";':'')
+      +'<script>var PW='+PAGE_W+';var HMX='+(hm.x!=null?hm.x:'null')+',HMY='+(hm.y!=null?hm.y:'null')+';'+(opts.forceDevice?'window.__forceDev="'+opts.forceDevice+'";':'')
       +'function fit(){'
-        +'var iw=window.innerWidth,HH=0;'
-        +'document.querySelectorAll(".topbar").forEach(function(tb){if(tb.style.display==="none")return;var tp=tb.querySelector(".topbar-pg");var tw=tp.offsetWidth||PW;var ts=Math.min(1,iw/tw);tp.style.transform="scale("+ts+")";tp.style.marginLeft=Math.max(0,(iw-tw*ts)/2)+"px";HH=tp.offsetHeight*ts;tb.style.height=HH+"px";});'
+        +'var iw=window.innerWidth,HH=0,_tbS=1;'
+        +'document.querySelectorAll(".topbar").forEach(function(tb){if(tb.style.display==="none")return;var tp=tb.querySelector(".topbar-pg");var tw=tp.offsetWidth||PW;var ts=Math.min(1,iw/tw);_tbS=ts;tp.style.transform="scale("+ts+")";tp.style.marginLeft=Math.max(0,(iw-tw*ts)/2)+"px";HH=tp.offsetHeight*ts;tb.style.height=HH+"px";});'
         +'document.body.style.paddingTop=HH+"px";'
+        /* 햄버거 위치: 드래그 지정(HMX/HMY)이면 그 위치(상단바 배율 적용), 없으면 상단바 세로 중앙 */
+        +'var _hb=document.getElementById("hmbtn");if(_hb){if(HMX!=null&&HMY!=null){_hb.style.left=(HMX*_tbS)+"px";_hb.style.right="auto";_hb.style.top=(HMY*_tbS)+"px";}else{_hb.style.top=(HH>0?Math.max(4,(HH-'+hmSize+')/2):8)+"px";}}'
         +'document.querySelectorAll(".pgwrap").forEach(function(wr){'
           +'if(wr.style.display==="none")return;'
           +'wr.querySelectorAll(".pg").forEach(function(pg){'
@@ -576,5 +595,5 @@
       +'<\/script></body></html>';
   }
 
-  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve};
+  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS};
 })();

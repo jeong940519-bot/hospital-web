@@ -693,6 +693,16 @@
         <textarea id="ai-desc" rows="4" placeholder="예: 부산 해운대의 정형외과입니다. 신뢰감 있는 파란 톤으로, 친절하고 전문적인 느낌을 원해요."></textarea>
       </div>
       <div class="grp">
+        <label>참고자료에서 가져올 항목 <span style="color:var(--sub);font-weight:400;text-transform:none">(체크한 것만 반영 · 기본 전체)</span></label>
+        <div id="ai-aspects" style="display:flex;flex-wrap:wrap;gap:6px">
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;text-transform:none;margin:0;font-weight:600"><input type="checkbox" class="ai-asp-cb" value="content" checked style="width:auto"> 📝 내용·문구</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;text-transform:none;margin:0;font-weight:600"><input type="checkbox" class="ai-asp-cb" value="mood" checked style="width:auto"> 🎭 분위기·톤</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;text-transform:none;margin:0;font-weight:600"><input type="checkbox" class="ai-asp-cb" value="color" checked style="width:auto"> 🎨 색감</label>
+          <label style="display:inline-flex;align-items:center;gap:6px;padding:7px 11px;background:var(--panel2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;text-transform:none;margin:0;font-weight:600"><input type="checkbox" class="ai-asp-cb" value="layout" checked style="width:auto"> 🧱 레이아웃·틀</label>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:6px">체크 해제한 항목은 참고자료를 따르지 않고 AI가 병원에 맞게 새로 정합니다.</div>
+      </div>
+      <div class="grp">
         <label>참고 이미지 <span style="color:var(--sub);font-weight:400;text-transform:none">(선택)</span></label>
         <div class="attach-row" id="ai-img-pick">
           <span class="attach-icon">📷</span>
