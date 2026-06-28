@@ -26,7 +26,7 @@ const db = getFirestore(fbApp);
 const storage = getStorage(fbApp);
 const auth = getAuth(fbApp);
 const functions = getFunctions(fbApp, 'asia-northeast3');
-const aiProxy = httpsCallable(functions, 'aiProxy');
+const aiProxy = httpsCallable(functions, 'aiProxy', { timeout: 300000 }); // 클라 타임아웃 300초(기본 70초→이미지·자기검증으로 초과 방지)
 const fetchSite = httpsCallable(functions, 'fetchSite');
 const DOC_PATH = ['site','editorProject']; // 공개 홈(도메인 루트)이 읽는 발행본 문서 (🚀 발행이 여기에 씀 / 구 저장 마이그레이션도 겸함)
 let isAdmin = false, DEFAULT_AI_KEY = '';
@@ -366,7 +366,7 @@ function addText(){
   const e = { id:uid(), type:'text', x, y, w:400, h:80, rot:0,
     text:'텍스트를 입력하세요', fontFamily:'Noto Sans KR', fontWeight:700, fontSize:40,
     color:'#222222', align:'center', lineHeight:1.3, letterSpacing:0, italic:false, underline:false };
-  page().elements.push(e); selId=e.id; afterMutate();
+  _tabTagNew(e); page().elements.push(e); selId=e.id; afterMutate();
 }
 function addImage(){
   document.getElementById('img-target').value = '';
@@ -379,7 +379,7 @@ function addShape(kind){
   const e = isLine
     ? { id:uid(), type:'shape', x, y, w, h, rot:0, shape:kind, fill:'#333333', radius:0, borderW:4, borderColor:'#333333' }
     : { id:uid(), type:'shape', x, y, w, h, rot:0, shape:kind, fill:'#6c7bff', radius:(kind==='circle'?9999:kind==='rrect'?28:0), borderW:0, borderColor:'#333333' };
-  page().elements.push(e); selId=e.id; selIds=new Set([e.id]); afterMutate();
+  _tabTagNew(e); page().elements.push(e); selId=e.id; selIds=new Set([e.id]); afterMutate();
   // 최근 사용한 도형 기록
   try{ let r=JSON.parse(localStorage.getItem('hw_recent_shapes')||'[]'); r=[kind,...r.filter(k=>k!==kind)].slice(0,12); localStorage.setItem('hw_recent_shapes',JSON.stringify(r)); }catch(_){}
 }
@@ -397,7 +397,74 @@ function addTable(cols,rows){
     cellBg:'#ffffff',cellColor:'#333333',
     fontSize:14,fontFamily:'Noto Sans KR',fontWeight:400,
     headerWeight:700,radius:0};
-  page().elements.push(e); selId=e.id; selIds=new Set([e.id]); afterMutate();
+  _tabTagNew(e); page().elements.push(e); selId=e.id; selIds=new Set([e.id]); afterMutate();
+}
+// 📑 탭 섹션 한 번에 생성 — 버튼 N개 + 내용 패널 N개를 하나의 그룹(group)·번호(idx 0..N-1)로 올바르게 배선
+// ── 탭 섹션 요소 생성기(공용) — 수동 생성·AI 초안 펼치기 양쪽에서 사용 ──
+// opts: {x,y,w,btnH,panelH,activeColor,idleColor, tabs:[{label, body?:[패널 기준 상대좌표 요소들]}]}
+// 반환: { els:[...], bottom:Y } — 저수준 tab-trigger/tab-content/twin/group 배선을 정확히 만든다.
+function buildTabSectionEls(opts){
+  opts=opts||{};
+  const G=opts.group||('tabs_'+uid().slice(0,6));
+  let tabs=Array.isArray(opts.tabs)&&opts.tabs.length?opts.tabs:[{label:'탭 1'},{label:'탭 2'},{label:'탭 3'}];
+  tabs=tabs.slice(0,8); const n=Math.max(2,tabs.length);
+  const pw=page().w||PAGE_W;
+  const blockW=Math.round(Math.max(280,Math.min(opts.w||Math.min(1100,pw-160), pw)));
+  const bx=Math.round(opts.x!=null?opts.x:Math.max(0,(pw-blockW)/2)), by=Math.round(opts.y!=null?opts.y:0);
+  const gap=12, btnH=opts.btnH||58, btnW=Math.round((blockW-(n-1)*gap)/n);
+  const cY=by+btnH+44, cH=opts.panelH||440;
+  const idle=opts.idleColor||'#eef1f6', active=opts.activeColor||'#3b82f6';
+  const news=[];
+  for(let i=0;i<n;i++){
+    const x=Math.round(bx+i*(btnW+gap)), twB=G+'_b'+i, twC=G+'_c'; // 쌍둥이: 버튼 슬롯(선택 전+후) / 내용 슬롯
+    const label=(tabs[i]&&tabs[i].label!=null?String(tabs[i].label):'탭 '+(i+1));
+    // ① 선택 전(기본) 버튼 — 글자가 들어간 도형 하나(별도 텍스트박스 없음). 항상 보이는 트리거
+    news.push({id:uid(),type:'shape',x,y:by,w:btnW,h:btnH,rot:0,shape:'rrect',fill:idle,radius:10,borderW:0,borderColor:'#333333',stext:label,stColor:'#3b4658',stSize:18,stWeight:700,stAlign:'center',stValign:'middle',twin:twB,fx:{type:'tab-trigger',group:G,idx:i}});
+    // ② 선택 후 버튼 — 같은 자리에 겹침. 그 탭이 선택됐을 때만 위에 나타남
+    news.push({id:uid(),type:'shape',x,y:by,w:btnW,h:btnH,rot:0,shape:'rrect',fill:active,radius:10,borderW:0,borderColor:'#333333',stext:label,stColor:'#ffffff',stSize:18,stWeight:800,stAlign:'center',stValign:'middle',twin:twB,fx:{type:'tab-content',group:G,idx:i}});
+    // ③ 내용 — AI가 body를 주면 그 요소들을(패널 기준 상대좌표→절대좌표), 없으면 자리표시 패널
+    const body=Array.isArray(tabs[i]&&tabs[i].body)?tabs[i].body.filter(b=>b&&b.type&&b.type!=='tabsection'):null;
+    if(body&&body.length){
+      // 패널 배경(없으면 깔아줌 — 첫 body가 폭 넓은 shape면 그것을 배경으로 인정)
+      const hasBg=body.some(b=>b.type==='shape'&&(b.x||0)<=8&&(b.w||0)>=blockW*0.8);
+      if(!hasBg) news.push({id:uid(),type:'shape',x:bx,y:cY,w:blockW,h:cH,rot:0,shape:'rrect',fill:'#f6f7fb',radius:14,borderW:1,borderColor:'#e3e7f0',twin:twC,fx:{type:'tab-content',group:G,idx:i}});
+      body.forEach(b=>{
+        const o=Object.assign({},b); o.id=uid(); o.rot=o.rot||0;
+        o.x=Math.round(bx+(o.x||0)); o.y=Math.round(cY+(o.y||0));
+        o.fx={type:'tab-content',group:G,idx:i};
+        news.push(o);
+      });
+    } else {
+      news.push({id:uid(),type:'shape',x:bx,y:cY,w:blockW,h:cH,rot:0,shape:'rrect',fill:'#f6f7fb',radius:14,borderW:1,borderColor:'#e3e7f0',stext:label+' 내용 — 「이펙트 ▸ 📑 탭별 편집」에서 이 탭을 골라 채우세요',stColor:'#9aa3c0',stSize:16,stWeight:500,stAlign:'center',stValign:'middle',twin:twC,fx:{type:'tab-content',group:G,idx:i}});
+    }
+  }
+  return { els:news, bottom: cY+cH };
+}
+function makeTabSection(){
+  const raw=prompt('탭 개수를 입력하세요 (2~8)','3'); if(raw==null) return;
+  const n=Math.max(2,Math.min(8,parseInt(raw,10)||0)); if(n<2){ toast('탭은 2개 이상이어야 합니다'); return; }
+  const blockW=Math.min(1100,(page().w||PAGE_W)-160);
+  const c=getViewCenter(blockW,560);
+  const tabs=[]; for(let i=0;i<n;i++) tabs.push({label:'탭 '+(i+1)});
+  const { els }=buildTabSectionEls({x:c.x,y:c.y,w:blockW,tabs});
+  page().elements.push(...els);
+  selId=null; selIds=new Set(els.filter(e=>e.fx&&e.fx.type==='tab-trigger').map(e=>e.id));
+  afterMutate();
+  toast(`탭 섹션 생성 ✨ (${n}개) — 탭 버튼 선택 후 「이펙트 ▸ 📑 탭별 편집」으로 한 탭씩 채우세요`);
+}
+// AI 초안의 고수준 컴포넌트 노드(tabsection 등)를 저수준 요소로 펼친다. (검증·정규화 전에 호출)
+function expandAiComponents(elements){
+  const out=[];
+  for(const e of (Array.isArray(elements)?elements:[])){
+    if(e&&e.type==='tabsection'){
+      try{
+        const r=buildTabSectionEls({ x:e.x, y:e.y, w:e.w, btnH:e.btnH, panelH:e.panelH,
+          activeColor:e.activeColor||e.color, idleColor:e.idleColor, tabs:e.tabs });
+        out.push(...r.els);
+      }catch(_){ /* 잘못된 노드는 건너뜀 */ }
+    } else if(e&&e.type){ out.push(e); }
+  }
+  return out;
 }
 
 // 이미지 dataURL을 캔버스에 배치 (cx,cy 주면 그 지점 중심, 없으면 화면 중앙)
@@ -414,7 +481,7 @@ function placeImage(dataURL, cx, cy){
     x=Math.max(0,Math.min(p.w-w, Math.round(x))); y=Math.max(0,Math.min(p.h-h, Math.round(y)));
     const ne = { id:uid(), type:'image', x, y, w, h, rot:0,
       src:dataURL, fit:'cover', radius:0, clip:'none', borderW:0, borderColor:'#333333' };
-    page().elements.push(ne); selId=ne.id; selIds=new Set([ne.id]); afterMutate();
+    _tabTagNew(ne); page().elements.push(ne); selId=ne.id; selIds=new Set([ne.id]); afterMutate();
   };
   img.src = dataURL;
 }
@@ -549,7 +616,7 @@ function renderCanvas(){
   const marqueeEl = document.getElementById('marquee');
   canvas.innerHTML = '';
   if(marqueeEl) canvas.appendChild(marqueeEl);
-  p.elements.forEach(e=> canvas.appendChild(renderEl(e)));
+  p.elements.forEach(e=>{ if(_tabHiddenInEdit(e)) return; canvas.appendChild(renderEl(e)); });
   drawSections();
   if(selIds.size>=2) addGroupFrame();
   else if(selId && el(selId)){
@@ -837,6 +904,7 @@ function renderEl(e){
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=>{
+    if(_linkPick){ if(ev.button===0){ ev.stopPropagation(); ev.preventDefault(); lpToggle(e); } return; }
     if(e.type==='table'){
       const colH=ev.target.dataset.tblColResize, rowH=ev.target.dataset.tblRowResize;
       if(colH!=null){ ev.stopPropagation(); ev.preventDefault(); startTblColResize(ev,e,+colH); return; }
@@ -860,7 +928,11 @@ function renderEl(e){
     startDrag(ev,e);
   });
   node.addEventListener('dblclick', ev=>{ if(e.type==='text'||e.type==='shape') startEdit(node,e); });
-  node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); selId=e.id; renderCanvas(); renderProps(); if(e.type==='table') showTableCtx(ev.clientX, ev.clientY, e, ev); else showLinkMenu(ev.clientX, ev.clientY, e); });
+  node.addEventListener('contextmenu', ev=>{ ev.preventDefault(); if(_linkPick) return; if(!selIds.has(e.id)){ if(e.groupId) selIds=new Set(page().elements.filter(x=>x.groupId===e.groupId).map(x=>x.id)); else selIds=new Set([e.id]); } selId=e.id; renderCanvas(); renderProps(); if(e.type==='table') showTableCtx(ev.clientX, ev.clientY, e, ev); else showElementCtx(ev.clientX, ev.clientY, e); });
+  if(_linkPick){
+    if(e.id===_linkPick.srcId) node.classList.add('lp-src');
+    else node.classList.add(lpIsLinked(e)?'lp-linked':'lp-cand');
+  }
   return node;
 }
 
@@ -1024,7 +1096,7 @@ function addGroupFrame(){
 let grez=null;
 function startGroupResize(ev,pos,bb){
   ev.preventDefault();
-  const arr=selAll(); const t=_snapTargets();
+  const arr=selAll().concat(twinMates(selIds)); const t=_snapTargets(); // 숨은 쌍둥이도 같은 비율로 크기조절
   grez={ pos, sx:ev.clientX, sy:ev.clientY, bb, snapX:t.sxT, snapY:t.syT,
     items: arr.map(e=>({e, ox:e.x, oy:e.y, ow:e.w, oh:e.h, of:e.fontSize, os:e.stSize})) };
   window.addEventListener('mousemove',onGroupResize);
@@ -1131,6 +1203,7 @@ function startDrag(ev,e){
   // 드래그 시작 — 선택된 모든 요소의 초기 위치 저장
   const init={};
   for(const id of selIds){ const e2=el(id); if(e2) init[id]={ox:e2.x,oy:e2.y}; }
+  twinMates(selIds).forEach(e2=>{ if(!init[e2.id]) init[e2.id]={ox:e2.x,oy:e2.y}; }); // 숨은 쌍둥이도 함께 이동
   // 스마트 가이드용: 이동 선택의 bbox + 다른 개체/페이지의 스냅선
   const selEls=selAll();
   const bx0=Math.min(...selEls.map(e=>e.x)),by0=Math.min(...selEls.map(e=>e.y)),bx1=Math.max(...selEls.map(e=>e.x+e.w)),by1=Math.max(...selEls.map(e=>e.y+e.h));
@@ -1225,7 +1298,7 @@ function showGuides(gx,gy){
   else if(gh) gh.style.display='none';
 }
 function hideGuides(){ ['guide-v','guide-h','spacing-layer'].forEach(id=>{ const g=document.getElementById(id); if(g) g.style.display='none'; }); }
-function endDrag(){ window.removeEventListener('mousemove',onDrag); window.removeEventListener('mouseup',endDrag); hideGuides(); if(drag){drag=null; afterMutate();} }
+function endDrag(){ window.removeEventListener('mousemove',onDrag); window.removeEventListener('mouseup',endDrag); hideGuides(); if(drag){ drag=null; afterMutate();} }
 
 let rez=null;
 function _nearest(v, arr, snap){ let best=null, bd=snap+.01; arr.forEach(t=>{ const d=Math.abs(v-t); if(d<bd){ bd=d; best=t; } }); return best; }
@@ -1233,7 +1306,8 @@ function _snapTargets(){ const sxT=[], syT=[], pg=page(); page().elements.forEac
 function startResize(ev,e,pos){
   ev.preventDefault();
   const t=_snapTargets();
-  rez={ id:e.id, pos, sx:ev.clientX, sy:ev.clientY, ox:e.x, oy:e.y, ow:e.w, oh:e.h, snapX:t.sxT, snapY:t.syT };
+  rez={ id:e.id, pos, sx:ev.clientX, sy:ev.clientY, ox:e.x, oy:e.y, ow:e.w, oh:e.h, snapX:t.sxT, snapY:t.syT,
+    twins: twinMates(new Set([e.id])).map(t2=>({e:t2,ox:t2.x,oy:t2.y,ow:t2.w,oh:t2.h})) };
   window.addEventListener('mousemove', onResize);
   window.addEventListener('mouseup', endResize);
 }
@@ -1257,6 +1331,7 @@ function onResize(ev){
   }
   e.x=Math.round(x); e.y=Math.round(y); e.w=Math.round(w); e.h=Math.round(h);
   const node=canvas.querySelector(`[data-id="${e.id}"]`); elStyleCommon(node,e);
+  if(rez.twins&&rez.twins.length){ const sx2=e.w/rez.ow, sy2=e.h/rez.oh; rez.twins.forEach(t2=>{ t2.e.x=Math.round(e.x+(t2.ox-rez.ox)*sx2); t2.e.y=Math.round(e.y+(t2.oy-rez.oy)*sy2); t2.e.w=Math.max(8,Math.round(t2.ow*sx2)); t2.e.h=Math.max(8,Math.round(t2.oh*sy2)); const n2=canvas.querySelector(`[data-id="${t2.e.id}"]`); if(n2) elStyleCommon(n2,t2.e); }); }
   showGuides(gx,gy);
   syncPosInputs(e);
 }
@@ -1303,6 +1378,7 @@ function startEdit(node,e){
 
 // 캔버스 빈 곳 클릭/드래그 → 마퀴 선택
 canvas.addEventListener('mousedown', ev=>{
+  if(_linkPick){ endLinkPick(); return; }
   if(ev.button!==0) return;
   if(_hambOpen){ _hambOpen=false; renderCanvas(); }
   if(ev.target !== canvas && ev.target.id !== 'marquee') return; // 요소 위면 무시
@@ -1329,6 +1405,7 @@ canvas.addEventListener('mousedown', ev=>{
     if(rw<4&&rh<4) return; // 너무 작으면 단순 클릭으로 간주 (이미 위에서 해제)
     const hit=new Set();
     for(const e2 of page().elements){
+      if(_tabHiddenInEdit(e2)) continue; // 편집 뷰에서 숨긴 다른 탭 요소는 선택 제외
       if(e2.x<rx+rw&&e2.x+e2.w>rx&&e2.y<ry+rh&&e2.y+e2.h>ry) hit.add(e2.id);
     }
     if(ev.ctrlKey||ev.metaKey||ev.shiftKey){ hit.forEach(id=>selIds.add(id)); }
@@ -1342,6 +1419,7 @@ canvas.addEventListener('mousedown', ev=>{
 // stage 여백(스크롤 영역) 클릭 → 선택 해제
 document.getElementById('stage').addEventListener('mousedown', ev=>{
   if(ev.target.id==='stage'||ev.target.id==='canvas-wrap'){
+    if(_linkPick){ endLinkPick(); return; }
     selId=null; selIds=new Set(); renderCanvas(); renderProps(); updateRibbonState();
   }
 });
@@ -1434,6 +1512,14 @@ function renderPages(){
 }
 
 // ───────────────────────── 렌더: 속성 패널 ─────────────────────────
+// 풀블리드 토글 — 도형/이미지(섹션 배경)를 발행 시 화면 끝까지 늘림
+function bleedToggleHtml(e){
+  return `<div class="grp" style="border-top:1px solid var(--border);padding-top:10px"><label style="display:flex;align-items:center;gap:7px;cursor:pointer;text-transform:none;margin:0"><input type="checkbox" id="el-bleed" ${e.bleed?'checked':''} style="width:auto"> 🖼 화면 끝까지 (풀블리드 배경)</label><div style="font-size:11px;color:var(--sub);margin-top:4px">발행하면 화면 좌우 끝까지 늘어납니다. 섹션 배경 사진·색에 사용 (글자·카드 위에 따로 올리세요).</div></div>`;
+}
+function wireBleedToggle(e){
+  const cb=document.getElementById('el-bleed');
+  if(cb) cb.addEventListener('change',()=>{ if(cb.checked) e.bleed=true; else delete e.bleed; afterMutate(); });
+}
 function renderProps(){
   const box=document.getElementById('props-body');
   const e = selId? el(selId):null;
@@ -1535,12 +1621,14 @@ function renderProps(){
     html += `<div class="grp"><label>액자 모양</label><select id="i-clip"><option value="none" ${e.clip==='none'?'selected':''}>사각형</option><option value="circle" ${e.clip==='circle'?'selected':''}>원형</option></select></div>`;
     html += `<div class="grp"><label>모서리 둥글기 ${e.radius}px</label><input type="range" id="i-radius" min="0" max="200" value="${e.radius}" ${e.clip==='circle'?'disabled':''}></div>`;
     html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="i-bw" value="${e.borderW}"></div><button type="button" class="panel-cbtn" id="i-bc" data-cpkey="imgBorder" title="테두리 색"><span style="background:${e.borderColor}"></span></button></div></div>`;
+    html += bleedToggleHtml(e);
   }else if(e.type==='shape'){
     // ── 채우기 (PPT 도형 서식) ──
     html += `<div class="sec-hd">▾ 채우기</div>`;
     html += `<div class="grp"><label>색 / 종류</label><button type="button" class="panel-cbtn" id="s-fill" data-cpkey="fill" title="채움색" style="width:100%;justify-content:flex-start"><span style="background:${e.fill}"></span><span style="font-size:12px;color:var(--sub)">단색 · 그라데이션 · 그림/질감 · 없음</span></button></div>`;
     const _ftr=100-(e.fillOpacity==null?100:e.fillOpacity);
     html += `<div class="grp"><label>투명도 <span id="s-ftr-val" style="float:right;color:var(--accent)">${_ftr}%</span></label><input type="range" id="s-ftr" min="0" max="100" value="${_ftr}"></div>`;
+    html += bleedToggleHtml(e);
     // ── 선 ──
     html += `<div class="sec-hd">▾ 선</div>`;
     html += `<div class="grp"><label>윤곽선 색 / 두께</label><div class="row"><button type="button" class="panel-cbtn" id="s-bc" data-cpkey="outline" title="윤곽선 색"><span style="background:${e.borderColor}"></span></button><div class="num-unit" style="flex:1"><span>두께</span><input type="number" id="s-bw" value="${e.borderW}"></div></div></div>`;
@@ -1763,6 +1851,7 @@ function bindProps(e){
     if($('i-radius')) $('i-radius').addEventListener('input',()=>{ e.radius=parseInt($('i-radius').value); renderProps(); liveStyle(); });
     num('i-bw','borderW');
     $('i-bc').addEventListener('input',()=>{ e.borderColor=$('i-bc').value; liveStyle(); });
+    wireBleedToggle(e);
   }else if(e.type==='shape'){
     $('s-fill').addEventListener('input',()=>{ e.fill=$('s-fill').value; liveStyle(); });
     $('s-fill').addEventListener('change',snapshot);
@@ -1771,6 +1860,7 @@ function bindProps(e){
     num('s-bw','borderW');
     $('s-bc').addEventListener('input',()=>{ e.borderColor=$('s-bc').value; liveStyle(); });
     $('s-bc').addEventListener('change',snapshot);
+    wireBleedToggle(e);
     // 도형 안 텍스트
     if($('s-text')){ $('s-text').addEventListener('input',()=>{ e.stext=$('s-text').value; liveStyle(); }); $('s-text').addEventListener('change',snapshot); }
     if($('s-tsize')){ $('s-tsize').addEventListener('input',()=>{ e.stSize=parseInt($('s-tsize').value)||28; liveStyle(); }); $('s-tsize').addEventListener('change',snapshot); }
@@ -1830,7 +1920,7 @@ function bindProps(e){
   });
   const linkGo=$('el-link-go');
   if(linkGo) linkGo.addEventListener('click',()=>{ const i=pageIndex(e.link); if(i>=0){ curPage=i; selId=null; renderCanvas(); renderPages(); renderProps(); toast('연결된 페이지로 이동'); } });
-  $('el-del').addEventListener('click',()=>{ page().elements=page().elements.filter(x=>x.id!==e.id); selId=null; afterMutate(); });
+  $('el-del').addEventListener('click',()=>{ const del=expandTabDelete(new Set([e.id])); page().elements=page().elements.filter(x=>!del.has(x.id)); selId=null; selIds=new Set(); afterMutate(); });
   $('el-dup').addEventListener('click',()=>{ const c={...JSON.parse(JSON.stringify(e)),id:uid(),x:e.x+20,y:e.y+20}; page().elements.push(c); selId=c.id; afterMutate(); });
   $('el-front').addEventListener('click',()=>{ const arr=page().elements; const i=arr.findIndex(x=>x.id===e.id); arr.push(arr.splice(i,1)[0]); afterMutate(); });
   $('el-back').addEventListener('click',()=>{ const arr=page().elements; const i=arr.findIndex(x=>x.id===e.id); arr.unshift(arr.splice(i,1)[0]); afterMutate(); });
@@ -1957,6 +2047,114 @@ const FX_DESC={
   },
 };
 let _fxInfoOpen=null;
+// ── 캔버스 직접 연결 모드 ── 트리거 효과 선택 후 캔버스에서 좌클릭으로 대상을 바로 연결
+let _linkPick=null; // {srcId, partnerType, group, idx, label}
+function lpIsLinked(t){ const lp=_linkPick; if(!lp) return false; const xfx=t.fx||{}; return xfx.type===lp.partnerType && xfx.group===lp.group && (lp.idx===undefined||(xfx.idx||0)===lp.idx); }
+function startLinkPick(srcEl, partnerType, group, idx, label){
+  _linkPick={srcId:srcEl.id, partnerType, group, idx, label:label||'대상'};
+  document.body.classList.add('lp-on'); showLinkPickBar(); renderCanvas(); renderProps();
+}
+function endLinkPick(){
+  if(!_linkPick) return;
+  _linkPick=null; document.body.classList.remove('lp-on');
+  const bar=document.getElementById('lp-bar'); if(bar) bar.remove();
+  renderCanvas(); renderProps();
+}
+function lpToggle(t){
+  const lp=_linkPick; if(!lp||t.id===lp.srcId) return;
+  if(lpIsLinked(t)){ delete t.fx; toast('연결 해제됨'); }
+  else { t.fx={type:lp.partnerType, group:lp.group}; if(lp.idx!==undefined) t.fx.idx=lp.idx; toast('연결됨 ✓'); }
+  renderCanvas(); save(true); snapshot(); showLinkPickBar();
+}
+function showLinkPickBar(){
+  const lp=_linkPick; if(!lp) return;
+  let bar=document.getElementById('lp-bar');
+  if(!bar){ bar=document.createElement('div'); bar.id='lp-bar'; document.body.appendChild(bar); makeBarDraggable(bar); }
+  const cnt=page().elements.filter(x=>x.id!==lp.srcId && lpIsLinked(x)).length;
+  bar.innerHTML=`<span>🎯 연결할 <b>${lp.label}</b>을(를) 캔버스에서 <b>클릭</b>하세요 · 다시 클릭=해제 · 줌으로 화면 크기조절 가능 · 현재 <b>${cnt}개</b> 연결됨</span><button id="lp-done">✓ 완료</button>`;
+  bar.querySelector('#lp-done').onclick=endLinkPick;
+}
+document.addEventListener('keydown',ev=>{ if(ev.key==='Escape' && _linkPick){ ev.stopPropagation(); endLinkPick(); } }, true);
+// ── 탭 섹션 편집 모드 ── 한 탭의 내용만 캔버스에 보이게 + 새 요소 자동 소속 + 선택 일괄 지정
+let _tabEditView=null; // {group, idx}
+// 편집 중인 탭=그 탭 활성, 기본 화면(전체보기)=아무 탭도 안 눌린 중립(선택 전만). twin 기준이라 위치/크기 바뀌어도 안 꼬임.
+function _tabVisibleIdx(group){ return (_tabEditView && _tabEditView.group===group) ? _tabEditView.idx : -1; }
+function _tabHiddenInEdit(e){
+  const f=e.fx; if(!f || f.type!=='tab-content') return false;
+  const vis=_tabVisibleIdx(f.group);
+  if(vis>=0) return (f.idx||0)!==vis;                 // 탭별 편집: 그 탭(선택 후 + 내용)만 보임
+  if(e.twin && /_b\d+$/.test(e.twin)) return true;    // 전체보기: '선택 후 버튼'은 숨김 → 선택 전(회색)이 보임
+  return (f.idx||0)!==0;                              // 내용 패널은 탭 0만 표시
+}
+function _tabTagNew(e){ if(_tabEditView){ e.fx={type:'tab-content', group:_tabEditView.group, idx:_tabEditView.idx}; } return e; }
+function tabGroupIdxs(group){ const s=new Set(); page().elements.forEach(e=>{ const f=e.fx; if(f && (f.type==='tab-trigger'||f.type==='tab-content') && f.group===group) s.add(f.idx||0); }); return [...s].sort((a,b)=>a-b); }
+// 그룹 G의 트리거(선택 전 버튼) 행 기준 y. 이보다 충분히 아래면 '내용 패널', 아니면 '버튼'으로 구분(크기 무관).
+function _tabTrigOf(G,triggers){ return triggers.find(t=>t.fx.group===G)||triggers[0]; }
+function _isTabPanel(o,tr){ return (o.y - tr.y) > tr.h*1.5; }
+// 선택 후(파랑) 버튼의 '위치'를 선택 전(회색) 트리거에 맞춤 — 기존에 어긋난 탭 정렬용(크기는 유지)
+function _snapTabSelButtons(){
+  const els=page().elements;
+  const triggers=els.filter(o=>o.fx&&o.fx.type==='tab-trigger');
+  triggers.forEach(tr=>{
+    const g=tr.fx.group, idx=tr.fx.idx||0;
+    els.forEach(o=>{ const f=o.fx; if(!f||f.type!=='tab-content'||f.group!==g||(f.idx||0)!==idx) return;
+      if(!_isTabPanel(o,tr)){ o.x=tr.x; o.y=tr.y; }  // 버튼 행에 있는 선택후 버튼만 위치 정렬(크기 유지)
+    });
+  });
+}
+// 탭 요소를 옮기면 짝(선택전↔선택후 버튼은 같은 idx끼리, 내용 패널은 모두)을 '같은 거리만큼' 따라 이동 — 위치만, 크기는 보존
+function _syncTabMove(){
+  if(!drag) return;
+  const els=page().elements;
+  const triggers=els.filter(o=>o.fx&&o.fx.type==='tab-trigger'); if(!triggers.length) return;
+  const movedGroups=new Set(); [...selIds].forEach(id=>{ const e2=el(id); if(e2&&e2.groupId) movedGroups.add(e2.groupId); });
+  const done=new Set();
+  movedGroups.forEach(gid=>{
+    const sib=els.find(o=>o.groupId===gid && o.fx && (o.fx.type==='tab-trigger'||o.fx.type==='tab-content')); if(!sib) return;
+    const ref=els.find(o=>o.groupId===gid && drag.els[o.id]); if(!ref) return;
+    const dx=ref.x-drag.els[ref.id].ox, dy=ref.y-drag.els[ref.id].oy; if(!dx&&!dy) return;
+    const f=sib.fx, G=f.group, idx=f.idx||0, tr=_tabTrigOf(G,triggers);
+    const movedIsPanel=(f.type==='tab-content') && _isTabPanel(sib,tr);
+    const targets=new Set();
+    if(movedIsPanel){
+      // 내용 패널 이동 → 같은 그룹의 모든 내용 패널 따라오기 (크기 무관, y 위치로 판별)
+      els.forEach(o=>{ if(o.fx&&o.fx.type==='tab-content'&&o.fx.group===G&&_isTabPanel(o,tr)) targets.add(o.groupId); });
+    } else {
+      // 버튼 이동(선택전 트리거 or 선택후) → 같은 idx의 버튼 행 요소들 따라오기
+      els.forEach(o=>{ if(o.fx&&(o.fx.type==='tab-trigger'||o.fx.type==='tab-content')&&o.fx.group===G&&(o.fx.idx||0)===idx&&!_isTabPanel(o,tr)) targets.add(o.groupId); });
+    }
+    targets.forEach(tgid=>{ if(tgid===gid||movedGroups.has(tgid)||done.has(tgid)) return; done.add(tgid); els.forEach(o=>{ if(o.groupId===tgid){ o.x=Math.round(o.x+dx); o.y=Math.round(o.y+dy); } }); });
+  });
+}
+function setTabEditView(group, idx){ _tabEditView={group, idx}; document.body.classList.add('tev-on'); showTabEditBar(); renderCanvas(); renderProps(); renderFxPanel(); }
+function clearTabEditView(){ if(!_tabEditView) return; _tabEditView=null; document.body.classList.remove('tev-on'); const b=document.getElementById('tev-bar'); if(b) b.remove(); renderCanvas(); renderProps(); renderFxPanel(); }
+function tabAssignSelection(){ const v=_tabEditView; if(!v) return; const arr=selAll(); if(!arr.length){ toast('먼저 캔버스에서 요소를 선택하세요'); return; } arr.forEach(e=>{ e.fx={type:'tab-content', group:v.group, idx:v.idx}; }); afterMutate(); toast(`${arr.length}개를 '탭 ${v.idx}' 내용으로 지정`); showTabEditBar(); }
+// 상단 배너(탭편집/연결)를 드래그로 옮길 수 있게 — 버튼 클릭은 그대로
+function makeBarDraggable(bar){
+  bar.style.cursor='move';
+  bar.addEventListener('mousedown',function(ev){
+    ev.stopPropagation();
+    if(ev.target.closest('button')) return; // 버튼은 클릭 동작 유지
+    ev.preventDefault();
+    const r=bar.getBoundingClientRect();
+    bar.style.left=r.left+'px'; bar.style.top=r.top+'px'; bar.style.transform='none';
+    const ox=ev.clientX-r.left, oy=ev.clientY-r.top;
+    function mm(e){ bar.style.left=Math.max(0,Math.min(window.innerWidth-r.width, e.clientX-ox))+'px'; bar.style.top=Math.max(0,Math.min(window.innerHeight-r.height, e.clientY-oy))+'px'; }
+    function mu(){ window.removeEventListener('mousemove',mm); window.removeEventListener('mouseup',mu); }
+    window.addEventListener('mousemove',mm); window.addEventListener('mouseup',mu);
+  });
+}
+function showTabEditBar(){
+  const v=_tabEditView; if(!v) return;
+  let b=document.getElementById('tev-bar');
+  if(!b){ b=document.createElement('div'); b.id='tev-bar'; document.body.appendChild(b); makeBarDraggable(b); }
+  const cnt=page().elements.filter(e=>{const f=e.fx;return f&&f.type==='tab-content'&&f.group===v.group&&(f.idx||0)===v.idx;}).length;
+  const tabs=tabGroupIdxs(v.group).map(i=>`<button class="tev-bar-tab${i===v.idx?' on':''}" data-i="${i}">탭 ${i}</button>`).join('');
+  b.innerHTML=`<span>📑 편집 중 · 새 요소가 <b>탭 ${v.idx}</b>에 들어감 · ${cnt}개</span><span class="tev-bar-tabs">${tabs}</span><button id="tev-assign">선택 요소 지정</button><button id="tev-done">✓ 완료</button>`;
+  b.querySelectorAll('.tev-bar-tab').forEach(btn=>btn.onclick=()=>setTabEditView(v.group, +btn.dataset.i));
+  b.querySelector('#tev-assign').onclick=tabAssignSelection;
+  b.querySelector('#tev-done').onclick=clearTabEditView;
+}
 let _fxPending=null; // null=대기없음, ''=없음 선택, 'scroll-reveal' 등=대기중
 let _fxLastElId=null; // 요소 바뀌면 pending 초기화용
 function renderFxPanel(){
@@ -2039,6 +2237,8 @@ function renderFxPanel(){
       const partnerLabel=ft==='hover-show'?'마우스 올리면 나타날 요소':'이 요소를 보여줄 트리거 요소';
       const pageEls=page().elements.filter(x=>x.id!==e.id);
       opts+=`<div class="grp"><label class="lbl">${partnerLabel}</label>
+        <button class="tb-btn primary lp-pick-btn" data-pt="${partnerType}" data-grp="${myGroup}" data-lbl="${partnerLabel}" style="width:100%;margin-bottom:7px">🎯 화면에서 직접 연결하기</button>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">버튼을 누르고 캔버스에서 대상을 클릭하세요 · 아래 목록에서 골라도 됩니다</div>
         <div style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto" id="el-linker">
         ${pageEls.length===0?`<div style="font-size:12px;color:var(--sub);text-align:center;padding:10px">페이지에 다른 요소가 없습니다</div>`
         :pageEls.map(x=>{
@@ -2065,7 +2265,20 @@ function renderFxPanel(){
       const partnerLabel=ft==='tab-trigger'?'이 버튼이 보여줄 내용 요소':'이 내용을 활성화하는 탭 버튼';
       const pageEls=page().elements.filter(x=>x.id!==e.id);
       opts+=`<div class="grp"><label class="lbl">탭 번호 <span style="color:var(--sub);font-weight:400">(0부터 시작)</span></label><input type="number" id="eff-idx" value="${myIdx}" min="0" max="20"></div>
+      <div class="grp"><label class="lbl">📑 탭별 편집 <span style="color:var(--sub);font-weight:400">(한 탭씩 보면서 편집)</span></label>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">
+          ${tabGroupIdxs(myGroup).map(i=>`<button class="tb-btn tev-btn${_tabEditView&&_tabEditView.group===myGroup&&_tabEditView.idx===i?' on':''}" data-grp="${myGroup}" data-i="${i}">탭 ${i}</button>`).join('')}
+          <button class="tb-btn tev-all">전체 보기</button>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:6px">탭을 누르면 그 탭 내용만 캔버스에 보이고, 새로 추가하는 요소는 그 탭에 자동 소속됩니다.</div>
+      </div>
+      ${ft==='tab-trigger'?`<div class="grp" style="background:rgba(108,123,255,.08);border:1px solid var(--border);border-radius:8px;padding:9px 11px">
+        <div style="font-size:12px;color:var(--text);font-weight:700;margin-bottom:3px">🎨 선택 전 / 선택 후 둘 다 디자인</div>
+        <div style="font-size:11px;color:var(--sub)">이 <b>회색 버튼 = 선택 전</b> 모양이고, 같은 자리에 겹친 <b>파란 버튼 = 선택 후</b> 모양입니다. 둘 다 캔버스에서 색·글자를 자유롭게 바꾸세요. 「📑 탭별 편집」에서 탭을 고르면 그 탭의 '선택 후' 버튼이 보여 편집할 수 있습니다.</div>
+      </div>`:''}
       <div class="grp"><label class="lbl">${partnerLabel}</label>
+        <button class="tb-btn primary lp-pick-btn" data-pt="${partnerType}" data-grp="${myGroup}" data-idx="${myIdx}" data-lbl="${partnerLabel}" style="width:100%;margin-bottom:7px">🎯 화면에서 직접 연결하기</button>
+        <div style="font-size:11px;color:var(--sub);margin-bottom:6px">버튼을 누르고 캔버스에서 이 탭 번호의 내용을 클릭하세요 · 아래 목록에서 골라도 됩니다</div>
         <div style="display:flex;flex-direction:column;gap:5px;max-height:160px;overflow-y:auto" id="el-linker">
         ${pageEls.length===0?`<div style="font-size:12px;color:var(--sub);text-align:center;padding:10px">페이지에 다른 요소가 없습니다</div>`
         :pageEls.map(x=>{
@@ -2110,7 +2323,9 @@ function renderFxPanel(){
         <button id="eff-auto" class="${fx.auto!==false?'on':''}">⏯ 자동재생</button>
         <button id="eff-arrows" class="${fx.arrows!==false?'on':''}">◀▶ 화살표</button>
         <button id="eff-dots" class="${fx.dots!==false?'on':''}">● 점</button>
-      </div>`;
+      </div>
+      <div class="btn-grp grp"><button id="eff-peek" class="${fx.peek?'on':''}" style="width:100%">🖼 양옆 미리보기 (센터 모드)</button></div>
+      <div style="font-size:11px;color:var(--sub);margin-top:-4px">켜면 가운데 사진이 크게, 좌우 사진이 살짝 보입니다 (발행/미리보기에서 확인)</div>`;
     }
     if(ft==='hover-expand'){
       opts+=`<div class="grp"><label class="lbl">접혔을 때 높이 <span style="float:right;color:var(--accent)">${fx.collapsedH||60}px</span></label>
@@ -2177,6 +2392,16 @@ function renderFxPanel(){
   // 취소 버튼
   const cancelBtn=document.getElementById('fx-cancel-btn');
   if(cancelBtn) cancelBtn.addEventListener('click',()=>{ _fxPending=null; renderFxPanel(); });
+  // 📑 탭별 편집 스위처
+  box.querySelectorAll('.tev-btn').forEach(b=>b.addEventListener('click',()=>setTabEditView(b.dataset.grp, +b.dataset.i)));
+  box.querySelectorAll('.tev-all').forEach(b=>b.addEventListener('click',clearTabEditView));
+  // 🎯 화면에서 직접 연결 버튼 → 캔버스 연결 모드 진입
+  box.querySelectorAll('.lp-pick-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const idx = b.dataset.idx!==undefined ? +b.dataset.idx : undefined;
+      startLinkPick(e, b.dataset.pt, b.dataset.grp, idx, b.dataset.lbl);
+    });
+  });
   // 요소 연결/해제 클릭
   box.querySelectorAll('.el-link-row').forEach(row=>{
     row.addEventListener('click',()=>{
@@ -2245,6 +2470,7 @@ function renderFxPanel(){
   });
   (fx.slides||[]).forEach((_,i)=>{const d=document.getElementById(`sl-del-${i}`);if(d)d.addEventListener('click',()=>{e.fx.slides.splice(i,1);renderFxPanel();save(true);snapshot();});});
   ['eff-auto','eff-arrows','eff-dots'].forEach(bid=>{const b=document.getElementById(bid);if(b)b.addEventListener('click',()=>{if(!e.fx)e.fx={};const k=bid==='eff-auto'?'auto':bid==='eff-arrows'?'arrows':'dots';e.fx[k]=e.fx[k]===false;renderFxPanel();save(true);snapshot();});});
+  { const bp=document.getElementById('eff-peek'); if(bp) bp.addEventListener('click',()=>{ if(!e.fx)e.fx={}; e.fx.peek=!e.fx.peek; renderFxPanel(); save(true); snapshot(); }); }
 }
 
 // ───────────────────────── 탭 전환 ─────────────────────────
@@ -2684,6 +2910,138 @@ document.getElementById('tpl-close').onclick=closeTplModal;
 document.getElementById('tpl-modal').addEventListener('mousedown',e=>{ if(e.target.id==='tpl-modal') closeTplModal(); });
 
 // ── 우클릭 링크 메뉴 ──
+// z순서(레이어) 변경 — 선택 요소들을 맨앞/앞으로/뒤로/맨뒤로
+function _zorder(dir){
+  const arr=page().elements, sel=selAll(); if(!sel.length) return;
+  const ids=new Set(sel.map(e=>e.id));
+  if(dir==='front'){ const picked=arr.filter(e=>ids.has(e.id)), rest=arr.filter(e=>!ids.has(e.id)); page().elements=[...rest,...picked]; }
+  else if(dir==='back'){ const picked=arr.filter(e=>ids.has(e.id)), rest=arr.filter(e=>!ids.has(e.id)); page().elements=[...picked,...rest]; }
+  else if(dir==='forward'){ for(let i=arr.length-2;i>=0;i--){ if(ids.has(arr[i].id)&&!ids.has(arr[i+1].id)) [arr[i],arr[i+1]]=[arr[i+1],arr[i]]; } }
+  else if(dir==='backward'){ for(let i=1;i<arr.length;i++){ if(ids.has(arr[i].id)&&!ids.has(arr[i-1].id)) [arr[i],arr[i-1]]=[arr[i-1],arr[i]]; } }
+  afterMutate();
+}
+// PPT식 우클릭 컨텍스트 메뉴 (일반 요소). 화살표 항목은 호버하면 옆으로 flyout이 펼쳐짐.
+function showElementCtx(x,y,e){
+  const m=document.getElementById('ctx-menu');
+  document.getElementById('ctx-fly')?.remove();
+  const fly=document.createElement('div'); fly.id='ctx-fly'; fly.className='ctx'; fly.style.cssText='position:fixed;display:none;z-index:9600'; document.body.appendChild(fly);
+  const hasShape = selShapeEls().length>0 || e.type==='shape';
+  const hasText  = selTextEls().length>0  || e.type==='text';
+  const linkTargets=()=> (selAll().length?selAll():[e]);
+  let flyTimer=null, curKey=null, curItem=null;
+  const closeAll=()=>{ hideCtx(); };
+  const BBTN='padding:6px 4px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:13px';
+  // ── 메인 메뉴 ──
+  const row=(ic,lb,kb,act)=>`<div class="ci" data-act="${act}" style="display:flex;align-items:center;gap:9px"><span style="width:18px;text-align:center">${ic}</span><span style="flex:1">${lb}</span>${kb?`<span style="color:var(--sub);font-size:11px;margin-left:18px">${kb}</span>`:''}</div>`;
+  const fl =(ic,lb,key)=>`<div class="ci ci-fly" data-fly="${key}" style="display:flex;align-items:center;gap:9px"><span style="width:18px;text-align:center">${ic}</span><span style="flex:1">${lb}</span><span style="color:var(--sub)">▸</span></div>`;
+  let h='';
+  h+=row('✂','잘라내기','Ctrl+X','cut')+row('📋','복사','Ctrl+C','copy')+row('📄','붙여넣기','Ctrl+V','paste');
+  h+='<div class="sep"></div>';
+  h+=fl('🗂','레이어','layer');
+  if(hasShape) h+=fl('🔷','도형 모양 변경','shape');
+  h+=fl('↔','정렬','align');
+  h+=row('✨','이펙트 추가','','fx')+row('⚙','서식 옵션','','format');
+  h+='<div class="sep"></div>';
+  if(hasText)  h+=fl('🅰','텍스트','text');
+  if(hasShape) h+=fl('🎨','색상(채우기)','fill');
+  if(hasShape) h+=fl('▢','테두리','border');
+  h+='<div class="sep"></div>';
+  h+=fl('🔗','링크','link');
+  m.innerHTML=h; m.style.display='block';
+  m.style.left=Math.min(x, window.innerWidth-m.offsetWidth-8)+'px';
+  m.style.top=Math.min(y, window.innerHeight-m.offsetHeight-8)+'px';
+  // ── flyout 내용 ──
+  function flyHTML(key){
+    if(key==='layer') return [['z-front','⏫ 맨 앞으로'],['z-forward','🔼 앞으로'],['z-backward','🔽 뒤로'],['z-back','⏬ 맨 뒤로']].map(a=>`<div class="ci" data-act="${a[0]}">${a[1]}</div>`).join('');
+    if(key==='align') return [['a-l','◧ 왼쪽'],['a-cx','▥ 가로 가운데'],['a-r','◨ 오른쪽'],['a-t','⊤ 위'],['a-cy','▤ 세로 가운데'],['a-b','⊥ 아래']].map(a=>`<div class="ci" data-act="${a[0]}">${a[1]}</div>`).join('');
+    if(key==='shape') return [['rect','■ 사각형'],['rrect','▢ 둥근 사각형'],['circle','● 원/타원']].map(s=>`<div class="ci" data-shape="${s[0]}">${s[1]}</div>`).join('');
+    if(key==='link'){ const others=project.pages.filter(p=>p.id!==page().id); let s=''; if(others.length) others.forEach(p=>{ s+=`<div class="ci ${e.link===p.id?'cur':''}" data-link="${p.id}">${e.link===p.id?'✓ ':''}${escapeHtml(p.name||'페이지')}</div>`; }); else s+='<div class="head">다른 페이지가 없어요</div>'; s+='<div class="sep"></div><div class="ci" data-act="link-new">＋ 새 페이지 연결</div>'; if(e.link) s+='<div class="ci" data-act="link-go">✎ 연결 페이지로</div><div class="ci" data-act="link-clear">✖ 링크 해제</div>'; return s; }
+    if(key==='text'){
+      const t=selTextEls()[0]||{}, wOn=(t.fontWeight||400)>=700, al=t.align||'center';
+      const onS='background:var(--accent);color:#fff;border-color:var(--accent)';
+      return `<div style="padding:7px;display:flex;flex-direction:column;gap:7px;min-width:218px">
+        <select class="ct-font" style="width:100%;padding:6px 7px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">${_fontOpts(t.fontFamily)}</select>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:11px;color:var(--sub)">크기</span><input class="ct-size" type="number" min="6" max="200" value="${t.fontSize||16}" style="width:58px;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">
+          <select class="ct-weight" style="flex:1;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px">${[['300','얇게'],['400','보통'],['500','중간'],['700','굵게'],['800','더굵게'],['900','매우굵게']].map(w=>`<option value="${w[0]}" ${String(t.fontWeight||400)===w[0]?'selected':''}>${w[1]}</option>`).join('')}</select>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="ct-tb" data-tb="bold" style="flex:1;font-weight:800;${BBTN};${wOn?onS:''}">B</button>
+          <button class="ct-tb" data-tb="italic" style="flex:1;font-style:italic;${BBTN};${t.italic?onS:''}">I</button>
+          <button class="ct-tb" data-tb="underline" style="flex:1;text-decoration:underline;${BBTN};${t.underline?onS:''}">U</button>
+        </div>
+        <div style="display:flex;gap:5px">
+          <button class="ct-al" data-al="left" style="flex:1;${BBTN};${al==='left'?onS:''}">⬅</button>
+          <button class="ct-al" data-al="center" style="flex:1;${BBTN};${al==='center'?onS:''}">↔</button>
+          <button class="ct-al" data-al="right" style="flex:1;${BBTN};${al==='right'?onS:''}">➡</button>
+          <button class="ct-al" data-al="justify" style="flex:1;${BBTN};${al==='justify'?onS:''}">▤</button>
+        </div>
+        <button class="ct-cp" data-cp="textColor" style="${BBTN};display:flex;align-items:center;gap:7px;justify-content:center"><span style="width:14px;height:14px;border-radius:3px;border:1px solid var(--border);background:${t.color||'#000'}"></span> 글자 색</button>
+      </div>`;
+    }
+    if(key==='fill'){
+      const s=selShapeEls()[0]||{};
+      return `<div style="padding:7px;display:flex;flex-direction:column;gap:7px;min-width:178px">
+        <button class="ct-cp" data-cp="fill" style="${BBTN};display:flex;align-items:center;gap:7px;justify-content:center"><span style="width:14px;height:14px;border-radius:3px;border:1px solid var(--border);background:${s.fill||'#ccc'}"></span> 채우기 색</button>
+        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:var(--sub)">모서리</span><input class="ct-radius" type="number" min="0" max="400" value="${s.radius||0}" style="flex:1;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"></div>
+      </div>`;
+    }
+    if(key==='border'){
+      const s=selShapeEls()[0]||{};
+      return `<div style="padding:7px;display:flex;flex-direction:column;gap:7px;min-width:178px">
+        <button class="ct-cp" data-cp="outline" style="${BBTN};display:flex;align-items:center;gap:7px;justify-content:center"><span style="width:14px;height:14px;border-radius:3px;border:1px solid var(--border);background:${s.borderColor||'#333'}"></span> 테두리 색</button>
+        <div style="display:flex;gap:6px;align-items:center"><span style="font-size:11px;color:var(--sub)">두께</span><input class="ct-bw" type="number" min="0" max="40" value="${s.borderW||0}" style="flex:1;padding:6px;background:var(--panel2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px"></div>
+      </div>`;
+    }
+    return '';
+  }
+  function showFly(key,item){
+    curKey=key; curItem=item; fly.innerHTML=flyHTML(key); fly.style.display='block';
+    const r=item.getBoundingClientRect();
+    let left=r.right+2; if(left+fly.offsetWidth>window.innerWidth-6) left=Math.max(6,r.left-fly.offsetWidth-2);
+    let top=r.top; if(top+fly.offsetHeight>window.innerHeight-6) top=Math.max(6,window.innerHeight-fly.offsetHeight-6);
+    fly.style.left=left+'px'; fly.style.top=top+'px';
+    m.querySelectorAll('.ci-fly').forEach(it=>it.style.background=''); item.style.background='var(--accent)'; item.style.color='#fff';
+    wireFly();
+  }
+  function refreshFly(){ if(curKey&&curItem) showFly(curKey,curItem); }
+  function doAct(a){
+    if(a==='cut') cutSel();
+    else if(a==='copy') copySel();
+    else if(a==='paste') pasteClipboard();
+    else if(a==='fx'){ selId=e.id; renderProps(); switchPropTab('fx'); }
+    else if(a==='format'){ selId=e.id; renderProps(); switchPropTab('attrs'); }
+    else if(a==='z-front')_zorder('front'); else if(a==='z-forward')_zorder('forward'); else if(a==='z-backward')_zorder('backward'); else if(a==='z-back')_zorder('back');
+    else if(a.startsWith('a-')) alignSelection(a.slice(2));
+    else if(a==='link-new'){ const nm=prompt('새 페이지 이름','새 페이지'); if(nm!==null){ const child=newPage(nm||'새 페이지', page().id); project.pages.push(child); linkTargets().forEach(x=>x.link=child.id); afterMutate(); toast('새 페이지를 만들어 연결'); } }
+    else if(a==='link-go'){ const i=pageIndex(e.link); if(i>=0){ curPage=i; selId=null; renderCanvas(); renderPages(); renderProps(); toast('연결 페이지로 이동'); } }
+    else if(a==='link-clear'){ linkTargets().forEach(x=>x.link=null); afterMutate(); toast('링크 해제됨'); }
+    if(a!=='copy') closeAll();
+  }
+  function wireFly(){
+    fly.querySelectorAll('[data-act]').forEach(it=>it.addEventListener('click',()=>doAct(it.dataset.act)));
+    fly.querySelectorAll('[data-shape]').forEach(it=>it.addEventListener('click',()=>{ selShapeEls().forEach(s=>s.shape=it.dataset.shape); afterMutate(); closeAll(); }));
+    fly.querySelectorAll('[data-link]').forEach(it=>it.addEventListener('click',()=>{ linkTargets().forEach(z=>z.link=it.dataset.link); afterMutate(); toast('링크 연결됨 🔗'); closeAll(); }));
+    fly.querySelectorAll('[data-cp]').forEach(b=>b.addEventListener('click',ev=>{ ev.stopPropagation(); toggleColorPopup(b.dataset.cp, b); }));
+    const fs=fly.querySelector('.ct-font'); if(fs) fs.addEventListener('change',()=>{ const v=fs.value; loadFont(v); applyToTexts(t=>t.fontFamily=v); });
+    const sz=fly.querySelector('.ct-size'); if(sz) sz.addEventListener('input',()=>{ const v=parseInt(sz.value)||16; applyToTexts(t=>t.fontSize=v,true); });
+    const wt=fly.querySelector('.ct-weight'); if(wt) wt.addEventListener('change',()=>{ const v=parseInt(wt.value)||400; applyToTexts(t=>t.fontWeight=v); refreshFly(); });
+    fly.querySelectorAll('.ct-tb').forEach(b=>b.addEventListener('click',()=>{ const k=b.dataset.tb, t0=selTextEls()[0]||{}; if(k==='bold'){ const on=(t0.fontWeight||400)>=700; applyToTexts(t=>t.fontWeight=on?400:700); } else if(k==='italic'){ const on=!t0.italic; applyToTexts(t=>t.italic=on); } else { const on=!t0.underline; applyToTexts(t=>t.underline=on); } refreshFly(); }));
+    fly.querySelectorAll('.ct-al').forEach(b=>b.addEventListener('click',()=>{ applyToTexts(t=>t.align=b.dataset.al); refreshFly(); }));
+    const rd=fly.querySelector('.ct-radius'); if(rd) rd.addEventListener('input',()=>{ const v=parseInt(rd.value)||0; applyToShapes(s=>{ if(s.shape!=='circle') s.radius=v; }); });
+    const bw=fly.querySelector('.ct-bw'); if(bw) bw.addEventListener('input',()=>{ const v=parseInt(bw.value)||0; applyToShapes(s=>s.borderW=v); });
+  }
+  // ── 호버/클릭으로 flyout 열기 ──
+  m.querySelectorAll('.ci-fly').forEach(it=>{
+    it.addEventListener('mouseenter',()=>{ clearTimeout(flyTimer); showFly(it.dataset.fly, it); });
+    it.addEventListener('mouseleave',()=>{ flyTimer=setTimeout(()=>fly.style.display='none',200); });
+    it.addEventListener('click',ev=>{ ev.stopPropagation(); clearTimeout(flyTimer); showFly(it.dataset.fly, it); });
+  });
+  fly.addEventListener('mouseenter',()=>clearTimeout(flyTimer));
+  fly.addEventListener('mouseleave',()=>{ flyTimer=setTimeout(()=>fly.style.display='none',200); });
+  // ── 메인 메뉴 단순 액션 ──
+  m.querySelectorAll('[data-act]').forEach(it=>it.addEventListener('click',()=>doAct(it.dataset.act)));
+}
 function showLinkMenu(x,y,e){
   const m=document.getElementById('ctx-menu');
   const others=project.pages.filter(p=>p.id!==page().id);
@@ -3222,8 +3580,8 @@ function _tblCellAlign(e,r,c,align){
   _tblCellProp(e,r,c,'align',align);
 }
 
-function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; }
-window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu') && !e.target.closest('#fill-dd') && !e.target.closest('#tbl-bd-pop')) hideCtx(); });
+function hideCtx(){ document.getElementById('ctx-menu').style.display='none'; document.getElementById('ctx-fly')?.remove(); }
+window.addEventListener('mousedown',e=>{ if(!e.target.closest('#ctx-menu') && !e.target.closest('#ctx-fly') && !e.target.closest('#fill-dd') && !e.target.closest('#tbl-bd-pop')) hideCtx(); });
 window.addEventListener('blur',hideCtx);
 
 // ── 페이지 맵 (노드 + 연결선) ──
@@ -3581,11 +3939,21 @@ async function addAiImg(file){
   try{ const {mediaType,data}=await downscaleToB64(file); aiRefImgs.push({mediaType,data}); renderAiThumbs(); }
   catch(err){ toast('이미지 처리 실패'); }
 }
-document.getElementById('btn-ai').onclick=()=>{ document.getElementById('ai-modal').style.display='flex'; };
+document.getElementById('btn-ai').onclick=()=>{ document.getElementById('ai-modal').style.display='flex'; setTimeout(()=>{ const d=document.getElementById('ai-desc'); if(d) d.focus(); },50); };
 document.getElementById('ai-close').onclick=()=>{ document.getElementById('ai-modal').style.display='none'; };
 document.getElementById('ai-modal').addEventListener('mousedown',e=>{ if(e.target.id==='ai-modal') e.currentTarget.style.display='none'; });
-document.getElementById('ai-img-pick').onclick=()=>document.getElementById('ai-img-file').click();
+document.getElementById('ai-img-folder').onclick=()=>document.getElementById('ai-img-file').click();
 document.getElementById('ai-img-clear').onclick=e=>{ e.stopPropagation(); aiRefImgs=[]; renderAiThumbs(); };
+// 참고 이미지 영역: 드래그&드롭으로도 첨부 (클릭으로는 파일창을 열지 않음)
+(function(){ const z=document.getElementById('ai-img-pick'); if(!z) return;
+  const hi=on=>{ z.style.borderColor = on?'var(--accent2)':''; };
+  z.addEventListener('dragover',e=>{ e.preventDefault(); hi(true); });
+  z.addEventListener('dragleave',()=>hi(false));
+  z.addEventListener('drop',async e=>{ e.preventDefault(); hi(false);
+    const fs=[...((e.dataTransfer&&e.dataTransfer.files)||[])].filter(f=>f.type.indexOf('image')===0);
+    for(const f of fs) await addAiImg(f);
+  });
+})();
 document.getElementById('ai-img-file').addEventListener('change', async e=>{
   const files=[...e.target.files]; e.target.value='';
   for(const f of files) await addAiImg(f);
@@ -3607,9 +3975,12 @@ document.getElementById('ai-url-go').onclick=async()=>{
     const res=await fetchSite({ url });
     const d=res.data||{};
     aiSiteRef=d;
+    // 렌더된 스크린샷이 오면 참고 이미지로 자동 첨부 → AI가 실제 화면을 봄
+    let shot=false;
+    if(d.screenshot){ const mm=String(d.screenshot).match(/^data:([^;]+);base64,(.+)$/); if(mm){ aiRefImgs.push({mediaType:mm[1], data:mm[2]}); renderAiThumbs(); shot=true; } }
     const cnt=(d.h1?.length||0)+(d.h2?.length||0)+(d.h3?.length||0);
     st.style.color='var(--accent2)';
-    st.textContent=`✓ 분석 완료: "${d.title||url}" · 제목 ${cnt}개 · 색상 ${(d.colors||[]).length}개 — '초안 생성하기'를 누르면 이 구조를 참고합니다`;
+    st.textContent=`✓ 분석 완료: "${d.title||url}" · 제목 ${cnt}개 · 색상 ${(d.colors||[]).length}개${(d.effects&&d.effects.length)?` · 효과 ${d.effects.join(', ')}`:''}${shot?' · 📷 스크린샷 첨부됨':''} — '초안 생성하기'를 누르면 이 구조를 참고합니다`;
   }catch(e){
     aiSiteRef=null;
     st.style.color='#ff8da3'; st.textContent='실패: '+((e.message||e+'').replace(/^.*?:/,'')||'가져오지 못했습니다');
@@ -3617,34 +3988,41 @@ document.getElementById('ai-url-go').onclick=async()=>{
 };
 document.getElementById('ai-go').onclick=async()=>{
   if(!isAdmin){ aiStatus('로그인이 필요합니다.'); openLogin(); return; }
-  const baseKey=document.getElementById('ai-base').value;
   const desc=document.getElementById('ai-desc').value.trim();
   const appendMode=document.getElementById('ai-append').checked;
-  const typeLabel=appendMode?'섹션(한 묶음)':({home:'병원 홈(메인)',about:'병원 소개',service:'진료 안내',contact:'오시는 길'}[baseKey]||'병원 페이지');
+  const typeLabel=appendMode?'섹션(한 묶음)':'병원 페이지';
+  const targetPageId=page().id; // 생성 시작 시점의 페이지 고정 — 완료 시 다른 페이지로 이동해도 여기에만 적용
   const SCHEMA_EXAMPLE=`{"name":"홈","bg":"#ffffff","elements":[
-  {"type":"shape","x":0,"y":0,"w":${PAGE_W},"h":520,"shape":"rect","fill":"#1a2b5c"},
+  {"type":"shape","x":0,"y":0,"w":${PAGE_W},"h":520,"shape":"rect","fill":"#1a2b5c","bleed":true},
   {"type":"text","x":120,"y":150,"w":620,"h":120,"text":"건강한 내일을 함께","fontSize":54,"fontWeight":900,"color":"#ffffff","align":"left"},
   {"type":"text","x":120,"y":300,"w":520,"h":80,"text":"환자 중심의 따뜻한 진료","fontSize":22,"fontWeight":400,"color":"#cfd8ff","align":"left"},
-  {"type":"shape","x":120,"y":410,"w":200,"h":60,"shape":"rrect","fill":"#3b82f6","radius":30},
-  {"type":"text","x":120,"y":425,"w":200,"h":32,"text":"진료 예약하기","fontSize":18,"fontWeight":700,"color":"#ffffff","align":"center"},
+  {"type":"shape","x":120,"y":410,"w":200,"h":60,"shape":"rrect","fill":"#3b82f6","radius":30,"stext":"진료 예약하기","stColor":"#ffffff","stSize":18,"stWeight":700,"stAlign":"center","stValign":"middle"},
   {"type":"image","x":760,"y":120,"w":320,"h":320},
-  {"type":"text","x":0,"y":640,"w":${PAGE_W},"h":50,"text":"진료 과목","fontSize":36,"fontWeight":900,"color":"#1a2b5c","align":"center"}
+  {"type":"text","x":0,"y":640,"w":${PAGE_W},"h":50,"text":"진료 과목","fontSize":36,"fontWeight":900,"color":"#1a2b5c","align":"center"},
+  {"type":"tabsection","x":120,"y":720,"w":960,"tabs":[
+    {"label":"진료안내","body":[{"type":"text","x":40,"y":40,"w":880,"h":40,"text":"내과 · 외과 · 정형외과","fontSize":24,"fontWeight":700,"color":"#1a2b5c"},{"type":"text","x":40,"y":100,"w":880,"h":120,"text":"각 분야 전문의가 정밀하게 진료합니다.","fontSize":17,"color":"#555"}]},
+    {"label":"의료진","body":[{"type":"text","x":40,"y":40,"w":880,"h":40,"text":"신뢰할 수 있는 의료진","fontSize":24,"fontWeight":700,"color":"#1a2b5c"}]},
+    {"label":"오시는길","body":[{"type":"text","x":40,"y":40,"w":880,"h":40,"text":"서울시 ○○구 ○○로 123","fontSize":20,"fontWeight":700,"color":"#1a2b5c"}]}
+  ]}
 ]}`;
   const sys=`너는 실력 있는 병원 홈페이지 디자이너다. 사용자의 참고 자료(URL 분석 결과 / 스크린샷 이미지 / 설명)를 바탕으로 '${typeLabel}' 페이지를 **처음부터 새로** 디자인해, 아래 스키마의 JSON 하나로만 응답한다. 베이스 골격은 없다 — 참고 자료의 분위기·구조·색을 살려 자유롭게 구성하라.
 
 캔버스: 가로폭 ${PAGE_W}px 고정. 모든 x는 0~${PAGE_W}. 세로 y는 0부터 아래로(보통 1400~2600), 여러 섹션(히어로/소개/카드/푸터 등)을 구성하라.
 요소 타입:
 - text: {"type":"text","x","y","w","h","text":"실제 문구","fontSize":숫자,"fontWeight":300~900,"color":"#hex","align":"left|center|right"}
-- shape: {"type":"shape","x","y","w","h","shape":"rect|rrect|circle","fill":"#hex","radius":숫자} ← 섹션 배경·카드·버튼 박스에 사용
-- image: {"type":"image","x","y","w","h"} ← src는 넣지 마라(자동으로 사진 자리표시자가 들어간다)
+- shape: {"type":"shape","x","y","w","h","shape":"rect|rrect|circle","fill":"#hex","radius":숫자} ← 섹션 배경·카드 배경에 사용. ★폭 전체를 덮는 섹션 배경 띠(예: x:0,w:${PAGE_W})에는 "bleed":true 를 더해라 → 발행 시 화면 좌우 끝까지 꽉 참(여백 없음).
+- shape(글자 포함): 위 shape에 "stext":"버튼/라벨 글자","stColor":"#hex","stSize":px,"stWeight":700,"stAlign":"center","stValign":"middle"를 더한 형태. ★버튼·태그·통계숫자·아이콘칩처럼 '도형+짧은 글자'는 반드시 이 stext 도형 하나로 만들어라. 도형 위에 별도 text를 겹치지 마라(요소 하나로).
+- image: {"type":"image","x","y","w","h"} ← src는 넣지 마라(자동으로 사진 자리표시자가 들어간다). 화면 전체를 덮는 히어로 배경 사진이면 "bleed":true 를 더해 화면 끝까지 차게 하라.
 - table: {"type":"table","x","y","w","h","cols":열수,"rows":행수,"cells":[{"r":0,"c":0,"text":"머리행항목"},...],"headerBg":"#hex","headerColor":"#fff","cellBg":"#fff","cellColor":"#333","fontSize":14,"borderW":1,"borderColor":"#ddd"} ← 진료시간·의료진·진료과목·가격·오시는길 안내 등 정보가 표로 정리되면 좋을 때 적극 활용. 첫 행(r:0)이 머리행. cells는 실제 한국어 내용으로 빠짐없이 채워라(placeholder 금지). w≈cols×140, h≈rows×44.
+- tabsection(탭 섹션): {"type":"tabsection","x","y","w","tabs":[{"label":"탭이름","body":[ ...패널 기준(좌상단 0,0) 상대좌표의 text/shape/image/table 요소들 ]}, ...]} ← 한 자리에서 탭을 눌러 내용이 바뀌는 섹션(예: 진료안내/의료진/오시는길). 탭 2~6개. body 각 요소의 x·y는 패널 영역(가로 0~w, 세로 0부터) 기준 상대좌표. ★탭 버튼·선택표시·전환 배선은 시스템이 자동 생성하니 너는 label과 body 내용만 채워라. 절대 탭 버튼을 shape로 직접 만들거나 fx에 tab-trigger/tab-content를 직접 쓰지 마라 — 탭이 필요하면 무조건 이 tabsection 형식만 사용.
 규칙:
 - 색상(bg, fill, color)은 참고 자료의 톤에 맞춰라.
 - 문구는 참고 자료에 있으면 반영하고, 없으면 병원에 어울리는 **자연스러운 한국어 문구를 직접 작성**하라. "제목","본문" 같은 자리표시자는 쓰지 마라.
-- 버튼은 둥근 shape(rrect) 위에 text를 겹쳐서 만든다. 카드도 연한 shape 위에 text를 얹는다.
+- 버튼·태그·통계 숫자 등 '도형+짧은 글자'는 stext 도형 하나로(별도 text 겹치기 금지). 카드는 연한 배경 shape 위에 제목/본문 text를 얹어 구성.
 - fontFamily는 보통 생략(기본 본고딕). 강조 제목엔 "Black Han Sans","Do Hyeon" 등을 써도 된다.
-- **맨 아래에 푸터 섹션**을 넣어라: 어두운 배경 띠(폭 전체 shape) 위에 병원명·주소·전화·진료시간·저작권(© 2026 …)을 흰/연한 글자로.
-- **주요 요소에 진입 효과를 절제해서 "fx"로 넣어도 된다**(없어도 됨): 큰 제목 {"type":"char-reveal"}, 히어로/큰 사진 {"type":"mask-wipe"} 또는 {"type":"blur-in"}, 같은 줄 카드들 {"type":"scroll-reveal","dir":"up","delay":0/100/200}(스태거). 과하지 않게, 본문·작은 글자엔 금지.
+- **섹션 배경은 화면 끝까지(bleed), 내용은 가운데**: 색이 다른 섹션마다 폭 전체 배경 띠 shape(x:0,w:${PAGE_W},"bleed":true)를 깔고, 그 위 제목·본문·카드 등 내용은 ${PAGE_W} 폭 안에 배치(내용 요소엔 bleed 금지). 이러면 넓은 화면에서 배경은 끝까지 차고 글자는 중앙에 모인다.
+- **맨 아래에 푸터 섹션**을 넣어라: 어두운 배경 띠(폭 전체 shape, "bleed":true) 위에 병원명·주소·전화·진료시간·저작권(© 2026 …)을 흰/연한 글자로.
+- **주요 요소에 효과를 절제해서 "fx"로 넣어도 된다**(없어도 됨): 큰 제목 {"type":"char-reveal"}, 히어로/큰 사진 {"type":"mask-wipe"}·{"type":"blur-in"}·{"type":"parallax","speed":0.15}, 같은 줄 카드들 {"type":"scroll-reveal","dir":"up","delay":0/100/200}(스태거), 주목 버튼 1개 {"type":"pulse"} 또는 {"type":"hover-lift"}, 통계 숫자 도형 {"type":"counter","from":0,"to":100,"suffix":"+"}, 사진 여러 장은 image에 {"type":"slider","peek":true}(양옆 살짝 보임). 과하지 않게, 본문·작은 글자엔 금지.
 - **고정탭(선택)**: 최상위에 "fixedTabs":[{"corner":"br","dir":"col","bg":"#hex","color":"#fff","radius":26,"items":[{"label":"📞 전화상담","action":"url","url":"tel:"},{"label":"예약하기","action":"top"}]}] 를 넣으면 화면 모서리에 항상 떠 있는 플로팅 버튼이 생긴다(전 페이지 공통). 병원 페이지엔 전화/예약 같은 상시 버튼이 유용하니 1개 정도 권장(과하면 생략). corner=tl|tr|bl|br, action=top(맨위로)|url(외부·tel:전화)|link(내부페이지).
 출력: 오직 {"name":"..","bg":"#hex","elements":[..],"fixedTabs":[..](선택)} JSON 하나. 마크다운/설명/주석 금지. 큰따옴표·정수·트레일링콤마 없음·끝까지 완성된 유효 JSON.
 스키마 예시(형식 참고용, 그대로 베끼지 말 것):
@@ -3655,8 +4033,10 @@ ${SCHEMA_EXAMPLE}`;
   let userText = desc ? `요청: ${desc}` : '참고 자료의 분위기에 맞춰 보기 좋은 병원 페이지를 만들어줘.';
   if(aiSiteRef){
     const s=aiSiteRef;
+    const brand=(s.brandColors&&s.brandColors.length)?`\n- 브랜드 색(CSS변수에서 추출 — 가장 우선 고려): ${s.brandColors.join(', ')}`:'';
+    const effLine=(s.effects&&s.effects.length)?`\n- 원본이 쓰는 효과(가능하면 비슷한 fx로 반영하라): ${s.effects.join(', ')}`:'';
     userText = `아래 [참고 사이트]를 참고해 '${typeLabel}'를 처음부터 만들어줘. 똑같이 베끼지 말고 아래에서 지정한 항목만 반영해 재구성하라.\n`+
-      `[참고 사이트]\n- 사이트명: ${s.title||''}\n- 설명: ${s.description||''}\n- 대표 색상: ${(s.colors||[]).join(', ')||s.themeColor||''}\n- 큰제목: ${(s.h1||[]).join(' / ')}\n- 중제목: ${(s.h2||[]).slice(0,8).join(' / ')}\n- 소제목: ${(s.h3||[]).slice(0,8).join(' / ')}\n- 버튼 문구: ${(s.buttons||[]).join(' / ')}\n\n추가 요청: ${desc||'(없음)'}`;
+      `[참고 사이트]\n- 사이트명: ${s.title||''}\n- 설명: ${s.description||''}\n- 대표 색상: ${(s.colors||[]).join(', ')||s.themeColor||''}${brand}\n- 큰제목: ${(s.h1||[]).join(' / ')}\n- 중제목: ${(s.h2||[]).slice(0,8).join(' / ')}\n- 소제목: ${(s.h3||[]).slice(0,8).join(' / ')}\n- 버튼 문구: ${(s.buttons||[]).join(' / ')}${effLine}\n\n추가 요청: ${desc||'(없음)'}`;
   }
   if(aiRefImgs.length){ userText += '\n첨부한 스크린샷도 참고자료로 활용하되, 아래에서 지정한 항목만 반영해줘.'; }
   if(hasRef){
@@ -3671,16 +4051,31 @@ ${SCHEMA_EXAMPLE}`;
   const content = aiRefImgs.length
     ? [ ...aiRefImgs.map(im=>({type:'image',source:{type:'base64',media_type:im.mediaType,data:im.data}})), {type:'text',text:userText} ]
     : userText;
-  const sysFull = appendMode
+  const sysFull = (appendMode
     ? sys + '\n\n★섹션 추가 모드: 페이지 전체가 아니라 하나의 섹션(소제목 + 카드/이미지/버튼 한 묶음)만 만들어라. 모든 y는 0부터 시작하는 섹션 내부 좌표로(맨 위 요소 y≈0), 섹션 총 높이는 500~1000px. "name"·"bg"는 출력하지 마라(elements만).'
-    : sys;
+    : sys) + deriveAiPrefs();
   aiStatus(appendMode?'AI가 섹션을 생성 중입니다…':'AI가 참고 자료로 템플릿을 생성 중입니다… (10~30초)');
   document.getElementById('ai-go').disabled=true;
   try{
     const res=await aiProxy({ body:{ model:'claude-opus-4-8', max_tokens:12000, system:sysFull, messages:[{role:'user',content}] }});
     const text=res.data?.content?.[0]?.text||'';
-    const spec=parseAiJson(text);
+    let spec=parseAiJson(text);
     if(!spec) throw new Error('AI 응답을 JSON으로 해석하지 못했습니다. 다시 시도해 주세요.');
+    // ── A. 자기검증 루프(선택) — 1차 결과를 AI가 스스로 검수해 개선본으로 교체 ──
+    if(document.getElementById('ai-refine')?.checked){
+      try{
+        aiStatus('AI가 생성 결과를 스스로 점검·개선 중입니다… (품질 향상, 10~30초)');
+        const reviewSys = sysFull + `\n\n────────\n★지금은 "냉정한 디자인 검수자" 역할이다. 아래 [초안 JSON]을 위 모든 규칙·스키마를 기준으로 점검하고, 발견한 문제를 고친 **전체 JSON**을 출력하라.\n점검 항목: 요소 겹침/잘림, 글자 위계(제목>소제목>본문) 불일치, 색 대비 부족(배경 위 글자 가독성), 빈 문구·"제목/본문" 같은 자리표시자, 푸터 누락, 섹션 간 간격 불균형, 캔버스(0~${PAGE_W}) 밖 좌표, 표 cells 누락, 버튼이 stext 도형 하나가 아닌 도형+text로 분리돼 있으면 stext 도형 하나로 합칠 것. ★tabsection·slider·counter 등 컴포넌트/효과는 type·구조·배선을 절대 바꾸지 말고(탭 버튼을 직접 만들지 말 것) 내부 label·body 문구·색·정렬만 다듬어라. 요소의 "bleed":true(섹션 배경 풀블리드)·fx 속성은 그대로 보존하라. 초안이 이미 충분히 좋으면 과한 변경 없이 그대로 둬도 된다. 설명·마크다운 없이 오직 개선된 JSON 하나만, 동일 스키마로 끝까지 유효하게 출력한다.`;
+        const reviewUser = `[원래 요청]\n${typeof userText==='string'?userText:'(이미지 첨부 기반 요청)'}\n\n[초안 JSON]\n${JSON.stringify(spec)}`;
+        const r2=await aiProxy({ body:{ model:'claude-opus-4-8', max_tokens:12000, system:reviewSys, messages:[{role:'user',content:reviewUser}] }});
+        const spec2=parseAiJson(r2.data?.content?.[0]?.text||'');
+        if(spec2 && Array.isArray(spec2.elements) && spec2.elements.length) spec=spec2;
+      }catch(_){ /* 검수 실패 시 1차 초안을 그대로 사용 */ }
+    }
+    // 생성 시작 시 고정한 페이지로 적용 (그 사이 다른 페이지로 이동했어도 그 페이지엔 영향 없음)
+    const _ti=project.pages.findIndex(pp=>pp.id===targetPageId);
+    if(_ti<0){ aiStatus('대상 페이지가 삭제되어 적용을 취소했습니다.'); return; }
+    if(curPage!==_ti){ curPage=_ti; renderPages(); }
     const p=page();
     const norm=e=>{
       const base={id:uid(),rot:e.rot||0,x:0,y:0,w:200,h:60};
@@ -3690,7 +4085,8 @@ ${SCHEMA_EXAMPLE}`;
       else if(e.type==='image') Object.assign(base,{src:PHOTO,fit:'cover',clip:'none',radius:0,borderW:0,borderColor:'#333333'});
       return Object.assign(base,e);
     };
-    const newEls=(Array.isArray(spec.elements)?spec.elements:[]).filter(e=>e&&e.type).map(norm);
+    const rawEls=expandAiComponents(spec.elements);   // tabsection 등 고수준 노드 → 정확한 저수준 요소
+    const newEls=rawEls.filter(e=>e&&e.type).map(norm);
     if(appendMode){
       // 섹션으로 추가 — 선택 위치(있으면) 또는 기존 내용 아래에 삽입
       let targetY;
@@ -3724,11 +4120,56 @@ document.getElementById('ai-append').addEventListener('change',function(){
   const ap=this.checked;
   document.getElementById('ai-go').textContent=ap?'＋ 섹션 추가하기':'초안 생성하기';
   const sub=document.querySelector('#ai-modal .modal-sub'); if(sub) sub.textContent=ap?'기존 내용 아래/선택 위치에 섹션 추가':'현재 페이지에 적용됩니다';
-  const lbl=document.getElementById('ai-base-lbl'); if(lbl) lbl.firstChild.textContent=ap?'섹션 종류 ':'만들 페이지 종류 ';
 });
 // ── 내 템플릿 라이브러리 (localStorage · 폴더+이름) ──
 function getTemplates(){ try{return JSON.parse(localStorage.getItem('hw_templates')||'[]');}catch{return[];} }
 function setTemplates(a){ try{localStorage.setItem('hw_templates',JSON.stringify(a));}catch(e){toast('저장 용량 초과 — 큰 이미지가 포함된 템플릿은 저장이 어려울 수 있어요');} }
+// ── B. 피드백 학습 — 사용자가 저장한 템플릿(긍정 신호)에서 취향을 추출해 프롬프트로 주입 ──
+function deriveAiPrefs(){
+  let tpls; try{ tpls=getTemplates(); }catch(_){ return ''; }
+  if(!tpls||!tpls.length) return '';
+  const recent=tpls.slice(-12);                 // 최근 저장 우선(최대 12개)
+  const titleSizes=[],bodySizes=[],colorCount={},famCount={}; let footer=0,tables=0; const n=recent.length;
+  let stextBtn=0,plainBtn=0,tabUse=0,sliderUse=0,fxUse=0; const fxKinds={};
+  for(const t of recent){
+    const els=(t.page&&t.page.elements)||[]; let hasFooter=false,hasTable=false,hasTab=false,hasSlider=false;
+    for(const e of els){
+      if(e.type==='text'){
+        if(e.fontSize>=26) titleSizes.push(e.fontSize); else if(e.fontSize&&e.fontSize<=18) bodySizes.push(e.fontSize);
+        if(e.color){ const c=e.color.toLowerCase(); colorCount[c]=(colorCount[c]||0)+1; }
+        if(e.fontFamily&&e.fontFamily!=='Noto Sans KR') famCount[e.fontFamily]=(famCount[e.fontFamily]||0)+1;
+        if(/©|저작권|all rights/i.test(e.text||'')) hasFooter=true;
+        // 작은 글자 도형 위에 겹친 '분리형 버튼' 추정
+        if((e.fontSize||0)<=22 && /예약|상담|문의|신청|바로가기|자세히|더보기|button|click/i.test(e.text||'')) plainBtn++;
+      } else if(e.type==='shape'){
+        if(e.fill){ const c=e.fill.toLowerCase(); colorCount[c]=(colorCount[c]||0)+1; }
+        if(e.stext && e.stext.length<=14) stextBtn++;       // 글자 들어간 도형(=요소 하나 버튼/칩)
+      }
+      else if(e.type==='table') hasTable=true;
+      const ft=e.fx&&e.fx.type;
+      if(ft){ fxUse++; fxKinds[ft]=(fxKinds[ft]||0)+1;
+        if(ft==='tab-trigger') hasTab=true; if(ft==='slider') hasSlider=true; }
+    }
+    if(hasFooter) footer++; if(hasTable) tables++; if(hasTab) tabUse++; if(hasSlider) sliderUse++;
+  }
+  const med=a=>{ if(!a.length) return 0; const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; };
+  const topColors=Object.entries(colorCount).sort((a,b)=>b[1]-a[1]).slice(0,5).map(c=>c[0]);
+  const topFam=(Object.entries(famCount).sort((a,b)=>b[1]-a[1])[0]||[])[0];
+  const topFx=Object.entries(fxKinds).filter(([k])=>!/^tab-/.test(k)).sort((a,b)=>b[1]-a[1]).slice(0,4).map(c=>c[0]);
+  const ts=med(titleSizes),bs=med(bodySizes), lines=[];
+  if(topColors.length) lines.push(`자주 쓰는 색: ${topColors.join(', ')} — 참고자료 색과 충돌하지 않으면 이 톤을 우선 고려`);
+  if(ts) lines.push(`제목 글자 크기는 ${ts}px 안팎을 선호`);
+  if(bs) lines.push(`본문 글자 크기는 ${bs}px 안팎을 선호`);
+  if(topFam) lines.push(`강조 제목 폰트로 "${topFam}"를 즐겨 씀`);
+  if(stextBtn>=plainBtn) lines.push('버튼·태그·칩은 글자 들어간 도형 하나(stext)로 만드는 방식을 선호 — 도형+텍스트로 분리하지 말 것');
+  if(tabUse/n>=0.3) lines.push('탭 섹션(tabsection)으로 정보를 묶는 구성을 즐겨 씀 — 어울리면 1개 포함');
+  if(sliderUse/n>=0.3) lines.push('사진 여러 장은 슬라이더(slider, peek)로 보여주는 방식을 선호');
+  if(footer/n>=0.5) lines.push('하단 푸터 섹션을 선호');
+  if(tables/n>=0.4) lines.push('정보 정리에 표(table)를 즐겨 씀');
+  if(topFx.length) lines.push(`즐겨 쓰는 효과(fx): ${topFx.join(', ')} — 비슷한 톤으로 절제해서 적용`);
+  if(!lines.length) return '';
+  return `\n\n[사용자 선호 — 과거에 저장한 템플릿 ${n}개에서 학습한 취향. 참고자료·요청과 충돌하지 않는 선에서 자연스럽게 반영하라]\n- ${lines.join('\n- ')}`;
+}
 function openTplLib(){ renderTplLib(); document.getElementById('tpl-lib-modal').style.display='flex'; }
 function saveCurrentTemplate(){
   const name=(prompt('템플릿 이름:', page().name||'새 템플릿')||'').trim(); if(!name) return;
@@ -3905,6 +4346,13 @@ function applyAiActions(actions){
       if(!project.fixedTabs) project.fixedTabs=[];
       project.fixedTabs.push(t); changed=true;
     }
+    else if(a.type==='add_tabsection'){
+      // 탭 섹션 생성 — 저수준 배선은 buildTabSectionEls가 정확히 만든다(AI가 직접 배선하지 않음)
+      const o=a.section||a;
+      try{ const { els }=buildTabSectionEls({ x:o.x, y:o.y, w:o.w, btnH:o.btnH, panelH:o.panelH, activeColor:o.activeColor||o.color, idleColor:o.idleColor, tabs:o.tabs });
+        page().elements.push(...els); selId=null; selIds=new Set(els.filter(e=>e.fx&&e.fx.type==='tab-trigger').map(e=>e.id)); changed=true;
+      }catch(_){}
+    }
     else if(a.type==='delete_fixtab'){
       if(project.fixedTabs&&a.id){ const i=project.fixedTabs.findIndex(x=>x.id===a.id); if(i>=0){ project.fixedTabs.splice(i,1); changed=true; } }
     }
@@ -3959,6 +4407,7 @@ ${selIds.size?`\n[현재 선택된 섹션] 사용자가 선택 중인 요소 id:
 8. {"type":"group","ids":[...]} / {"type":"ungroup","ids":[...]} ← 그룹 묶기/풀기
 9. {"type":"add_fixtab","fixtab":{corner,dx,dy,w,h,bg,color,fontSize,fontWeight,radius,dir,device,items:[{label,action,link,url,bg,color}],fx}} ← 고정탭(화면 모서리 플로팅 버튼·전 페이지 공통)
    {"type":"update_fixtab","id":"탭ID","props":{...}} / {"type":"delete_fixtab","id":"탭ID"}
+10. {"type":"add_tabsection","section":{"x","y","w","tabs":[{"label":"탭이름","body":[패널 기준(0,0) 상대좌표 text/shape/image 요소들]},...]}} ← 탭 섹션(한 자리에서 탭 눌러 내용 전환). 탭 2~6개. ★탭 버튼·전환 배선은 자동 생성되니 label·body만 채워라. 절대 tab-trigger/tab-content fx나 탭 버튼 shape를 직접 만들지 마라 — 탭이 필요하면 무조건 이 액션 사용.
 
 속성 참고:
 텍스트: text(줄바꿈=\\n), fontFamily, fontWeight(300~900), fontSize, color(#hex), align(left|center|right|justify), valign(top|middle|bottom), lineHeight(0.8~2.5), letterSpacing, italic/underline/strike(bool), highlight(#hex|null), bullet(none|disc|number)
@@ -4227,14 +4676,6 @@ function clipboardImageFile(e){
   for(const it of cb.items){ if(it.type && it.type.indexOf('image')===0) return it.getAsFile(); }
   return null;
 }
-// AI 초안 모달: 설명칸/모달 어디에 붙여넣어도 참고 이미지로 첨부
-['ai-desc','ai-modal'].forEach(id=>{
-  const t=document.getElementById(id);
-  if(t) t.addEventListener('paste', async e=>{
-    const f=clipboardImageFile(e); if(!f) return; e.preventDefault();
-    await addAiImg(f); toast('스크린샷 첨부됨 📋');
-  });
-});
 // AI 작업 채팅: 입력칸/패널에 붙여넣으면 첨부
 ['ai-chat-input','ai-chat-panel'].forEach(id=>{
   const t=document.getElementById(id);
@@ -4249,7 +4690,14 @@ function clipboardImageFile(e){
 // 캔버스에 이미지/스크린샷 붙여넣기 (전역) — 입력창·AI패널·편집중 제외
 document.addEventListener('paste', ev=>{
   const ae=document.activeElement;
-  if(ae&&ae.closest&&ae.closest('#ai-chat-panel,#ai-modal,#login-modal,#find-modal,#cloud-modal')) return;
+  // AI 초안 모달이 열려 있으면 포커스 위치와 무관하게 '참고 이미지'로 첨부 (단일 핸들러 — 중복/캔버스 누출 방지)
+  const aiM=document.getElementById('ai-modal');
+  if(aiM && getComputedStyle(aiM).display!=='none'){
+    const fi=clipboardImageFile(ev);
+    if(fi){ ev.preventDefault(); addAiImg(fi); toast('스크린샷 첨부됨 📋'); }
+    return; // 이미지 아니면(텍스트 등) 기본 붙여넣기 그대로
+  }
+  if(ae&&ae.closest&&ae.closest('#ai-chat-panel,#login-modal,#find-modal,#cloud-modal')) return;
   if(ae&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)) return;
   if(document.querySelector('.el.editing')) return;
   const f=clipboardImageFile(ev); if(!f) return;
@@ -4496,6 +4944,26 @@ function withGroups(idSet){
   if(gids.size) page().elements.forEach(e=>{ if(e.groupId&&gids.has(e.groupId)) out.add(e.id); });
   return out;
 }
+// 쌍둥이 미러링 — 같은 자리의 다른 상태(예: 선택 전↔선택 후 버튼, 탭별 내용 패널)는 e.twin을 공유.
+// 전체 보기에서 한쪽을 이동/크기조절하면 숨은 짝도 함께 따라가게 한다(탭별 편집 중엔 미러링 안 함 → 개별).
+function twinMates(idSet){
+  // 전체모드: 절대규칙 — 하나를 집든 여러 개를 집든 항상 숨은 짝까지 함께 이동·크기.
+  // 탭별 편집 중에만 개별 조절(선택한 상태만 따로) → 그 위치가 그대로 유지됨.
+  if(_tabEditView) return [];
+  const twins=new Set();
+  idSet.forEach(id=>{ const e=el(id); if(e&&e.twin) twins.add(e.twin); });
+  if(!twins.size) return [];
+  return page().elements.filter(e=>e.twin && twins.has(e.twin) && !idSet.has(e.id));
+}
+// 삭제 확장 — 탭 요소를 지우면 같은 탭(같은 group+idx)의 숨은 짝(선택 후 버튼·내용 등)까지 함께 삭제
+function expandTabDelete(idSet){
+  const slots=new Set();
+  idSet.forEach(id=>{ const e=el(id), f=e&&e.fx; if(f&&(f.type==='tab-trigger'||f.type==='tab-content')) slots.add(f.group+'|'+(f.idx||0)); });
+  if(!slots.size) return idSet;
+  const out=new Set(idSet);
+  page().elements.forEach(e=>{ const f=e.fx; if(f&&(f.type==='tab-trigger'||f.type==='tab-content')&&slots.has(f.group+'|'+(f.idx||0))) out.add(e.id); });
+  return out;
+}
 // 그룹 인식 정렬 — 같은 그룹은 한 덩어리(내부 간격 유지)로 이동
 function alignSelection(kind, toPage){
   const arr=selAll(); if(!arr.length) return;
@@ -4579,7 +5047,7 @@ function arrOrder(kind){
   afterMutate();
 }
 function arrDup(){ const arr=selAll(); if(!arr.length)return; const ns=new Set(); arr.forEach(e=>{ const c={...JSON.parse(JSON.stringify(e)),id:uid(),x:e.x+20,y:e.y+20}; delete c.groupId; page().elements.push(c); ns.add(c.id); }); selIds=ns; selId=[...ns].at(-1); afterMutate(); }
-function arrDel(){ if(!selIds.size)return; page().elements=page().elements.filter(x=>!selIds.has(x.id)); selId=null; selIds=new Set(); afterMutate(); }
+function arrDel(){ if(!selIds.size)return; const del=expandTabDelete(selIds); page().elements=page().elements.filter(x=>!del.has(x.id)); selId=null; selIds=new Set(); afterMutate(); }
 
 // ── 드롭다운 공통 ──
 function closeAllDD(){ document.querySelectorAll('.rdd').forEach(d=>d.style.display='none'); }
@@ -4861,6 +5329,7 @@ document.getElementById('rb2-addshape')?.addEventListener('click',()=>document.g
 document.getElementById('rb2-newpage')?.addEventListener('click',openTplModal);
 document.getElementById('rb2-tpl')?.addEventListener('click',openTplModal);
 document.getElementById('rb2-fixtab')?.addEventListener('click',addFixedTab);
+document.getElementById('rb2-tabsection')?.addEventListener('click',makeTabSection);
 // 보기 탭 버튼
 document.getElementById('rb-zoom-in')?.addEventListener('click',()=>{ zoom=Math.min(3,zoom+0.1); applyZoom(); updateRibbonState(); });
 document.getElementById('rb-zoom-out')?.addEventListener('click',()=>{ zoom=Math.max(0.1,zoom-0.1); applyZoom(); updateRibbonState(); });
@@ -4927,7 +5396,7 @@ window.addEventListener('keydown',ev=>{
   else if(ck&&code==='KeyC'){ ev.preventDefault(); if(selIds.size) copySel(); else toast('복사할 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyX'){ ev.preventDefault(); if(selIds.size) cutSel(); else toast('잘라낼 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyV'){ ev.preventDefault(); if(_clipboard&&_clipboard.length) pasteClipboard(); else toast('붙여넣을 내용이 없습니다 (먼저 Ctrl+C)'); }
-  else if((ev.key==='Delete'||ev.key==='Backspace')&&selIds.size){ ev.preventDefault(); page().elements=page().elements.filter(x=>!selIds.has(x.id)); selId=null; selIds=new Set(); afterMutate(); }
+  else if((ev.key==='Delete'||ev.key==='Backspace')&&selIds.size){ ev.preventDefault(); const del=expandTabDelete(selIds); page().elements=page().elements.filter(x=>!del.has(x.id)); selId=null; selIds=new Set(); afterMutate(); }
   else if(ck&&code==='KeyD'){ ev.preventDefault(); if(selIds.size) dupSel(); }
   else if(ck&&code==='BracketRight'&&selId){ ev.preventDefault(); const arr=page().elements,i=arr.findIndex(x=>x.id===selId); if(ev.shiftKey){arr.push(arr.splice(i,1)[0]);}else if(i<arr.length-1){[arr[i],arr[i+1]]=[arr[i+1],arr[i]];} afterMutate(); }
   else if(ck&&code==='BracketLeft'&&selId){ ev.preventDefault(); const arr=page().elements,i=arr.findIndex(x=>x.id===selId); if(ev.shiftKey){arr.unshift(arr.splice(i,1)[0]);}else if(i>0){[arr[i-1],arr[i]]=[arr[i],arr[i-1]];} afterMutate(); }

@@ -441,6 +441,12 @@
           <span>API Key</span>
           <input type="password" id="ai-api-key" placeholder="sk-ant-..." />
         </div>
+        <div class="ai-key-row">
+          <span>스크린샷 키</span>
+          <input type="password" id="shot-key" placeholder="Browserless API 토큰" />
+          <button class="btn-save" id="shot-save" style="white-space:nowrap">저장</button>
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin:-6px 0 12px">초안 만들기에서 URL 분석 시 그 사이트를 실제 렌더해 스크린샷으로 자동 첨부합니다. (서버에서만 사용 · Browserless 토큰)</div>
         <div class="ai-chips">
           <span class="chip" data-prompt="SEO를 최적화해줘. 현재 병원 정보를 바탕으로 title, description, keywords를 작성해줘.">SEO 자동 최적화</span>
           <span class="chip" data-prompt="병원 소개 문구를 전문적이고 신뢰감 있게 다시 작성해줘.">소개 문구 개선</span>
@@ -754,6 +760,22 @@ document.querySelectorAll('.chip').forEach(chip => {
     document.getElementById('ai-input').value = chip.dataset.prompt;
     sendAI();
   });
+});
+
+// ── Browserless 스크린샷 키 (config/screenshot) ──
+(async () => {
+  try { const s = await getDoc(doc(db, 'config', 'screenshot'));
+    if (s.exists() && s.data().key) { const i = document.getElementById('shot-key'); if (i) i.placeholder = '🔑 키 저장됨 (변경하려면 새로 입력)'; }
+  } catch (_) {}
+})();
+document.getElementById('shot-save')?.addEventListener('click', async () => {
+  const k = document.getElementById('shot-key').value.trim();
+  if (!k) { toast('Browserless 토큰을 입력하세요'); return; }
+  try {
+    await setDoc(doc(db, 'config', 'screenshot'), { key: k, region: 'production-sfo' }, { merge: true });
+    toast('스크린샷 키 저장됨 ✓');
+    const i = document.getElementById('shot-key'); i.value = ''; i.placeholder = '🔑 키 저장됨';
+  } catch (e) { toast('저장 실패: ' + (e.message || e)); }
 });
 
 async function sendAI() {
