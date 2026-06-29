@@ -141,7 +141,7 @@ function openFixTabPopup(t,x,y,pw,ph){
   const itemHtml=items.map((it,i)=>`
     <div style="border:1px solid var(--border,#e7e7f1);border-radius:9px;padding:7px;margin-bottom:6px;background:rgba(127,127,170,.05)">
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="ft-l" data-i="${i}" type="text" value="${ea(it.label)}" placeholder="항목 이름" style="${IN};flex:1">
+        <textarea class="ft-l" data-i="${i}" rows="1" placeholder="항목 이름 (Enter=줄바꿈)" style="${IN};flex:1;resize:vertical;min-height:34px;line-height:1.3;font-family:inherit">${ea(it.label)}</textarea>
         ${items.length>1?`<button class="ft-rm" data-i="${i}" title="항목 삭제" style="border:none;background:transparent;cursor:pointer;font-size:13px;color:#e36;padding:3px">🗑</button>`:''}
       </div>
       <div style="display:flex;gap:6px;margin-top:6px">

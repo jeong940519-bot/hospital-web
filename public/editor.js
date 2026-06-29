@@ -159,6 +159,33 @@ function cutSel(){ const a=selAll(); if(!a.length) return; _clipboard=a.map(e=>J
 function pasteClones(list, off){ if(!list||!list.length) return; const gmap={}; const ns=new Set(); list.forEach(src=>{ const c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.x=(c.x||0)+off; c.y=(c.y||0)+off; if(c.groupId){ gmap[c.groupId]=gmap[c.groupId]||('grp_'+uid()); c.groupId=gmap[c.groupId]; } page().elements.push(c); ns.add(c.id); }); selIds=ns; selId=[...ns].at(-1); afterMutate(); toast(`${ns.size}개 붙여넣기 됨`); }
 function pasteClipboard(){ pasteClones(_clipboard,24); }
 function dupSel(){ pasteClones(selAll(),20); }
+// ── 서식 복사(Format Painter) — 이펙트 포함, 그룹 단위 ──
+let _fmtClip=null, _fmtPaint=false;
+const _LINKED_FX=['tab-trigger','tab-content','hover-show','hover-hide'];   // 연동형(탭/호버) — 복사 시 대상 것 보존
+function _styleOf(e){
+  const pick=ks=>{ const s={}; ks.forEach(k=>{ if(e[k]!==undefined) s[k]=JSON.parse(JSON.stringify(e[k])); }); return s; };
+  if(e.type==='text')  return pick(['fontFamily','fontWeight','fontSize','color','align','valign','lineHeight','letterSpacing','italic','underline','strike','shadow','autofit']);
+  if(e.type==='shape') return pick(['fill','grad','gradient','borderColor','borderW','radius','shadow','shape','opacity','clip']);
+  if(e.type==='image') return pick(['borderColor','borderW','radius','shadow','clip','opacity']);
+  if(e.type==='table') return pick(['fontFamily','fontSize','fontWeight','headerWeight','headerBg','headerColor','cellBg','cellColor','borderW','borderColor']);
+  return {};
+}
+function _captureFmt(els){ return els.map(e=>({type:e.type, style:_styleOf(e), fx:e.fx?JSON.parse(JSON.stringify(e.fx)):null})); }
+function _paintFxTo(srcFx,t){
+  if(t.fx && _LINKED_FX.includes(t.fx.type)) return;                                   // 대상의 탭/호버 연동 이펙트 보존
+  if(srcFx && srcFx.type && !_LINKED_FX.includes(srcFx.type)) t.fx=JSON.parse(JSON.stringify(srcFx));  // 시각 이펙트 복사
+  else if((!srcFx||!srcFx.type) && t.fx && !_LINKED_FX.includes(t.fx.type)) delete t.fx;               // 소스에 이펙트 없으면 대상 시각 이펙트 제거
+}
+function _applyFmtTo(els){
+  if(!_fmtClip||!_fmtClip.length||!els.length) return 0;
+  const byType={}; _fmtClip.forEach(f=>{ (byType[f.type]||(byType[f.type]=[])).push(f); });
+  const cnt={}; let n=0;
+  els.forEach(t=>{ const list=byType[t.type]; if(!list||!list.length) return; const i=cnt[t.type]||0; cnt[t.type]=i+1; const f=list[Math.min(i,list.length-1)]; Object.assign(t, JSON.parse(JSON.stringify(f.style))); _paintFxTo(f.fx,t); n++; });
+  if(n) afterMutate();
+  return n;
+}
+function startFmtPaint(){ const src=selAll(); if(!src.length){ toast('서식을 복사할 요소를 먼저 선택하세요'); return; } _fmtClip=_captureFmt(src); _fmtPaint=true; document.body.style.cursor='copy'; toast('🖌 서식 복사 — 적용할 요소(또는 그룹)를 클릭하세요 · Esc로 종료'); }
+function endFmtPaint(){ if(!_fmtPaint) return; _fmtPaint=false; document.body.style.cursor=''; }
 let history = [], hist_i = -1;
 
 function newProject(){
@@ -832,7 +859,10 @@ function renderEl(e){
     inner.style.fontWeight=e.stWeight||700;
     inner.style.fontSize=(e.stSize||28)+'px';
     inner.style.color=e.stColor||'#ffffff';
-    inner.style.textAlign=sal; inner.style.width='100%'; inner.style.lineHeight='1.25'; inner.style.whiteSpace='pre-wrap';
+    inner.style.fontStyle=e.stItalic?'italic':'normal';
+    inner.style.textDecoration=e.stUnderline?'underline':'none';
+    inner.style.letterSpacing=(e.stLetterSpacing||0)+'px';
+    inner.style.textAlign=sal; inner.style.width='100%'; inner.style.lineHeight=String(e.stLineHeight!=null?e.stLineHeight:1.25); inner.style.whiteSpace='pre-wrap';
     inner.textContent=e.stext||'';
     tl.appendChild(inner); node.appendChild(tl);
    }
@@ -904,6 +934,7 @@ function renderEl(e){
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=>{
+    if(_fmtPaint && ev.button===0){ ev.stopPropagation(); ev.preventDefault(); const tgt = e.groupId ? page().elements.filter(x=>x.groupId===e.groupId) : [e]; const n=_applyFmtTo(tgt); toast(n?('🖌 서식 적용됨'+(n>1?` (${n}개)`:'')):'적용할 같은 종류 요소가 없습니다'); return; }
     if(_linkPick){ if(ev.button===0){ ev.stopPropagation(); ev.preventDefault(); lpToggle(e); } return; }
     if(e.type==='table'){
       const colH=ev.target.dataset.tblColResize, rowH=ev.target.dataset.tblRowResize;
@@ -1378,6 +1409,7 @@ function startEdit(node,e){
 
 // 캔버스 빈 곳 클릭/드래그 → 마퀴 선택
 canvas.addEventListener('mousedown', ev=>{
+  if(_fmtPaint){ endFmtPaint(); toast('서식 복사 종료'); return; }
   if(_linkPick){ endLinkPick(); return; }
   if(ev.button!==0) return;
   if(_hambOpen){ _hambOpen=false; renderCanvas(); }
@@ -1619,7 +1651,7 @@ function renderProps(){
     html += `<div class="grp"><label>이미지</label><button class="tb-btn" id="i-replace" style="width:100%">🔄 사진 교체</button></div>`;
     html += `<div class="grp"><label>채움 방식</label><select id="i-fit"><option value="cover" ${e.fit==='cover'?'selected':''}>꽉 채우기</option><option value="contain" ${e.fit==='contain'?'selected':''}>전체 보이기</option></select></div>`;
     html += `<div class="grp"><label>액자 모양</label><select id="i-clip"><option value="none" ${e.clip==='none'?'selected':''}>사각형</option><option value="circle" ${e.clip==='circle'?'selected':''}>원형</option></select></div>`;
-    html += `<div class="grp"><label>모서리 둥글기 ${e.radius}px</label><input type="range" id="i-radius" min="0" max="200" value="${e.radius}" ${e.clip==='circle'?'disabled':''}></div>`;
+    html += `<div class="grp"><label>모서리 둥글기 <span id="i-radius-v">${e.radius}</span>px</label><div class="row" style="gap:8px;align-items:center"><input type="range" id="i-radius" min="0" max="200" value="${Math.min(200,e.radius)}" ${e.clip==='circle'?'disabled':''} style="flex:1"><input type="number" id="i-radius-n" min="0" max="9999" value="${e.radius}" ${e.clip==='circle'?'disabled':''} style="width:64px"></div></div>`;
     html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="i-bw" value="${e.borderW}"></div><button type="button" class="panel-cbtn" id="i-bc" data-cpkey="imgBorder" title="테두리 색"><span style="background:${e.borderColor}"></span></button></div></div>`;
     html += bleedToggleHtml(e);
   }else if(e.type==='shape'){
@@ -1632,14 +1664,16 @@ function renderProps(){
     // ── 선 ──
     html += `<div class="sec-hd">▾ 선</div>`;
     html += `<div class="grp"><label>윤곽선 색 / 두께</label><div class="row"><button type="button" class="panel-cbtn" id="s-bc" data-cpkey="outline" title="윤곽선 색"><span style="background:${e.borderColor}"></span></button><div class="num-unit" style="flex:1"><span>두께</span><input type="number" id="s-bw" value="${e.borderW}"></div></div></div>`;
-    if(e.shape!=='circle') html += `<div class="grp"><label>모서리 둥글기 ${e.radius}px</label><input type="range" id="s-radius" min="0" max="300" value="${e.radius}"></div>`;
+    if(e.shape!=='circle') html += `<div class="grp"><label>모서리 둥글기 <span id="s-radius-v">${e.radius}</span>px</label><div class="row" style="gap:8px;align-items:center"><input type="range" id="s-radius" min="0" max="300" value="${Math.min(300,e.radius)}" style="flex:1"><input type="number" id="s-radius-n" min="0" max="9999" value="${e.radius}" style="width:64px"></div></div>`;
     // 도형 안 텍스트
-    const _sal=e.stAlign||'center', _sva=e.stValign||'middle';
+    const _sal=e.stAlign||'center', _sva=e.stValign||'middle', _sw=e.stWeight||700, _slh=(e.stLineHeight!=null?e.stLineHeight:1.25), _sls=(e.stLetterSpacing||0);
     html += `<div class="grp" style="border-top:1px solid var(--border);padding-top:12px"><label>도형 안 텍스트 <span style="color:var(--sub);font-weight:400">(더블클릭으로도 입력)</span></label><textarea id="s-text" rows="2" placeholder="도형 안에 표시할 글자">${escapeHtml(e.stext||'')}</textarea></div>`;
+    html += `<div class="grp"><label>폰트</label><select id="s-tfont">${_fontOpts(e.stFont||'Noto Sans KR')}</select></div>`;
     html += `<div class="grp"><label>글자 크기 / 색상</label><div class="row"><div class="num-unit" style="flex:1"><input type="number" id="s-tsize" value="${e.stSize||28}"></div><button type="button" class="panel-cbtn" id="s-tcolor" data-cpkey="shapeText" title="글자 색"><span style="background:${e.stColor||'#ffffff'}"></span></button></div></div>`;
-    html += `<div class="grp"><label>글자 굵기</label><div class="btn-grp">
-      <button data-stw="400" class="${(e.stWeight||700)<700?'on':''}">보통</button>
-      <button data-stw="700" class="${(e.stWeight||700)>=700?'on':''}" style="font-weight:800">굵게</button></div></div>`;
+    html += `<div class="grp"><label>글자 굵기</label><select id="s-tw">${[['300','얇게'],['400','보통'],['500','중간'],['700','굵게'],['800','더굵게'],['900','매우굵게']].map(w=>`<option value="${w[0]}" ${String(_sw)===w[0]?'selected':''}>${w[1]} (${w[0]})</option>`).join('')}</select></div>`;
+    html += `<div class="grp"><label>스타일</label><div class="btn-grp">
+      <button id="s-titalic" class="${e.stItalic?'on':''}" style="font-style:italic">I</button>
+      <button id="s-tunderline" class="${e.stUnderline?'on':''}" style="text-decoration:underline">U</button></div></div>`;
     html += `<div class="grp"><label>가로 정렬</label><div class="btn-grp">
       <button data-stal="left" class="${_sal==='left'?'on':''}">⬅</button>
       <button data-stal="center" class="${_sal==='center'?'on':''}">⬌</button>
@@ -1648,6 +1682,8 @@ function renderProps(){
       <button data-stva="top" class="${_sva==='top'?'on':''}">⤒ 위</button>
       <button data-stva="middle" class="${_sva==='middle'?'on':''}">중간</button>
       <button data-stva="bottom" class="${_sva==='bottom'?'on':''}">아래 ⤓</button></div></div>`;
+    html += `<div class="grp"><label>행간 <span id="s-tlh-v" style="float:right;color:var(--accent)">${_slh}</span></label><input type="range" id="s-tlh" min="0.8" max="2.5" step="0.1" value="${_slh}"></div>`;
+    html += `<div class="grp"><label>자간 <span id="s-tls-v" style="float:right;color:var(--accent)">${_sls}px</span></label><input type="range" id="s-tls" min="-3" max="15" step="0.5" value="${_sls}"></div>`;
   }else if(e.type==='table'){
     html += `<div class="sec-hd">▾ 표 구조</div>`;
     html += `<div class="grp"><label>열 × 행</label><div class="row">
@@ -1848,14 +1884,25 @@ function bindProps(e){
     $('i-replace').addEventListener('click',()=>{ document.getElementById('img-target').value=e.id; document.getElementById('img-file').click(); });
     $('i-fit').addEventListener('change',()=>{ e.fit=$('i-fit').value; liveStyle(); snapshot(); });
     $('i-clip').addEventListener('change',()=>{ e.clip=$('i-clip').value; renderProps(); liveStyle(); snapshot(); });
-    if($('i-radius')) $('i-radius').addEventListener('input',()=>{ e.radius=parseInt($('i-radius').value); renderProps(); liveStyle(); });
+    if($('i-radius')){
+      const updIR=(v,fromNum)=>{ e.radius=Math.max(0,parseInt(v)||0); const lv=$('i-radius-v'); if(lv)lv.textContent=e.radius; const sl=$('i-radius'); if(sl&&fromNum)sl.value=Math.min(200,e.radius); const nn=$('i-radius-n'); if(nn&&!fromNum)nn.value=e.radius; liveStyle(); };
+      $('i-radius').addEventListener('input',()=>updIR($('i-radius').value,false));
+      $('i-radius').addEventListener('change',snapshot);
+      if($('i-radius-n')){ $('i-radius-n').addEventListener('input',()=>updIR($('i-radius-n').value,true)); $('i-radius-n').addEventListener('change',snapshot); }
+    }
     num('i-bw','borderW');
     $('i-bc').addEventListener('input',()=>{ e.borderColor=$('i-bc').value; liveStyle(); });
     wireBleedToggle(e);
   }else if(e.type==='shape'){
     $('s-fill').addEventListener('input',()=>{ e.fill=$('s-fill').value; liveStyle(); });
     $('s-fill').addEventListener('change',snapshot);
-    if($('s-radius')) $('s-radius').addEventListener('input',()=>{ e.radius=parseInt($('s-radius').value); renderProps(); liveStyle(); });
+    if($('s-radius')){
+      // 슬라이더·숫자 입력 동기화 — input마다 renderProps()로 패널을 다시 그리던 게 드래그를 끊었음 → 인라인 갱신만
+      const updR=(v,fromNum)=>{ e.radius=Math.max(0,parseInt(v)||0); const lv=$('s-radius-v'); if(lv)lv.textContent=e.radius; const sl=$('s-radius'); if(sl&&fromNum)sl.value=Math.min(300,e.radius); const nn=$('s-radius-n'); if(nn&&!fromNum)nn.value=e.radius; liveStyle(); };
+      $('s-radius').addEventListener('input',()=>updR($('s-radius').value,false));
+      $('s-radius').addEventListener('change',snapshot);
+      if($('s-radius-n')){ $('s-radius-n').addEventListener('input',()=>updR($('s-radius-n').value,true)); $('s-radius-n').addEventListener('change',snapshot); }
+    }
     if($('s-ftr')){ $('s-ftr').addEventListener('input',()=>{ const tr=parseInt($('s-ftr').value)||0; e.fillOpacity=100-tr; const v=document.getElementById('s-ftr-val'); if(v)v.textContent=tr+'%'; liveStyle(); }); $('s-ftr').addEventListener('change',snapshot); }
     num('s-bw','borderW');
     $('s-bc').addEventListener('input',()=>{ e.borderColor=$('s-bc').value; liveStyle(); });
@@ -1865,7 +1912,12 @@ function bindProps(e){
     if($('s-text')){ $('s-text').addEventListener('input',()=>{ e.stext=$('s-text').value; liveStyle(); }); $('s-text').addEventListener('change',snapshot); }
     if($('s-tsize')){ $('s-tsize').addEventListener('input',()=>{ e.stSize=parseInt($('s-tsize').value)||28; liveStyle(); }); $('s-tsize').addEventListener('change',snapshot); }
     if($('s-tcolor')){ $('s-tcolor').addEventListener('input',()=>{ e.stColor=$('s-tcolor').value; liveStyle(); }); $('s-tcolor').addEventListener('change',snapshot); }
-    document.querySelectorAll('[data-stw]').forEach(b=>b.addEventListener('click',()=>{ e.stWeight=parseInt(b.dataset.stw); renderProps(); liveStyle(); snapshot(); }));
+    if($('s-tfont')){ $('s-tfont').addEventListener('change',()=>{ e.stFont=$('s-tfont').value; loadFont(e.stFont); liveStyle(); snapshot(); }); }
+    if($('s-tw')){ $('s-tw').addEventListener('change',()=>{ e.stWeight=parseInt($('s-tw').value)||700; liveStyle(); snapshot(); }); }
+    if($('s-titalic')){ $('s-titalic').addEventListener('click',()=>{ e.stItalic=!e.stItalic; $('s-titalic').classList.toggle('on',e.stItalic); liveStyle(); snapshot(); }); }
+    if($('s-tunderline')){ $('s-tunderline').addEventListener('click',()=>{ e.stUnderline=!e.stUnderline; $('s-tunderline').classList.toggle('on',e.stUnderline); liveStyle(); snapshot(); }); }
+    if($('s-tlh')){ $('s-tlh').addEventListener('input',()=>{ e.stLineHeight=parseFloat($('s-tlh').value); const v=$('s-tlh-v'); if(v)v.textContent=e.stLineHeight; liveStyle(); }); $('s-tlh').addEventListener('change',snapshot); }
+    if($('s-tls')){ $('s-tls').addEventListener('input',()=>{ e.stLetterSpacing=parseFloat($('s-tls').value); const v=$('s-tls-v'); if(v)v.textContent=e.stLetterSpacing+'px'; liveStyle(); }); $('s-tls').addEventListener('change',snapshot); }
     document.querySelectorAll('[data-stal]').forEach(b=>b.addEventListener('click',()=>{ e.stAlign=b.dataset.stal; renderProps(); liveStyle(); snapshot(); }));
     document.querySelectorAll('[data-stva]').forEach(b=>b.addEventListener('click',()=>{ e.stValign=b.dataset.stva; renderProps(); liveStyle(); snapshot(); }));
   }else if(e.type==='table'){
@@ -1935,6 +1987,7 @@ const FX_NAMES={'sticky':'상단 고정','char-reveal':'글자 등장','parallax
   'shake':'흔들림','heartbeat':'하트비트','tada':'짠(타다)','swing':'그네','glow-loop':'발광 반복','blink':'깜빡임',
   'hover-lift':'호버 떠오름','hover-glow':'호버 발광','hover-tilt':'호버 3D틸트','hover-grow':'호버 확대','hover-sink':'호버 눌림',
   'hover-rotate':'호버 회전','hover-bright':'호버 밝게','hover-border':'호버 테두리','hover-dim':'호버 어둡게','hover-float':'호버 떠올라 확대',
+  'hover-color':'호버 색변화',
   'hover-show':'호버 트리거','hover-hide':'호버 대상','tab-trigger':'탭 버튼','tab-content':'탭 내용','hover-zoom':'호버 줌','hover-expand':'아코디언','counter':'카운터','slider':'슬라이더'};
 const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-scrub':'📈','bg-video':'🎬','scroll-reveal':'📜',
   'mask-wipe':'🎬','mask-wipe-l':'🎬','rotate-in':'🔄','blur-in':'🌫','skew-in':'📐','flip-in':'🔃','zoom-in':'🔎','zoom-out':'🔭','bounce-in':'🏀',
@@ -1943,18 +1996,20 @@ const FX_ICONS={'sticky':'📌','char-reveal':'🔠','parallax':'🌊','scroll-s
   'shake':'📳','heartbeat':'❤️','tada':'🎊','swing':'🪀','glow-loop':'💡','blink':'✴️',
   'hover-lift':'🖐','hover-glow':'✨','hover-tilt':'🃏','hover-grow':'➕','hover-sink':'⬇',
   'hover-rotate':'🔄','hover-bright':'🔆','hover-border':'⬜','hover-dim':'🌑','hover-float':'🎈',
+  'hover-color':'🎨',
   'hover-show':'👁','hover-hide':'🙈','tab-trigger':'🏷','tab-content':'📄','hover-zoom':'🔍','hover-expand':'📂','counter':'🔢','slider':'🎠'};
 const FX_CATS=[
   {name:'진입 (스크롤 등장)', icon:'📥', keys:['scroll-reveal','char-reveal','fade-in','slide-down','slide-left','slide-right','pop-in','mask-wipe','mask-wipe-l','blur-in','skew-in','flip-in','flip-y','zoom-in','zoom-out','bounce-in']},
   {name:'스크롤 연동', icon:'📈', keys:['parallax','scroll-scrub','sticky']},
   {name:'상시 움직임 (루프)', icon:'🔁', keys:['float','pulse','spin','wobble','gradient-flow','marquee','shake','heartbeat','tada','swing','glow-loop','blink']},
-  {name:'호버 (마우스)', icon:'🖱', keys:['hover-lift','hover-glow','hover-tilt','hover-grow','hover-sink','hover-rotate','hover-bright','hover-border','hover-dim','hover-float','hover-zoom']},
+  {name:'호버 (마우스)', icon:'🖱', keys:['hover-color','hover-lift','hover-glow','hover-tilt','hover-grow','hover-sink','hover-rotate','hover-bright','hover-border','hover-dim','hover-float','hover-zoom']},
   {name:'인터랙션', icon:'🧩', keys:['hover-show','hover-hide','tab-trigger','tab-content','hover-expand']},
   {name:'콘텐츠', icon:'🎞', keys:['counter','slider','bg-video']},
 ];
 let _fxCat=null;
 const _mkDesc=(result,tip,steps)=>({result,tip,steps:steps||['요소를 선택','이 효과를 적용 (설정값 없이 바로 적용)','화면에 들어오면 재생됩니다']});
 const FX_DESC={
+  'hover-color':_mkDesc('마우스를 올리면 글자색(텍스트)·배경색(도형)이 지정한 색으로 부드럽게 바뀝니다.','💡 버튼·메뉴에 쓰면 생동감. 아래에서 바뀔 색을 고르세요',['요소(텍스트/도형)를 선택','이 효과 적용 후 바뀔 색 선택','발행/미리보기에서 마우스를 올리면 샤라락 전환']),
   'mask-wipe':_mkDesc('이미지/요소가 아래에서 위로 커튼 걷히듯 드러납니다.','💡 큰 사진·배너에 쓰면 고급스럽게 등장'),
   'mask-wipe-l':_mkDesc('왼쪽에서 오른쪽으로 닦이듯 드러납니다.','💡 가로로 긴 띠·배너에 잘 어울려요'),
   'rotate-in':_mkDesc('살짝 회전하며 또렷해집니다.','💡 카드·아이콘에 생동감'),
@@ -2155,6 +2210,24 @@ function showTabEditBar(){
   b.querySelector('#tev-assign').onclick=tabAssignSelection;
   b.querySelector('#tev-done').onclick=clearTabEditView;
 }
+// ── 이펙트 적용 시 캔버스에서 1회 미리 재생 ──
+const _FXPREV_KF=`@keyframes fxpv-fade{from{opacity:0}to{opacity:1}}@keyframes fxpv-up{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}@keyframes fxpv-down{from{opacity:0;transform:translateY(-40px)}to{opacity:1;transform:none}}@keyframes fxpv-left{from{opacity:0;transform:translateX(40px)}to{opacity:1;transform:none}}@keyframes fxpv-right{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}@keyframes fxpv-zin{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}@keyframes fxpv-zout{from{opacity:0;transform:scale(1.3)}to{opacity:1;transform:none}}@keyframes fxpv-pop{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.08)}100%{opacity:1;transform:none}}@keyframes fxpv-bounce{0%{opacity:0;transform:translateY(60px)}60%{transform:translateY(-12px)}100%{opacity:1;transform:none}}@keyframes fxpv-rot{from{opacity:0;transform:rotate(-12deg) scale(.9)}to{opacity:1;transform:none}}@keyframes fxpv-blur{from{opacity:0;filter:blur(10px)}to{opacity:1;filter:none}}@keyframes fxpv-flip{from{opacity:0;transform:perspective(600px) rotateX(70deg)}to{opacity:1;transform:none}}@keyframes fxpv-skew{from{opacity:0;transform:skewX(-12deg) translateY(20px)}to{opacity:1;transform:none}}@keyframes fxpv-mask{from{clip-path:inset(100% 0 0 0)}to{clip-path:inset(0)}}@keyframes fxpv-maskl{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}@keyframes fxpv-pulse{0%,100%{transform:none}50%{transform:scale(1.08)}}@keyframes fxpv-float{0%,100%{transform:none}50%{transform:translateY(-12px)}}@keyframes fxpv-shake{0%,100%{transform:none}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}@keyframes fxpv-spin{to{transform:rotate(360deg)}}@keyframes fxpv-wob{0%,100%{transform:none}33%{transform:rotate(4deg)}66%{transform:rotate(-4deg)}}@keyframes fxpv-heart{0%,100%{transform:none}30%{transform:scale(1.12)}45%{transform:scale(1)}}@keyframes fxpv-glow{0%,100%{filter:none}50%{filter:drop-shadow(0 0 12px rgba(108,123,255,.8))}}@keyframes fxpv-blink{0%,100%{opacity:1}50%{opacity:.3}}`;
+const _FXPREV_MAP={'scroll-reveal':'fxpv-up .6s ease','char-reveal':'fxpv-up .6s ease','fade-in':'fxpv-fade .6s ease','slide-down':'fxpv-down .6s ease','slide-left':'fxpv-left .6s ease','slide-right':'fxpv-right .6s ease','zoom-in':'fxpv-zin .6s ease','zoom-out':'fxpv-zout .6s ease','pop-in':'fxpv-pop .6s ease','bounce-in':'fxpv-bounce .7s ease','rotate-in':'fxpv-rot .6s ease','blur-in':'fxpv-blur .6s ease','flip-in':'fxpv-flip .6s ease','flip-y':'fxpv-flip .6s ease','skew-in':'fxpv-skew .6s ease','mask-wipe':'fxpv-mask .7s ease','mask-wipe-l':'fxpv-maskl .7s ease','float':'fxpv-float 1.2s ease','pulse':'fxpv-pulse .8s ease','spin':'fxpv-spin .9s linear','wobble':'fxpv-wob .8s ease','swing':'fxpv-wob .8s ease','shake':'fxpv-shake .6s ease','heartbeat':'fxpv-heart .9s ease','tada':'fxpv-pop .7s ease','glow-loop':'fxpv-glow 1s ease','blink':'fxpv-blink .9s ease','gradient-flow':'fxpv-fade .6s ease','marquee':'fxpv-left .6s ease'};
+const _FXPREV_HOVER={'hover-lift':'transform:translateY(-8px)','hover-glow':'filter:brightness(1.06);box-shadow:0 0 26px rgba(108,123,255,.6)','hover-grow':'transform:scale(1.06)','hover-tilt':'transform:perspective(600px) rotateX(6deg) rotateY(-6deg)','hover-sink':'transform:translateY(4px)','hover-rotate':'transform:rotate(4deg) scale(1.03)','hover-bright':'filter:brightness(1.15)','hover-border':'box-shadow:0 0 0 3px #6c7bff','hover-dim':'filter:brightness(.8)','hover-float':'transform:translateY(-8px) scale(1.03)','hover-zoom':'transform:scale(1.07)'};
+function _fxPreviewPlay(elId, type){
+  const node=canvas.querySelector(`[data-id="${elId}"]`); if(!node||!type) return;
+  if(!document.getElementById('fxprev-style')){ const st=document.createElement('style'); st.id='fxprev-style'; st.textContent=_FXPREV_KF; document.head.appendChild(st); }
+  const anim=_FXPREV_MAP[type];
+  if(anim){ node.style.animation='none'; void node.offsetWidth; node.style.animation=anim; setTimeout(()=>{ node.style.animation=''; }, 1500); return; }
+  if(type==='hover-color'){
+    const e2=el(elId), col=(e2&&e2.fx&&e2.fx.color)||'#2b6cff', inner=node.querySelector('.inner');
+    if(e2&&e2.type==='text'&&inner){ const o=inner.style.color; inner.style.transition='color .3s'; inner.style.color=col; setTimeout(()=>{ inner.style.color=o; }, 850); }
+    else { const o=node.style.background; node.style.transition='background-color .3s,background .3s'; node.style.background=col; setTimeout(()=>{ node.style.background=o; }, 850); }
+    return;
+  }
+  const hov=_FXPREV_HOVER[type];
+  if(hov){ const prev=node.style.cssText; node.style.transition='transform .3s ease,box-shadow .3s ease,filter .3s ease'; hov.split(';').forEach(d=>{ const c=d.indexOf(':'); if(c>0) node.style.setProperty(d.slice(0,c).trim(), d.slice(c+1).trim()); }); setTimeout(()=>{ node.style.cssText=prev; }, 850); }
+}
 let _fxPending=null; // null=대기없음, ''=없음 선택, 'scroll-reveal' 등=대기중
 let _fxLastElId=null; // 요소 바뀌면 pending 초기화용
 function renderFxPanel(){
@@ -2256,6 +2329,12 @@ function renderFxPanel(){
         </div>
         <div style="font-size:11px;color:var(--sub);margin-top:6px">클릭해서 연결 / 다시 클릭하면 해제</div>
       </div>`;
+      // 나타나는 방향 — 트리거(hover-show)·대상(hover-hide) 어느 쪽을 골라도 설정 가능
+      let _rv=fx.reveal||'fade';
+      if(ft==='hover-show'){ const _c=page().elements.find(x=>{const f=x.fx;return f&&f.type==='hover-hide'&&f.group===myGroup;}); _rv=(_c&&_c.fx.reveal)||'fade'; }
+      opts+=`<div class="grp"><label class="lbl">나타나는 방향 ${ft==='hover-show'?'<span style="color:var(--sub);font-weight:400">(연결된 대상에 적용)</span>':''}</label><div class="btn-grp" style="flex-wrap:wrap;gap:4px">
+        ${[['fade','✦','페이드'],['top','⬇','위에서 내려옴'],['bottom','⬆','아래에서 올라옴'],['left','➡','왼쪽에서 들어옴'],['right','⬅','오른쪽에서 들어옴'],['zoom','🔎','확대되며']].map(d=>`<button class="rv-btn${_rv===d[0]?' on':''}" data-rv="${d[0]}" title="${d[2]}" style="min-width:40px;font-size:15px">${d[1]}</button>`).join('')}
+      </div></div>`;
     }
     if(ft==='tab-trigger'||ft==='tab-content'){
       if(!fx.group){if(!e.fx)e.fx={};e.fx.type=ft;e.fx.group='tab_'+e.id.slice(0,6);}
@@ -2303,6 +2382,15 @@ function renderFxPanel(){
         <div style="flex:1"><label class="lbl">단위</label><input type="text" id="eff-suf" value="${fx.suffix||''}" placeholder="%"></div></div></div>
       <div class="grp"><label class="lbl">지속 시간 <span style="float:right;color:var(--accent)">${(fx.dur||2000)/1000}초</span></label>
         <input type="range" id="eff-dur" min="500" max="8000" step="500" value="${fx.dur||2000}">
+      </div>`;
+    }
+    if(ft==='hover-color'){
+      opts+=`<div class="grp"><label class="lbl">마우스 올릴 때 색</label>
+        <div style="display:flex;align-items:center;gap:8px">
+          <input type="color" id="eff-hc" value="${fx.color||'#2b6cff'}" style="width:46px;height:34px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);cursor:pointer;padding:2px">
+          <input type="text" id="eff-hc-t" value="${fx.color||'#2b6cff'}" placeholder="#2b6cff" style="flex:1">
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:5px">텍스트=글자색, 도형=배경색이 이 색으로 부드럽게 전환됩니다 (발행/미리보기에서 확인)</div>
       </div>`;
     }
     if(ft==='slider'){
@@ -2356,6 +2444,24 @@ function renderFxPanel(){
         <input type="text" id="eff-bgsrc" value="${(fx.src||'').replace(/"/g,'&quot;')}" placeholder="https://...mp4 또는 유튜브 링크">
         <div style="font-size:11px;color:var(--sub);margin-top:5px">무음·자동반복 재생됩니다. 글자는 위에 별도 요소로 올리세요.</div></div>`;
     }
+    // ── 두 번째 효과 (멀티 이펙트) — 진입·루프·호버를 하나 더 겹쳐 적용 · 검색 가능 ──
+    {
+      const fx2t=(e.fx2&&e.fx2.type)||'';
+      const safeNames=['진입 (스크롤 등장)','상시 움직임 (루프)','호버 (마우스)'];
+      const items=[];
+      FX_CATS.filter(c=>safeNames.includes(c.name)).forEach(c=>{
+        c.keys.filter(k=>k!=='char-reveal'&&k!==ft).forEach(k=>{ if(FX_NAMES[k]) items.push({k,name:FX_NAMES[k],icon:FX_ICONS[k]||'✨',cat:c.name}); });
+      });
+      const row=(k,name,icon,cat,on)=>`<div class="fx2-item${on?' on':''}" data-fx2="${k}" data-search="${(name+' '+(cat||'')).toLowerCase()}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--border);${on?'background:rgba(108,123,255,.15)':''}"><span style="width:18px;text-align:center">${icon}</span><span style="flex:1;font-size:12px">${name}</span><span style="font-size:10px;color:var(--sub)">${(cat||'').split(' ')[0]}</span></div>`;
+      const cur=fx2t?(FX_NAMES[fx2t]||fx2t):'없음';
+      opts+=`<div class="grp" style="border-top:1px dashed var(--border);padding-top:12px;margin-top:8px"><label class="lbl">➕ 두 번째 효과 <span style="color:var(--sub);font-weight:400">(현재: ${cur})</span></label>
+        <input type="text" id="fx2-search" placeholder="🔍 효과 검색 (예: 호버, 떠오름, 페이드, 둥실)" autocomplete="off" style="width:100%;margin-bottom:6px;padding:7px 10px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);color:var(--text)">
+        <div id="fx2-list" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;background:var(--panel2)">
+          ${row('','없음 (두 번째 효과 제거)','🚫','없음 none 제거',!fx2t)}
+          ${items.map(it=>row(it.k,it.name,it.icon,it.cat,fx2t===it.k)).join('')}
+        </div>
+        <div style="font-size:11px;color:var(--sub);margin-top:5px">검색해서 진입·루프·호버 효과를 하나 더 겹쳐 적용 (예: 스크롤 등장 + 호버 떠오름).</div></div>`;
+    }
     opts+=`</div>`;
   }
 
@@ -2383,10 +2489,12 @@ function renderFxPanel(){
   const applyBtn=document.getElementById('fx-apply-btn');
   if(applyBtn) applyBtn.addEventListener('click',()=>{
     const _ts=selAll(); const _t=_ts.length?_ts:[e];   // 그룹/다중선택이면 전체 적용
-    if(_fxPending===''){ _t.forEach(x=>delete x.fx); }
+    const _appliedType=_fxPending;   // 미리보기용으로 적용 타입 보관
+    if(_fxPending===''){ _t.forEach(x=>{ delete x.fx; delete x.fx2; }); }
     else if(_fxPending){ _t.forEach(x=>{ if(!x.fx)x.fx={}; x.fx.type=_fxPending; }); }
     _fxPending=null; _fxInfoOpen=null;
     renderFxPanel();renderProps();renderCanvas();save(true);snapshot();   // liveStyle()(renderProps 지역함수)는 스코프 밖→에러였음. 전체 갱신으로 교체
+    if(_appliedType) requestAnimationFrame(()=>_t.forEach(x=>_fxPreviewPlay(x.id, _appliedType)));   // 적용 직후 1회 재생
     if(_t.length>1) toast(`${_t.length}개에 적용됨`);
   });
   // 취소 버튼
@@ -2437,6 +2545,23 @@ function renderFxPanel(){
   box.querySelectorAll('.dir-btn').forEach(b=>{
     b.addEventListener('click',()=>{ if(!e.fx)e.fx={}; e.fx.dir=b.dataset.dir; renderFxPanel();snapshot(); });
   });
+  // 호버 등장 방향 — 대상(hover-hide)이면 자신에, 트리거(hover-show)면 연결된 모든 대상에 적용
+  box.querySelectorAll('.rv-btn').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const d=b.dataset.rv; if(!e.fx)e.fx={type:ft};
+      if(e.fx.type==='hover-show'){ const g=e.fx.group; let n=0; page().elements.forEach(x=>{ if(x.fx&&x.fx.type==='hover-hide'&&x.fx.group===g){ x.fx.reveal=d; n++; } }); if(!n) toast('먼저 나타날 대상을 연결하세요'); }
+      else { e.fx.reveal=d; }
+      renderFxPanel(); save(true); snapshot();
+    });
+  });
+  // 두 번째 효과 — 검색 + 목록 선택
+  {
+    const sInp=document.getElementById('fx2-search'), list=document.getElementById('fx2-list');
+    if(sInp&&list){
+      sInp.addEventListener('input',()=>{ const q=sInp.value.trim().toLowerCase(); list.querySelectorAll('.fx2-item').forEach(it=>{ const m=!q||(it.dataset.search||'').indexOf(q)>=0; it.style.display=m?'flex':'none'; }); });
+    }
+    if(list) list.querySelectorAll('.fx2-item').forEach(it=>it.addEventListener('click',()=>{ const v=it.dataset.fx2; if(!v) delete e.fx2; else e.fx2={type:v}; renderFxPanel(); renderCanvas(); save(true); snapshot(); }));
+  }
   // range/text 바인딩
   function rangeSync(id,cb){
     const el2=document.getElementById(id); if(!el2)return;
@@ -2461,6 +2586,12 @@ function renderFxPanel(){
   textSync('eff-from',v=>{if(!e.fx)e.fx={};e.fx.from=+v||0;});
   textSync('eff-to',v=>{if(!e.fx)e.fx={};e.fx.to=+v||0;});
   textSync('eff-suf',v=>{if(!e.fx)e.fx={};e.fx.suffix=v;});
+  // 호버 색변화 — 색 선택(컬러피커 ↔ 텍스트 동기화)
+  { const hc=document.getElementById('eff-hc'), hct=document.getElementById('eff-hc-t');
+    const setHC=(v)=>{ if(!/^#?[0-9a-fA-F]{3,8}$/.test(v.trim()))return; let c=v.trim(); if(c[0]!=='#')c='#'+c; if(!e.fx)e.fx={}; e.fx.color=c; if(hc)hc.value=c; if(hct)hct.value=c; save(true); };
+    if(hc) hc.addEventListener('input',()=>setHC(hc.value));
+    if(hct){ hct.addEventListener('input',()=>setHC(hct.value)); hct.addEventListener('change',()=>snapshot()); }
+  }
   textSync('eff-bgsrc',v=>{if(!e.fx)e.fx={};e.fx.src=v.trim();e.fx.kind=/youtu/.test(v)?'youtube':/vimeo/.test(v)?'vimeo':'mp4';});
   // 슬라이더 버튼
   const effSlAdd=document.getElementById('eff-sl-add');
@@ -2937,6 +3068,8 @@ function showElementCtx(x,y,e){
   let h='';
   h+=row('✂','잘라내기','Ctrl+X','cut')+row('📋','복사','Ctrl+C','copy')+row('📄','붙여넣기','Ctrl+V','paste');
   h+='<div class="sep"></div>';
+  h+=row('🖌','서식 복사','Ctrl+Shift+C','fmtcopy');
+  h+='<div class="sep"></div>';
   h+=fl('🗂','레이어','layer');
   if(hasShape) h+=fl('🔷','도형 모양 변경','shape');
   h+=fl('↔','정렬','align');
@@ -3009,6 +3142,7 @@ function showElementCtx(x,y,e){
     if(a==='cut') cutSel();
     else if(a==='copy') copySel();
     else if(a==='paste') pasteClipboard();
+    else if(a==='fmtcopy') startFmtPaint();
     else if(a==='fx'){ selId=e.id; renderProps(); switchPropTab('fx'); }
     else if(a==='format'){ selId=e.id; renderProps(); switchPropTab('attrs'); }
     else if(a==='z-front')_zorder('front'); else if(a==='z-forward')_zorder('forward'); else if(a==='z-backward')_zorder('backward'); else if(a==='z-back')_zorder('back');
@@ -5393,7 +5527,7 @@ window.addEventListener('keydown',ev=>{
   if(ck&&code==='KeyF'){ ev.preventDefault(); document.getElementById('rb-find')?.click(); return; }
   if(ck&&code==='KeyZ'&&!ev.shiftKey){ ev.preventDefault(); undo(); }
   else if(ck&&(code==='KeyY'||(ev.shiftKey&&code==='KeyZ'))){ ev.preventDefault(); redo(); }
-  else if(ck&&code==='KeyC'){ ev.preventDefault(); if(selIds.size) copySel(); else toast('복사할 요소를 먼저 선택하세요'); }
+  else if(ck&&code==='KeyC'){ ev.preventDefault(); if(ev.shiftKey){ startFmtPaint(); } else if(selIds.size) copySel(); else toast('복사할 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyX'){ ev.preventDefault(); if(selIds.size) cutSel(); else toast('잘라낼 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyV'){ ev.preventDefault(); if(_clipboard&&_clipboard.length) pasteClipboard(); else toast('붙여넣을 내용이 없습니다 (먼저 Ctrl+C)'); }
   else if((ev.key==='Delete'||ev.key==='Backspace')&&selIds.size){ ev.preventDefault(); const del=expandTabDelete(selIds); page().elements=page().elements.filter(x=>!del.has(x.id)); selId=null; selIds=new Set(); afterMutate(); }
@@ -5403,6 +5537,7 @@ window.addEventListener('keydown',ev=>{
   else if(ck&&code==='KeyG'&&ev.shiftKey){ ev.preventDefault(); arrUngroup(); }
   else if(ck&&code==='KeyG'){ ev.preventDefault(); arrGroup(); }
   else if(ck&&code==='KeyA'){ ev.preventDefault(); selIds=new Set(page().elements.map(e=>e.id)); selId=selIds.size>0?[...selIds].at(-1):null; renderCanvas(); renderProps(); updateRibbonState(); }
+  else if(ev.key==='Escape'&&_fmtPaint){ endFmtPaint(); toast('서식 복사 종료'); }
   else if(ev.key==='Escape'&&selIds.size>0){ selId=null; selIds=new Set(); renderCanvas(); renderProps(); updateRibbonState(); }
   else if(selId && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(ev.key)){ ev.preventDefault(); const d=ev.shiftKey?10:1; for(const id of selIds){const e2=el(id);if(!e2)continue;if(ev.key==='ArrowUp')e2.y-=d;if(ev.key==='ArrowDown')e2.y+=d;if(ev.key==='ArrowLeft')e2.x-=d;if(ev.key==='ArrowRight')e2.x+=d;} renderCanvas(); const primary=el(selId); if(primary) syncPosInputs(primary); save(true); }
 });
