@@ -1,7 +1,8 @@
 // editor-fixtab.js — 고정탭(플로팅 탭) 기능 모듈. editor.js와 상호 import(순환, ESM 안전).
 // 최상위는 선언만 → init 시 editor.js 바인딩 미접근. 회귀 시 git으로 복구.
 import { _clamp } from './editor-shapes.js';
-import { page, zoom, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, _fontOpts, project, selId, selIds, _clearSel, _resetCpTarget } from './editor.js';
+import { page, zoom, canvas, save, snapshot, renderCanvas, renderProps, toast, hamburgerRootPages, uid, FONTS, _fontOpts, project, selId, selIds, _clearSel, _resetCpTarget, editorDevice } from './editor.js';
+const FIXTAB_M_KEYS=['w','h','dx','dy','corner','fontSize','radius','letterSpacing','lineHeight','gap','itemRadius','borderW'];
 
 let _fixTabSel=null;
 let _fixItemIdx=0;   // 항목별 색상 팝업이 가리키는 항목 인덱스
@@ -42,10 +43,12 @@ function fixTabItemsOf(t){
 function renderFixTabsOnCanvas(){
   canvas.querySelectorAll('.fixtab-edit').forEach(n=>n.remove());
   const R=(window.SiteRender&&SiteRender.fixTabResolve); if(!R) return;
+  const mobView=editorDevice==='mobile';
   fixedTabs().forEach(t=>{
-    const r=R(t), sel=(t.id===_fixTabSel && !selId && !selIds.size);
+    const r=R(t, mobView), sel=(t.id===_fixTabSel && !selId && !selIds.size);
     const node=document.createElement('div'); node.className='fixtab-edit';
     node.style.cssText='position:absolute;z-index:90;'+r.hx+';'+r.hy+';'+r.container+(sel?';outline:2px solid var(--accent);outline-offset:2px':'');
+    if(mobView && t.m){ const mb=document.createElement('div'); mb.textContent='📱'; mb.title='모바일 전용 크기/위치 편집 중'; mb.style.cssText='position:absolute;top:-9px;right:-9px;width:18px;height:18px;font-size:11px;background:#2b6cff;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;z-index:92;pointer-events:none'; node.appendChild(mb); }
     // 항목들을 발행본과 동일하게 시각적으로 표시(편집기에선 클릭 비활성, 컨테이너 단위로 선택)
     r.items.forEach((it,i)=>{
       const cell=document.createElement('div');
@@ -74,16 +77,18 @@ function renderFixTabsOnCanvas(){
 }
 function startFixTabDrag(ev,t){
   ev.preventDefault();
-  const p=page(), r0=SiteRender.fixTabResolve(t), w=r0.w, h=r0.h, rect=canvas.getBoundingClientRect();
-  const startLeft=((t.corner||'br').indexOf('l')>=0)? t.dx : (p.w - t.dx - w);
-  const startTop =((t.corner||'br').indexOf('t')>=0)? t.dy : (p.h - t.dy - h);
+  const p=page(), rect=canvas.getBoundingClientRect();
+  const tgt=(editorDevice==='mobile' && t.m)? t.m : t;
+  const w=tgt.w, h=tgt.h;
+  const startLeft=((tgt.corner||'br').indexOf('l')>=0)? tgt.dx : (p.w - tgt.dx - w);
+  const startTop =((tgt.corner||'br').indexOf('t')>=0)? tgt.dy : (p.h - tgt.dy - h);
   const grabX=(ev.clientX-rect.left)/zoom-startLeft, grabY=(ev.clientY-rect.top)/zoom-startTop;
   function mv(ev2){
     let left=_clamp((ev2.clientX-rect.left)/zoom-grabX, 0, p.w-w), top=_clamp((ev2.clientY-rect.top)/zoom-grabY, 0, p.h-h);
     const cx=left+w/2, cy=top+h/2;
-    t.corner=(cy<p.h/2?'t':'b')+(cx<p.w/2?'l':'r');
-    t.dx=Math.round(t.corner.indexOf('l')>=0?left:(p.w-(left+w)));
-    t.dy=Math.round(t.corner.indexOf('t')>=0?top:(p.h-(top+h)));
+    tgt.corner=(cy<p.h/2?'t':'b')+(cx<p.w/2?'l':'r');
+    tgt.dx=Math.round(tgt.corner.indexOf('l')>=0?left:(p.w-(left+w)));
+    tgt.dy=Math.round(tgt.corner.indexOf('t')>=0?top:(p.h-(top+h)));
     _fixSave();
   }
   function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
@@ -93,11 +98,12 @@ function startFixTabResize(ev,t,pos){
   ev.preventDefault();
   pos=pos||'se';
   const p=page(), rect=canvas.getBoundingClientRect();
-  const corner=t.corner||'br', hasL=corner.indexOf('l')>=0, hasT=corner.indexOf('t')>=0;
+  const tgt=(editorDevice==='mobile' && t.m)? t.m : t;
+  const corner=tgt.corner||'br', hasL=corner.indexOf('l')>=0, hasT=corner.indexOf('t')>=0;
   // 현재 절대 박스
-  const left0=hasL? t.dx : (p.w - t.dx - t.w);
-  const top0 =hasT? t.dy : (p.h - t.dy - t.h);
-  const right0=left0+t.w, bottom0=top0+t.h;
+  const left0=hasL? tgt.dx : (p.w - tgt.dx - tgt.w);
+  const top0 =hasT? tgt.dy : (p.h - tgt.dy - tgt.h);
+  const right0=left0+tgt.w, bottom0=top0+tgt.h;
   const MINW=40, MINH=24;
   function mv(ev2){
     const mx=(ev2.clientX-rect.left)/zoom, my=(ev2.clientY-rect.top)/zoom;
@@ -107,9 +113,9 @@ function startFixTabResize(ev,t,pos){
     if(pos.indexOf('n')>=0) top  =_clamp(my, 0, bottom0-MINH);
     if(pos.indexOf('s')>=0) bottom=_clamp(my, top0+MINH, p.h);
     // 같은 corner 기준으로 dx/dy 재계산(앵커 고정 → 튐 없음)
-    t.dx=Math.round(hasL? left : (p.w-right));
-    t.dy=Math.round(hasT? top : (p.h-bottom));
-    t.w=Math.round(right-left); t.h=Math.round(bottom-top);
+    tgt.dx=Math.round(hasL? left : (p.w-right));
+    tgt.dy=Math.round(hasT? top : (p.h-bottom));
+    tgt.w=Math.round(right-left); tgt.h=Math.round(bottom-top);
     _fixSave();
   }
   function up(){ window.removeEventListener('mousemove',mv); window.removeEventListener('mouseup',up); snapshot(); }
@@ -121,6 +127,7 @@ function openFixTabPopup(t,x,y,pw,ph){
   // 새로 여는 경우(프로그램 재오픈 아님) 저장된 위치·크기 복원
   if(pw==null){ const g=_fixLoadGeo(); if(g){ x=g.x; y=g.y; pw=g.w; ph=g.h; } }
   const items=fixTabItemsOf(t), dir=(t.dir==='col')?'col':'row';
+  const mob=editorDevice==='mobile' && !!t.m, tgt=mob?t.m:t;
   const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   const roots=hamburgerRootPages();
   const IN='padding:5px 7px;border:1px solid var(--border,#dcdce8);border-radius:7px;background:var(--bg,#fff);color:var(--text,#222);font-size:12px;outline:none;box-sizing:border-box';
@@ -161,29 +168,32 @@ function openFixTabPopup(t,x,y,pw,ph){
   pop.addEventListener('contextmenu',ev=>ev.preventDefault());
   pop.innerHTML=`
     <div id="ft-head" style="display:flex;align-items:center;gap:7px;cursor:move;user-select:none;margin:-13px -14px 9px;padding:11px 14px 9px;border-bottom:1px solid var(--border,#ececf4);position:sticky;top:-13px;background:var(--panel,#fff);z-index:2;border-radius:13px 13px 0 0">
-      <span style="font-weight:800;font-size:14px">📌 고정탭</span>
+      <span style="font-weight:800;font-size:14px">📌 고정탭${mob?' · 📱 모바일 값 편집 중':''}</span>
       <span style="color:var(--sub,#bbb);font-size:13px;margin-left:auto;letter-spacing:1px" title="드래그로 이동">⠿⠿</span>
     </div>
     <div style="color:var(--sub,#999);font-size:11px;margin:0 0 11px">탭 하나에 여러 항목 · 창은 드래그로 이동</div>
+    <label style="display:flex;align-items:center;gap:6px;margin-bottom:11px;padding:8px;border:1px solid var(--border,#dcdce8);border-radius:8px;background:rgba(43,108,255,.06);font-size:11px;color:var(--text,#333)">
+      <input type="checkbox" id="ft-mob" ${t.m?'checked':''}> 📱 모바일에서 크기·위치 따로 쓰기${(!mob&&t.m)?' <span style="color:#e08">(모바일 모드로 전환해서 편집)</span>':''}
+    </label>
     <div style="${SL}">항목</div>
     <div id="ft-items">${itemHtml}</div>
     <button id="ft-add" style="width:100%;padding:7px;border:1px dashed var(--accent,#2b6cff);border-radius:8px;background:transparent;color:var(--accent,#2b6cff);cursor:pointer;font-size:12px;font-weight:600">＋ 항목 추가</button>
     <div style="height:1px;background:var(--border,#ececf4);margin:12px 0"></div>
-    <div style="${SL}">스타일</div>
+    <div style="${SL}">스타일${mob?' (📱 모바일 전용)':''}</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">${dbtn('row','가로 배열')}${dbtn('col','세로 배열')}</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">${swatch('fixTabBg',t.bg||'#2b6cff')}${swatch('fixTabColor',t.color||'#ffffff')}</div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${t.fontSize||15}" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${t.radius!=null?t.radius:23}" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">글자크기</span><input type="number" id="ft-fs" value="${tgt.fontSize||15}" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">모서리 둥글기</span><input type="number" id="ft-rad" value="${tgt.radius!=null?tgt.radius:23}" style="${IN}"></label>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">자간(px)</span><input type="number" id="ft-ls" value="${t.letterSpacing||0}" step="0.5" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">행간</span><input type="number" id="ft-lh" value="${t.lineHeight!=null?t.lineHeight:1.2}" step="0.1" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">항목 간격</span><input type="number" id="ft-gap" value="${t.gap!=null?t.gap:''}" placeholder="자동" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">자간(px)</span><input type="number" id="ft-ls" value="${tgt.letterSpacing||0}" step="0.5" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">행간</span><input type="number" id="ft-lh" value="${tgt.lineHeight!=null?tgt.lineHeight:1.2}" step="0.1" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">항목 간격</span><input type="number" id="ft-gap" value="${tgt.gap!=null?tgt.gap:''}" placeholder="자동" style="${IN}"></label>
     </div>
     <div style="display:flex;gap:6px;margin-bottom:8px;align-items:flex-end">
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">칸 둥글기</span><input type="number" id="ft-irad" value="${t.itemRadius!=null?t.itemRadius:''}" placeholder="자동" style="${IN}"></label>
-      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${t.borderW||0}" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">칸 둥글기</span><input type="number" id="ft-irad" value="${tgt.itemRadius!=null?tgt.itemRadius:''}" placeholder="자동" style="${IN}"></label>
+      <label style="flex:1;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 굵기</span><input type="number" id="ft-bw" value="${tgt.borderW||0}" style="${IN}"></label>
       <div style="flex:1.2;display:flex;flex-direction:column;gap:3px"><span style="font-size:10px;color:var(--sub,#999)">테두리 색</span>${swatch('fixTabBorder',t.borderColor||'#e2e2ee')}</div>
     </div>
     <label style="display:flex;flex-direction:column;gap:3px;margin-bottom:8px"><span style="font-size:10px;color:var(--sub,#999)">폰트</span><select id="ft-font" style="${IN};width:100%">${fontOpts}</select></label>
@@ -224,25 +234,30 @@ function openFixTabPopup(t,x,y,pw,ph){
   pop.querySelectorAll('.ft-rm').forEach(b=>b.addEventListener('click',()=>{ items.splice(+b.dataset.i,1); _fixSave(); snapshot(); reopen(); }));
   q('ft-add').addEventListener('click',()=>{ items.push({ label:'메뉴', action:'top', link:(roots[0]&&roots[0].id)||'', url:'' }); _fixSave(); snapshot(); reopen(); });
   pop.querySelectorAll('.ft-dir').forEach(b=>b.addEventListener('click',()=>{ t.dir=b.dataset.d; _fixSave(); snapshot(); reopen(); }));
-  q('ft-fs').addEventListener('input',()=>{ t.fontSize=parseInt(q('ft-fs').value)||15; _fixSave(); });
+  q('ft-fs').addEventListener('input',()=>{ tgt.fontSize=parseInt(q('ft-fs').value)||15; _fixSave(); });
   q('ft-fs').addEventListener('change',()=>snapshot());
-  q('ft-rad').addEventListener('input',()=>{ t.radius=parseInt(q('ft-rad').value)||0; _fixSave(); });
+  q('ft-rad').addEventListener('input',()=>{ tgt.radius=parseInt(q('ft-rad').value)||0; _fixSave(); });
   q('ft-rad').addEventListener('change',()=>snapshot());
-  q('ft-ls').addEventListener('input',()=>{ t.letterSpacing=parseFloat(q('ft-ls').value)||0; _fixSave(); });
+  q('ft-ls').addEventListener('input',()=>{ tgt.letterSpacing=parseFloat(q('ft-ls').value)||0; _fixSave(); });
   q('ft-ls').addEventListener('change',()=>snapshot());
-  q('ft-lh').addEventListener('input',()=>{ t.lineHeight=parseFloat(q('ft-lh').value)||1.2; _fixSave(); });
+  q('ft-lh').addEventListener('input',()=>{ tgt.lineHeight=parseFloat(q('ft-lh').value)||1.2; _fixSave(); });
   q('ft-lh').addEventListener('change',()=>snapshot());
-  q('ft-bw').addEventListener('input',()=>{ t.borderW=parseInt(q('ft-bw').value)||0; _fixSave(); });
+  q('ft-bw').addEventListener('input',()=>{ tgt.borderW=parseInt(q('ft-bw').value)||0; _fixSave(); });
   q('ft-bw').addEventListener('change',()=>snapshot());
-  q('ft-gap').addEventListener('input',()=>{ const v=q('ft-gap').value.trim(); t.gap=(v===''?null:(parseInt(v)||0)); _fixSave(); });
+  q('ft-gap').addEventListener('input',()=>{ const v=q('ft-gap').value.trim(); tgt.gap=(v===''?null:(parseInt(v)||0)); _fixSave(); });
   q('ft-gap').addEventListener('change',()=>snapshot());
-  q('ft-irad').addEventListener('input',()=>{ const v=q('ft-irad').value.trim(); t.itemRadius=(v===''?null:(parseInt(v)||0)); _fixSave(); });
+  q('ft-irad').addEventListener('input',()=>{ const v=q('ft-irad').value.trim(); tgt.itemRadius=(v===''?null:(parseInt(v)||0)); _fixSave(); });
   q('ft-irad').addEventListener('change',()=>snapshot());
   // 항목별 색 스와치: 클릭 시 대상 항목 인덱스 지정 + 토글 모호성 제거(항상 새로 열기)
   pop.querySelectorAll('.ft-isw').forEach(b=>b.addEventListener('click',()=>{ _fixItemIdx=+b.dataset.i; _resetCpTarget(); }));
   q('ft-font').addEventListener('change',()=>{ t.fontFamily=q('ft-font').value; _fixSave(); snapshot(); });
   q('ft-fw').addEventListener('change',()=>{ t.fontWeight=parseInt(q('ft-fw').value); _fixSave(); snapshot(); });
   q('ft-dev').addEventListener('change',()=>{ t.device=q('ft-dev').value; _fixSave(); snapshot(); });
+  q('ft-mob').addEventListener('change',()=>{
+    if(q('ft-mob').checked){ t.m={}; FIXTAB_M_KEYS.forEach(k=>{ t.m[k]=t[k]; }); toast('📱 모바일 모드로 전환해 드래그·크기조절하면 모바일 전용 값으로 저장됩니다'); }
+    else{ delete t.m; }
+    _fixSave(); snapshot(); reopen();
+  });
   q('ft-fx').addEventListener('change',()=>{ const v=q('ft-fx').value; if(v) t.fx={type:v}; else delete t.fx; _fixSave(); snapshot(); });
   q('ft-del').addEventListener('click',()=>{ const a=fixedTabs(); const i=a.findIndex(x=>x.id===t.id); if(i>=0)a.splice(i,1); _fixTabSel=null; pop.remove(); renderCanvas(); save(true); snapshot(); toast('고정탭 삭제됨'); });
   const closer=ev=>{ if(!ev.target.closest('#fixtab-popup') && !ev.target.closest('#fill-dd')){ _fixSaveGeo(); pop.remove(); document.removeEventListener('mousedown',closer); } };

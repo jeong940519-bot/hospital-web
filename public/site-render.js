@@ -64,26 +64,31 @@
     if(t.items && t.items.length) return t.items;
     return [{ label:(t.label!=null?t.label:'예약'), action:(t.action||'top'), link:t.link||'', url:t.url||'' }];
   }
-  /* 고정탭(플로팅 탭) 스타일 해석 — 편집기·발행본 공유. corner=tl|tr|bl|br + dx/dy 오프셋, 항목 여러 개 가능. */
-  function fixTabResolve(t){
+  /* 고정탭(플로팅 탭) 스타일 해석 — 편집기·발행본 공유. corner=tl|tr|bl|br + dx/dy 오프셋, 항목 여러 개 가능.
+     mob=true면 t.m(모바일 전용 오버라이드)이 있는 필드만 덮어써서 계산(없으면 PC 값 그대로 사용). */
+  function fixTabResolve(t, mob){
     t=t||{};
-    var corner=t.corner||'br';
-    var dx=(t.dx!=null?+t.dx:24), dy=(t.dy!=null?+t.dy:24);
-    var w=(t.w!=null?+t.w:118), h=(t.h!=null?+t.h:46);
-    var hx=(corner.indexOf('l')>=0)?('left:'+dx+'px'):('right:'+dx+'px');
-    var hy=(corner.indexOf('t')>=0)?('top:'+dy+'px'):('bottom:'+dy+'px');
-    var radius=(t.radius!=null?+t.radius:23);
+    var ov=(mob && t.m)?t.m:{};
+    var g=function(k,d){ return ov[k]!=null? +ov[k] : (t[k]!=null? +t[k] : d); };
+    var corner=ov.corner||t.corner||'br';
+    var dx=g('dx',24), dy=g('dy',24);
+    var w=g('w',118), h=g('h',46);
+    var hxSide=(corner.indexOf('l')>=0)?'left':'right';
+    var hySide=(corner.indexOf('t')>=0)?'top':'bottom';
+    var hx=hxSide+':'+dx+'px';
+    var hy=hySide+':'+dy+'px';
+    var radius=g('radius',23);
     var dir=(t.dir==='col')?'column':'row';
     var items=fixTabItems(t);
     var pill=items.some(function(it){return it&&it.bg;});   // 항목별 배경이 하나라도 있으면 '알약' 모드
-    var lh=(t.lineHeight!=null?+t.lineHeight:1.2);
-    var ls=(t.letterSpacing!=null?+t.letterSpacing:0);
-    var bw=(t.borderW!=null?+t.borderW:0);
-    var gap=(t.gap!=null?+t.gap:(pill?6:0));     // 항목 사이 간격(독립 조절)
+    var lh=g('lineHeight',1.2);
+    var ls=g('letterSpacing',0);
+    var bw=g('borderW',0);
+    var gap=g('gap',(pill?6:0));     // 항목 사이 간격(독립 조절)
     var pad=(t.pad!=null?+t.pad:(pill?6:0));
-    var itemR=(t.itemRadius!=null?+t.itemRadius:(pill?Math.max(4,radius-pad):0));   // 칸(글자 박스) 둥글기
+    var itemR=g('itemRadius',(pill?Math.max(4,radius-pad):0));   // 칸(글자 박스) 둥글기
     var container='width:'+w+'px;height:'+h+'px;background:'+(t.bg||'#2b6cff')+';color:'+(t.color||'#ffffff')
-      +';font-size:'+(+(t.fontSize||15))+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
+      +';font-size:'+g('fontSize',15)+'px;font-weight:'+(t.fontWeight||700)+";font-family:'"+(t.fontFamily||'Noto Sans KR')+"',sans-serif"
       +';border-radius:'+radius+'px;display:flex;flex-direction:'+dir+';align-items:stretch'
       +';line-height:'+lh+';letter-spacing:'+ls+'px'
       +(bw>0?';border:'+bw+'px solid '+(t.borderColor||'#e2e2ee'):'')
@@ -99,7 +104,7 @@
       if(it&&it.color) s+=';color:'+it.color;
       return s;
     }
-    return { hx:hx, hy:hy, w:w, h:h, container:container, itemCss:itemBase, divCss:divCss, itemStyle:itemStyle, dir:dir, radius:radius, items:items, dev:(t.device||'both') };
+    return { hx:hx, hy:hy, hxSide:hxSide, hySide:hySide, dx:dx, dy:dy, w:w, h:h, fontSize:g('fontSize',15), radius:radius, container:container, itemCss:itemBase, divCss:divCss, itemStyle:itemStyle, dir:dir, items:items, dev:(t.device||'both') };
   }
   // 고정탭 효과 — 일반 요소와 동일한 data 속성 방식(등장/루프/호버). FX_ANIM/LOOP/HOVER는 호출시점에 초기화됨.
   function fixTabFxAttr(fx){
@@ -110,7 +115,7 @@
     return '';
   }
   function fixTabHtml(t){
-    var r=fixTabResolve(t);
+    var r=fixTabResolve(t,false);
     var inner=r.items.map(function(it,i){
       var css=r.itemStyle(it,i);
       var attr=' class="fixtab-item" style="'+css+'"';
@@ -119,7 +124,20 @@
       if(it.action==='link') return '<div data-link="'+esc(it.link||'')+'"'+attr+'>'+lbl+'</div>';
       return '<div data-fixtab="top"'+attr+'>'+lbl+'</div>';
     }).join('');
-    return '<div class="fixtab" data-dev="'+r.dev+'"'+fixTabFxAttr(t.fx)+' style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.container+'">'+inner+'</div>';
+    var elId='fx-'+(t.id||Math.random().toString(36).slice(2));
+    var mqCss='';
+    if(t.m){
+      // 모바일 화면(≤768px)에서는 t.m 오버라이드 값으로 크기·위치·글자 재적용(!important로 인라인 PC값을 덮음)
+      var rm=fixTabResolve(t,true);
+      var oppX=(rm.hxSide==='left')?'right':'left', oppY=(rm.hySide==='top')?'bottom':'top';
+      mqCss='<style>@media(max-width:768px){#'+elId+'{'
+        +rm.hxSide+':'+rm.dx+'px!important;'+oppX+':auto!important;'
+        +rm.hySide+':'+rm.dy+'px!important;'+oppY+':auto!important;'
+        +'width:'+rm.w+'px!important;height:'+rm.h+'px!important;'
+        +'font-size:'+rm.fontSize+'px!important;border-radius:'+rm.radius+'px!important'
+        +'}}</style>';
+    }
+    return mqCss+'<div id="'+elId+'" class="fixtab" data-dev="'+r.dev+'"'+fixTabFxAttr(t.fx)+' style="position:fixed;z-index:500;'+r.hx+';'+r.hy+';'+r.container+'">'+inner+'</div>';
   }
 
   /* ── 효과 CSS ── */
@@ -283,10 +301,18 @@
   };
   function shapeClipOf(e){ var c=SHAPE_ADJ[e.shape]; if(c){ var a={},k; for(k in c.def)a[k]=c.def[k]; if(e.adj)for(k in e.adj)a[k]=e.adj[k]; return c.clip(a); } return SHAPE_CLIP[e.shape]||''; }
 
+  // ✂️ 영역 잘라내기 — clipCut(요소 박스 기준 0~1 비율 닫힌 다각형)이 있으면 그 안쪽을 CSS clip-path로 제거
+  function _clipCutCss(e){
+    if(!e.clipCut||e.clipCut.length<3) return '';
+    var w=e.w,h=e.h;
+    var pts=e.clipCut.map(function(p){ return (p.x*w).toFixed(2)+','+(p.y*h).toFixed(2); }).join(' L ');
+    var d='M0,0 L'+w+',0 L'+w+','+h+' L0,'+h+' Z M'+pts+' Z';
+    return 'clip-path:path(evenodd, \''+d+'\');';
+  }
   function renderElStatic(e){
     var fx = e.fx||{}, ft = fx.type||'';
     var _tf=''; if(e.rot)_tf+='rotate('+e.rot+'deg)'; if(e.flipH)_tf+=' scaleX(-1)'; if(e.flipV)_tf+=' scaleY(-1)';
-    var base = 'left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px;'+(_tf?'transform:'+_tf.trim()+';':'');
+    var base = 'left:'+e.x+'px;top:'+e.y+'px;width:'+e.w+'px;height:'+e.h+'px;'+(_tf?'transform:'+_tf.trim()+';':'')+_clipCutCss(e);
     var _hcCol = (fx.type==='hover-color'&&fx.color)?fx.color : ((e.fx2&&e.fx2.type==='hover-color'&&e.fx2.color)?e.fx2.color:'');
     if(_hcCol) base+='--fxhc:'+_hcCol+';';   // 호버 색변화 대상 색
     var lnk = e.link?' data-link="'+e.link+'"':'';
@@ -344,6 +370,13 @@
       function hlw(s){ return hl?'<span style="background:'+hl+';box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:0 .12em">'+s+'</span>':s; }
       var content;
       if(ft==='counter'){ content='0'+(fx.suffix||''); }
+      else if(e.richFonts&&e.richFonts.length&&!(e.bullet&&e.bullet!=='none')&&ft!=='char-reveal'){
+        inn+='white-space:pre-wrap;';
+        content=e.richFonts.map(function(r){
+          var t=hlw(esc(r.text));
+          return r.font ? '<span style="font-family:\''+r.font+'\',sans-serif">'+t+'</span>' : t;
+        }).join('');
+      }
       else if(e.bullet&&e.bullet!=='none'){
         inn+='white-space:normal;';
         content=esc(e.text).split('\n').map(function(ln,i){
@@ -395,7 +428,10 @@
         var ai=sva==='top'?'flex-start':sva==='bottom'?'flex-end':'center';
         var jc=sal==='left'?'flex-start':sal==='right'?'flex-end':'center';
         var tinn="font-family:'"+(e.stFont||'Noto Sans KR')+"',sans-serif;font-weight:"+(e.stWeight||700)+";font-size:"+(e.stSize||28)+"px;color:"+(e.stColor||'#ffffff')+";text-align:"+sal+";width:100%;line-height:"+(e.stLineHeight!=null?e.stLineHeight:1.25)+";letter-spacing:"+(e.stLetterSpacing||0)+"px;font-style:"+(e.stItalic?'italic':'normal')+";text-decoration:"+(e.stUnderline?'underline':'none')+";white-space:pre-wrap";
-        stxt='<div style="position:absolute;inset:0;display:flex;overflow:hidden;padding:8px;box-sizing:border-box;align-items:'+ai+';justify-content:'+jc+'"><div style="'+tinn+'">'+esc(e.stext)+'</div></div>';
+        var stBody=(e.stRichFonts&&e.stRichFonts.length)
+          ? e.stRichFonts.map(function(r){ var t=esc(r.text); return r.font?'<span style="font-family:\''+r.font+'\',sans-serif">'+t+'</span>':t; }).join('')
+          : esc(e.stext);
+        stxt='<div style="position:absolute;inset:0;display:flex;overflow:hidden;padding:8px;box-sizing:border-box;align-items:'+ai+';justify-content:'+jc+'"><div style="'+tinn+'">'+stBody+'</div></div>';
       }
       // 아코디언(hover-expand): 바깥 박스에 overflow:hidden이 걸리므로, 도형의 둥근 모서리를 바깥에도 줘서 네모로 잘리지 않게
       var _exr=(ft==='hover-expand')?';border-radius:'+(e.shape==='circle'?'50%':(e.radius||0)+'px'):'';
@@ -506,7 +542,13 @@
     var hmBg = hm.bg||'#ffffff', hmColor = hm.color||'#1a2b5c', hmBtnC = hm.btnColor||'#1a2b5c';
     var hmSize = hm.size||46, hmPos = hm.pos||'left';
     var hmBtnStyle = 'color:'+hmBtnC+';width:'+hmSize+'px;height:'+hmSize+'px;font-size:'+Math.round(hmSize*0.55)+'px;'+(hmPos==='right'?'right:10px;left:auto;':'left:10px;right:auto;');
-    var drawerLinks = hmItems.map(function(it){ var pg=pageMap[it.link]; return '<a href="#" data-id="'+(it.link||'')+'" data-dev="'+((pg&&pg.device)||'both')+'">'+esc(it.name||'')+'</a>'; }).join('');
+    var drawerLinks = hmItems.map(function(it){
+      if(it.children && it.children.length){
+        var subLinks = it.children.map(function(c){ var cpg=pageMap[c.link]; return '<a href="#" data-id="'+(c.link||'')+'" data-dev="'+((cpg&&cpg.device)||'both')+'">'+esc(c.name||'')+'</a>'; }).join('');
+        return '<div class="hmgrp"><button type="button" class="hmgrp-t">'+esc(it.name||'')+'<span class="hmgrp-c">▾</span></button><div class="hmsub">'+subLinks+'</div></div>';
+      }
+      var pg=pageMap[it.link]; return '<a href="#" data-id="'+(it.link||'')+'" data-dev="'+((pg&&pg.device)||'both')+'">'+esc(it.name||'')+'</a>';
+    }).join('');
     var hamburgerHtml = '<button id="hmbtn" aria-label="메뉴" style="'+hmBtnStyle+'">☰</button><div id="hmoverlay"></div><nav id="hmdrawer" style="background:'+hmBg+';color:'+hmColor+'">'+drawerLinks+'</nav>';
     // 고정탭(플로팅) — 모든 페이지에 항상 표시
     var fixTabsHtml = (project.fixedTabs||[]).map(fixTabHtml).join('');
@@ -525,6 +567,8 @@
     project.pages.forEach(function(p){p.elements.forEach(function(e){
       if((e.type==='text'||e.type==='table') && e.fontFamily) _addUF(e.fontFamily);
       if(e.type==='shape' && e.stFont) _addUF(e.stFont);
+      if(e.richFonts) e.richFonts.forEach(function(r){ if(r.font) _addUF(r.font); });     // 부분 폰트(텍스트)
+      if(e.stRichFonts) e.stRichFonts.forEach(function(r){ if(r.font) _addUF(r.font); }); // 부분 폰트(도형 안 글자)
     });});
     (project.fixedTabs||[]).forEach(function(t){ _addUF(t.fontFamily); });
     var _GFW={'Noto Sans KR':'wght@300;400;500;700;900','Noto Serif KR':'wght@400;700','Nanum Gothic':'wght@400;700;800','Nanum Myeongjo':'wght@400;700;800','Gaegu':'wght@400;700','Sunflower':'wght@300;500;700','Dancing Script':'wght@400;500;700','Open Sans':'wght@300;400;500;700;800','Inter':'wght@300;400;500;700;900','Roboto':'wght@300;400;500;700;900','Lato':'wght@300;400;700;900','Montserrat':'wght@300;400;500;700;900','Poppins':'wght@300;400;500;700;900','Oswald':'wght@300;400;500;700','Raleway':'wght@300;400;500;700;900','Nunito':'wght@300;400;500;700;900','Quicksand':'wght@300;400;500;700','Playfair Display':'wght@400;500;700;900','Merriweather':'wght@300;400;700;900'};
@@ -570,6 +614,12 @@
       +'#hmdrawer a{display:block;padding:15px 24px;color:inherit;text-decoration:none;font-weight:700;font-size:'+(hm.itemSize||17)+'px;border-bottom:1px solid rgba(0,0,0,.06);border-radius:0;background:none}'
       +'#hmdrawer a.active{background:rgba(0,0,0,.05);color:inherit}'
       +'#hmdrawer a:active{background:#eef3ff}'
+      +'.hmgrp-t{display:flex;justify-content:space-between;align-items:center;width:100%;padding:15px 24px;background:none;border:none;border-bottom:1px solid rgba(0,0,0,.06);font-weight:700;font-size:'+(hm.itemSize||17)+'px;color:inherit;text-align:left;cursor:pointer;font-family:inherit}'
+      +'.hmgrp-c{font-size:11px;transition:transform .2s;flex:none;margin-left:8px}'
+      +'.hmgrp.open .hmgrp-c{transform:rotate(180deg)}'
+      +'.hmsub{max-height:0;overflow:hidden;transition:max-height .25s ease}'
+      +'.hmgrp.open .hmsub{max-height:600px}'
+      +'#hmdrawer .hmsub a{padding:13px 24px 13px 44px;font-size:'+(hm.subSize||Math.max(13,(hm.itemSize||17)-2))+'px;font-weight:'+(hm.subWeight||500)+';color:'+(hm.subColor||hmColor)+';background:rgba(0,0,0,.02)}'
       +'#hmoverlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:410;opacity:0;pointer-events:none;transition:opacity .28s}'
       +'#hmoverlay.open{opacity:1;pointer-events:auto}'
       +'.el{position:absolute}'
@@ -621,6 +671,7 @@
         +'fit();'
       +'}'
       +'document.querySelectorAll("nav a").forEach(function(a){a.addEventListener("click",function(ev){ev.preventDefault();show(a.getAttribute("data-id"));if(a.closest("#hmdrawer"))hmToggle(false);});});'
+      +'document.querySelectorAll(".hmgrp-t").forEach(function(b){b.addEventListener("click",function(){var g=b.parentNode,open=!g.classList.contains("open");document.querySelectorAll(".hmgrp.open").forEach(function(og){if(og!==g)og.classList.remove("open");});g.classList.toggle("open",open);});});'
       +'var _hb=document.getElementById("hmbtn");if(_hb)_hb.addEventListener("click",function(){hmToggle();});'
       +'var _ho=document.getElementById("hmoverlay");if(_ho)_ho.addEventListener("click",function(){hmToggle(false);});'
       +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'

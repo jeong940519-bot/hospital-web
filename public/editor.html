@@ -362,6 +362,8 @@
   #tev-bar .tev-bar-tab{background:var(--panel2);color:var(--text);border:1px solid var(--border);padding:5px 11px}
   #tev-bar .tev-bar-tab.on{background:#ffb020;color:#1a1a1a;border-color:#ffb020}
   .tev-btn.on{background:#ffb020!important;color:#1a1a1a!important;border-color:#ffb020!important}
+  .ipm-btn.on{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+  .ics-btn.on{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
   /* 상태 메시지 */
   .modal-status{font-size:12px;color:var(--sub);min-height:18px;padding:2px 0}
   /* 템플릿 그리드 */
@@ -537,6 +539,7 @@
           <button class="rbtn" id="rb2-addshape"><span class="ri">⬛</span><span class="rl">도형</span></button>
           <button class="rbtn" id="rb2-addtable"><span class="ri">▦</span><span class="rl">표</span></button>
           <button class="rbtn" id="rb2-tabsection" title="탭으로 내용을 전환하는 섹션을 올바르게 배선해 한 번에 생성"><span class="ri">📑</span><span class="rl">탭 섹션</span></button>
+          <button class="rbtn" id="rb2-icon" title="무료 아이콘 20만+ 검색해서 바로 삽입 (Iconify)"><span class="ri">🔣</span><span class="rl">아이콘</span></button>
         </div>
         <div class="rgroup-lbl">개체</div>
       </div>
@@ -645,7 +648,7 @@
 </div>
 
 <input type="file" id="img-file" accept="image/*" style="display:none" />
-<input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2,font/*" style="display:none" />
+<input type="file" id="font-file" accept=".ttf,.otf,.woff,.woff2,font/*" multiple style="display:none" />
 <div class="toast" id="toast"></div>
 
 <!-- 로그인 모달 -->
@@ -738,6 +741,64 @@
 <!-- 우클릭 링크 메뉴 -->
 <div id="ctx-menu" class="ctx" style="display:none"></div>
 
+<!-- 아이콘 삽입 모달 (Iconify) -->
+<div class="modal-bg" id="icon-modal" style="display:none">
+  <div class="modal" style="width:640px;max-width:94vw">
+    <div class="modal-head"><h3>🔣 아이콘 삽입</h3><button class="sp-close" id="icon-close">✕</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:8px;margin-bottom:8px;align-items:center;flex-wrap:wrap">
+        <div style="position:relative;flex:1;min-width:200px">
+          <input type="text" id="icon-search" placeholder="한글·영어로 검색 (예: 병원, heart, 전화, star)" style="width:100%" autocomplete="off">
+          <div id="icon-suggest" style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:20;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px #0008;max-height:230px;overflow-y:auto"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--sub)">색 <button type="button" class="panel-cbtn" id="icon-cbtn" data-cpkey="iconColor" title="아이콘 색"><span id="icon-color-sw" style="background:#333333"></span></button></label>
+        <button class="tb-btn primary" id="icon-go">검색</button>
+      </div>
+      <div id="icon-status" style="font-size:12px;color:var(--sub);min-height:16px"></div>
+      <div id="icon-grid" style="display:grid;grid-template-columns:repeat(8,1fr);gap:6px;max-height:360px;overflow-y:auto;margin-top:6px"></div>
+      <div style="font-size:11px;color:var(--sub);margin-top:8px">Iconify — 20만+ 무료 아이콘(출처표기 불필요). 클릭하면 선택한 색으로 캔버스에 삽입됩니다.</div>
+      <div id="icon-dropzone" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:10px;text-align:center;font-size:12px;color:var(--sub);cursor:pointer">
+        📁 <b style="color:var(--text)">내 SVG 파일 가져오기</b> — 클릭해서 선택하거나 파일을 이 창에 끌어다 놓으세요 · 복사한 SVG 코드는 이 창에서 Ctrl+V
+      </div>
+      <input type="file" id="icon-file" accept=".svg,image/svg+xml" style="display:none">
+    </div>
+  </div>
+</div>
+<!-- 아이콘 부분 색 지정 모달 -->
+<div class="modal-bg" id="iconparts-modal" style="display:none">
+  <div class="modal" style="width:400px;max-width:94vw">
+    <div class="modal-head"><h3>🎨 부분 색 지정</h3><button class="tb-btn" id="iconparts-undo" title="바로 전 작업으로 되돌리기" style="margin-left:auto;margin-right:8px;font-size:11px;padding:4px 10px" disabled>↩ 되돌리기</button><button class="sp-close" id="iconparts-close">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:10px">원하는 부분을 <b>마우스로 대략 둘러 그리면</b> 영역을 자동으로 찾아드려요.</div>
+      <div id="iconparts-preview" style="width:190px;height:190px;margin:0 auto 12px;display:flex;align-items:center;justify-content:center;background:var(--panel2);border:1px solid var(--border);border-radius:12px"></div>
+      <div id="iconparts-list" style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center"></div>
+      <div style="display:flex;gap:6px;margin-top:14px"><button class="tb-btn" id="iconparts-reset" style="flex:1">↺ 단색으로 초기화</button><button class="tb-btn primary" id="iconparts-done" style="flex:1">완료</button></div>
+    </div>
+  </div>
+</div>
+<!-- 요소 영역 잘라내기 모달 (텍스트·도형·이미지·표 공통) -->
+<div class="modal-bg" id="elcut-modal" style="display:none">
+  <div class="modal" style="width:400px;max-width:94vw">
+    <div class="modal-head"><h3>✂️ 영역 잘라내기</h3><button class="sp-close" id="elcut-close">✕</button></div>
+    <div class="modal-body">
+      <div id="elcut-hint" style="font-size:12px;color:var(--sub);margin-bottom:10px">지울 부분을 <b>클릭해서 점을 찍어</b> 영역을 감싸세요. 더블클릭 또는 완료 버튼으로 확정합니다.</div>
+      <div style="display:flex;align-items:center;gap:5px;width:100%;margin-bottom:10px">
+        <button type="button" class="tb-btn ics-btn on" id="elcut-cs-poly" style="flex:1;font-size:10px">📍 점찍기</button>
+        <button type="button" class="tb-btn ics-btn" id="elcut-cs-rect" style="flex:1;font-size:10px">▭ 사각형</button>
+        <button type="button" class="tb-btn ics-btn" id="elcut-cs-ellipse" style="flex:1;font-size:10px">⭕ 원형</button>
+      </div>
+      <div id="elcut-preview" style="margin:0 auto 12px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;position:relative"></div>
+      <div style="display:flex;gap:6px">
+        <button class="tb-btn" id="elcut-cancelpts" style="flex:1;display:none">↺ 다시 그리기</button>
+        <button class="tb-btn primary" id="elcut-done" style="flex:1;display:none">✓ 완료</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <button class="tb-btn" id="elcut-reset" style="flex:1">↩ 잘라내기 취소(원본으로)</button>
+        <button class="tb-btn" id="elcut-ok" style="flex:1">닫기</button>
+      </div>
+    </div>
+  </div>
+</div>
 <!-- 도형 피커 모달 -->
 <!-- 표 삽입 그리드 피커 -->
 <div class="modal-bg" id="table-modal" style="display:none">
