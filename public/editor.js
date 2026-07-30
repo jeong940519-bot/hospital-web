@@ -1,6 +1,6 @@
 // ───────────────────────── Firebase (기존 프로젝트 재사용) ─────────────────────────
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, doc, getDoc, setDoc, collection, getDocs, addDoc, deleteDoc, query, where, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getStorage, ref as sRef, uploadBytes, getDownloadURL, listAll, deleteObject, getMetadata } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
@@ -1563,6 +1563,13 @@ function renderPartsEditor(){
     list.innerHTML='';
   }
 }
+function addBoardElement(){
+  const w=420,h=520, c=getViewCenter(w,h), p=page();
+  const x=Math.max(0,Math.min(p.w-w,Math.round(c.x-w/2))), y=Math.max(0,Math.min(p.h-h,Math.round(c.y-h/2)));
+  const ne={ id:uid(), type:'board', x, y, w, h, rot:0, title:'게시판', bg:'#ffffff', color:'#222222', accent:'#2b6cff', pageSize:10, allowSecret:true };
+  _tabTagNew(ne); page().elements.push(ne); selId=ne.id; selIds=new Set([ne.id]); afterMutate();
+  toast('📋 게시판 추가됨 — 우클릭으로 글 관리, 발행 후 실제로 작동합니다');
+}
 function insertIcon(rawSvg, name){
   const color=_iconColor||'#333333';
   const strokeable=iconStrokeable(rawSvg);
@@ -1689,6 +1696,7 @@ function _loadSvgFile(file){
 }
 {
   const gb=document.getElementById('rb2-icon'); if(gb) gb.addEventListener('click',openIconModal);
+  const bb=document.getElementById('rb2-board'); if(bb) bb.addEventListener('click',addBoardElement);
   const cb=document.getElementById('icon-close'); if(cb) cb.onclick=()=>document.getElementById('icon-modal').style.display='none';
   const im=document.getElementById('icon-modal'); if(im) im.addEventListener('mousedown',e=>{ if(e.target.id==='icon-modal') e.currentTarget.style.display='none'; });
   const gg=document.getElementById('icon-go'); if(gg) gg.onclick=()=>{ const b=document.getElementById('icon-suggest'); if(b)b.style.display='none'; iconSearch(); };
@@ -2268,6 +2276,16 @@ function renderEl(e){
     if(e.shadow) node.style.boxShadow = SHADOW_CSS;
     node.appendChild(img);
     if(e.fx && e.fx.type==='slider') buildSliderOverlay(node,e);
+  }else if(e.type==='board'){
+    node.style.background=e.bg||'#ffffff';
+    node.style.border='2px dashed '+(e.accent||'#2b6cff');
+    node.style.borderRadius='10px';
+    node.style.display='flex'; node.style.flexDirection='column'; node.style.alignItems='center'; node.style.justifyContent='center'; node.style.gap='6px';
+    node.style.color=e.accent||'#2b6cff'; node.style.fontSize='13px'; node.style.fontWeight='700'; node.style.textAlign='center'; node.style.padding='10px'; node.style.boxSizing='border-box';
+    const ic=document.createElement('div'); ic.style.fontSize='30px'; ic.textContent='📋';
+    const lb=document.createElement('div'); lb.textContent=e.title||'게시판';
+    const sub=document.createElement('div'); sub.style.cssText='font-size:11px;font-weight:400;color:#889'; sub.textContent='발행 후 실제 목록·글쓰기가 표시됩니다 · 우클릭=글 관리';
+    node.appendChild(ic); node.appendChild(lb); node.appendChild(sub);
   }else if(e.type==='shape'){
    if(e.shape==='line'||e.shape==='line-arrow'){
     const col=e.fill||'#333333', lw=Math.max(1,e.borderW||4);
@@ -3139,6 +3157,12 @@ function renderProps(){
       html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="i-bw" value="${e.borderW}"></div><button type="button" class="panel-cbtn" id="i-bc" data-cpkey="imgBorder" title="테두리 색"><span style="background:${e.borderColor}"></span></button></div></div>`;
       html += bleedToggleHtml(e);
     }
+  }else if(e.type==='board'){
+    html += `<div class="grp"><label>게시판 제목</label><input type="text" id="bd-title" value="${escapeHtml(e.title||'게시판')}"></div>`;
+    html += `<div class="grp"><label>배경색 / 강조색</label><div class="row"><button type="button" class="panel-cbtn" id="bd-bg" data-cpkey="boardBg" title="배경색"><span style="background:${e.bg||'#ffffff'}"></span></button><button type="button" class="panel-cbtn" id="bd-accent" data-cpkey="boardAccent" title="강조색(버튼 등)"><span style="background:${e.accent||'#2b6cff'}"></span></button></div></div>`;
+    html += `<div class="grp"><label>페이지당 글 수</label><input type="number" id="bd-pagesize" min="3" max="50" value="${e.pageSize||10}"></div>`;
+    html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-secret" ${e.allowSecret!==false?'checked':''} style="width:auto"> 비밀글 허용(작성자가 비밀번호로 잠금)</label></div>`;
+    html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
   }else if(e.type==='shape'){
     // ── 채우기 (PPT 도형 서식) ──
     html += `<div class="sec-hd">▾ 채우기</div>`;
@@ -3404,6 +3428,21 @@ function bindProps(e){
       const isw=$('ic-stroke');
       if(isw){ isw.addEventListener('input',()=>{ e._iconThick=parseFloat(isw.value); const v=$('ic-stroke-v'); if(v)v.textContent=(e._iconThick>0?'+':'')+e._iconThick; refreshIconEl(e); renderCanvas(); save(true); }); isw.addEventListener('change',snapshot); }
       const ipb=$('ic-parts'); if(ipb) ipb.addEventListener('click',openIconParts);
+    }
+  }else if(e.type==='board'){
+    $('bd-title').addEventListener('input',()=>{ e.title=$('bd-title').value; renderCanvas(); save(true); });
+    $('bd-title').addEventListener('change',snapshot);
+    $('bd-pagesize').addEventListener('input',()=>{ e.pageSize=Math.max(3,parseInt($('bd-pagesize').value)||10); save(true); });
+    $('bd-pagesize').addEventListener('change',snapshot);
+    $('bd-secret').addEventListener('change',()=>{ e.allowSecret=$('bd-secret').checked; save(true); snapshot(); });
+    $('bd-manage').addEventListener('click',()=>openBoardManage(e));
+    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
+      CP_TARGETS.boardBg={ label:'게시판 배경색', rich:false,
+        current:()=>{ const x=selId?el(selId):null; return (x&&x.bg)||'#ffffff'; },
+        set:v=>{ const x=selId?el(selId):null; if(x){ x.bg=v; renderCanvas(); save(true); } } };
+      CP_TARGETS.boardAccent={ label:'게시판 강조색', rich:false,
+        current:()=>{ const x=selId?el(selId):null; return (x&&x.accent)||'#2b6cff'; },
+        set:v=>{ const x=selId?el(selId):null; if(x){ x.accent=v; renderCanvas(); save(true); } } };
     }
   }else if(e.type==='shape'){
     $('s-fill').addEventListener('input',()=>{ e.fill=$('s-fill').value; liveStyle(); });
@@ -4587,6 +4626,7 @@ function showElementCtx(x,y,e){
   if(hasShape) h+=fl('🔷','도형 모양 변경','shape');
   h+=fl('↔','정렬','align');
   h+=row('✨','이펙트 추가','','fx')+row('⚙','서식 옵션','','format')+row('✂️','영역 잘라내기','','elcut');
+  if(e.type==='board') h+=row('✉','게시판 글 관리','','board-manage');
   h+='<div class="sep"></div>';
   if(hasText)  h+=fl('🅰','텍스트','text');
   if(hasShape) h+=fl('🎨','색상(채우기)','fill');
@@ -4671,6 +4711,7 @@ function showElementCtx(x,y,e){
     else if(a==='fx'){ selId=e.id; renderProps(); switchPropTab('fx'); }
     else if(a==='format'){ selId=e.id; renderProps(); switchPropTab('attrs'); }
     else if(a==='elcut'){ openElementCut(e); }
+    else if(a==='board-manage'){ openBoardManage(e); }
     else if(a==='z-front')_zorder('front'); else if(a==='z-forward')_zorder('forward'); else if(a==='z-backward')_zorder('backward'); else if(a==='z-back')_zorder('back');
     else if(a.startsWith('a-')) alignSelection(a.slice(2));
     else if(a==='link-new'){ const nm=prompt('새 페이지 이름','새 페이지'); if(nm!==null){ const child=newPage(nm||'새 페이지', page().id); project.pages.push(child); linkTargets().forEach(x=>x.link=child.id); afterMutate(); toast('새 페이지를 만들어 연결'); } }
@@ -5377,6 +5418,49 @@ async function uploadEmbeddedFonts(){
     project.fontFiles[fam]={ url: await getDownloadURL(r), fmt: d.fmt||'truetype' };
   }
 }
+// ── 게시판 글 관리(관리자) ──
+async function openBoardManage(e){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  const m=document.getElementById('board-modal'); if(!m) return;
+  document.getElementById('board-modal-title').textContent='✉ '+(e.title||'게시판')+' — 글 관리';
+  const status=document.getElementById('board-modal-status'), list=document.getElementById('board-modal-list');
+  status.textContent='불러오는 중…'; list.innerHTML=''; m.style.display='flex';
+  const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+  try{
+    const qs=await getDocs(query(collection(db,'boardPosts'), where('boardId','==',e.id), orderBy('createdAt','desc'), limit(200)));
+    if(qs.empty){ status.textContent='아직 작성된 글이 없습니다'; return; }
+    status.textContent=qs.size+'개';
+    list.innerHTML=qs.docs.map(d=>{
+      const p=d.data();
+      return `<div class="grp" style="border:1px solid var(--border);border-radius:9px;padding:10px" data-id="${d.id}">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start">
+          <div>
+            <div style="font-weight:700">${p.secret?'🔒 ':''}${ea(p.title||'')}</div>
+            <div style="font-size:11px;color:var(--sub)">${ea(p.name||'익명')} · ${ea(String(p.createdAt||'').slice(0,16).replace('T',' '))}</div>
+          </div>
+          <button class="tb-btn" data-bd-del="${d.id}" style="color:#e05a7a;flex:none">🗑 삭제</button>
+        </div>
+        <div style="font-size:13px;margin:8px 0;white-space:pre-wrap">${ea(p.content||'')}</div>
+        <textarea data-bd-reply="${d.id}" placeholder="답변 작성 (공개로 표시됨)" rows="2" style="width:100%">${ea(p.reply||'')}</textarea>
+        <button class="tb-btn primary" data-bd-replysave="${d.id}" style="margin-top:6px">답변 저장</button>
+      </div>`;
+    }).join('');
+    list.querySelectorAll('[data-bd-del]').forEach(b=>b.addEventListener('click',async()=>{
+      if(!confirm('이 글을 삭제할까요?')) return;
+      await deleteDoc(doc(db,'boardPosts',b.dataset.bdDel));
+      const row=b.closest('[data-id]'); if(row) row.remove();
+      toast('삭제됨');
+    }));
+    list.querySelectorAll('[data-bd-replysave]').forEach(b=>b.addEventListener('click',async()=>{
+      const id=b.dataset.bdReplysave;
+      const ta=list.querySelector(`[data-bd-reply="${id}"]`);
+      await setDoc(doc(db,'boardPosts',id), {reply:ta.value, repliedAt:new Date().toISOString()}, {merge:true});
+      toast('답변 저장됨');
+    }));
+  }catch(err){ status.textContent='불러오기 실패: '+(err.message||err); }
+}
+document.getElementById('board-close')?.addEventListener('click',()=>{ document.getElementById('board-modal').style.display='none'; });
+document.getElementById('board-modal')?.addEventListener('mousedown',ev=>{ if(ev.target.id==='board-modal') ev.currentTarget.style.display='none'; });
 async function cloudSave(name, targetId){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const btn=document.getElementById('btn-cloud'); const prev=btn.textContent;
@@ -5414,6 +5498,29 @@ async function publishSite(){
   finally{ if(btn){ btn.textContent=prev; btn.disabled=false; } }
 }
 document.getElementById('btn-publish')?.addEventListener('click', publishSite);
+// ── SEO 설정 모달 ──
+function seoCfg(){ if(!project.seo) project.seo={}; return project.seo; }
+function openSeoModal(){
+  const c=seoCfg();
+  const t=document.getElementById('seo-title'); if(t) t.value=c.title||'';
+  const d=document.getElementById('seo-desc'); if(d) d.value=c.desc||'';
+  const k=document.getElementById('seo-keywords'); if(k) k.value=c.keywords||'';
+  const o=document.getElementById('seo-ogimage'); if(o) o.value=c.ogImage||'';
+  const m=document.getElementById('seo-modal'); if(m) m.style.display='flex';
+}
+document.getElementById('btn-seo')?.addEventListener('click', openSeoModal);
+document.getElementById('seo-close')?.addEventListener('click', ()=>{ document.getElementById('seo-modal').style.display='none'; });
+document.getElementById('seo-modal')?.addEventListener('mousedown', e=>{ if(e.target.id==='seo-modal') e.currentTarget.style.display='none'; });
+document.getElementById('seo-save')?.addEventListener('click', ()=>{
+  const c=seoCfg();
+  c.title=(document.getElementById('seo-title').value||'').trim();
+  c.desc=(document.getElementById('seo-desc').value||'').trim();
+  c.keywords=(document.getElementById('seo-keywords').value||'').trim();
+  c.ogImage=(document.getElementById('seo-ogimage').value||'').trim();
+  save(true); snapshot();
+  document.getElementById('seo-modal').style.display='none';
+  toast('🔍 SEO 설정 저장됨 — 🚀 발행을 눌러야 실제 사이트에 반영됩니다');
+});
 async function loadCloud(){
   try{
     let snap;

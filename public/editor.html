@@ -400,6 +400,7 @@
         <button class="rsm" id="btn-save">💾 저장</button>
         <button class="rsm" id="btn-cloud">☁ 클라우드</button>
         <button class="rsm" id="btn-login">로그인</button>
+        <button class="rsm" id="btn-seo" title="검색결과·카톡/메신저 링크 미리보기 설정">🔍 SEO</button>
         <button class="rsm" id="btn-preview" style="background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700">▶ 미리보기</button>
         <button class="rsm" id="btn-publish" title="현재 프로젝트를 공개 홈페이지(도메인 루트)로 발행" style="background:#16a34a;border-color:#16a34a;color:#fff;font-weight:700">🚀 발행</button>
       </div>
@@ -540,6 +541,7 @@
           <button class="rbtn" id="rb2-addtable"><span class="ri">▦</span><span class="rl">표</span></button>
           <button class="rbtn" id="rb2-tabsection" title="탭으로 내용을 전환하는 섹션을 올바르게 배선해 한 번에 생성"><span class="ri">📑</span><span class="rl">탭 섹션</span></button>
           <button class="rbtn" id="rb2-icon" title="무료 아이콘 20만+ 검색해서 바로 삽입 (Iconify)"><span class="ri">🔣</span><span class="rl">아이콘</span></button>
+          <button class="rbtn" id="rb2-board" title="방문자가 글을 쓸 수 있는 게시판 (문의·후기 등)"><span class="ri">📋</span><span class="rl">게시판</span></button>
         </div>
         <div class="rgroup-lbl">개체</div>
       </div>
@@ -659,6 +661,35 @@
       <div class="grp"><label>이메일</label><input type="email" id="login-email" autocomplete="username" placeholder="admin@example.com"></div>
       <div class="grp"><label>비밀번호</label><input type="password" id="login-pw" autocomplete="current-password" placeholder="••••••••"></div>
       <button class="tb-btn primary" id="login-submit" style="width:100%;margin-top:4px">로그인</button>
+    </div>
+  </div>
+</div>
+
+<!-- SEO 설정 모달 -->
+<div class="modal-bg" id="seo-modal" style="display:none">
+  <div class="modal" style="width:420px">
+    <div class="modal-head"><h3>🔍 SEO / 링크 미리보기 설정</h3><button class="sp-close" id="seo-close">✕</button></div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--sub);margin-bottom:12px;line-height:1.5">여기서 설정한 내용이 구글 검색결과 제목과, 카카오톡·문자 등에 링크를 붙여넣었을 때 뜨는 미리보기 카드에 사용됩니다.</div>
+      <div class="grp"><label>사이트 제목</label><input type="text" id="seo-title" placeholder="비워두면 첫 페이지 이름 사용"></div>
+      <div class="grp"><label>설명</label><textarea id="seo-desc" placeholder="검색결과·링크 미리보기에 표시될 한두 문장" style="min-height:70px"></textarea></div>
+      <div class="grp"><label>검색 키워드 (쉼표로 구분)</label><input type="text" id="seo-keywords" placeholder="병원, 부산 내과, ..."></div>
+      <div class="grp"><label>미리보기 이미지 URL</label><input type="text" id="seo-ogimage" placeholder="https://... (비워두면 이미지 없이 텍스트만)"></div>
+      <button class="tb-btn primary" id="seo-save" style="width:100%;margin-top:4px">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 게시판 글 관리 모달 -->
+<div class="modal-bg" id="board-modal" style="display:none">
+  <div class="modal" style="width:520px;max-height:82vh;display:flex;flex-direction:column">
+    <div class="modal-head">
+      <h3 id="board-modal-title">✉ 게시판 글 관리</h3>
+      <button class="sp-close" id="board-close" style="margin-left:auto">✕</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1">
+      <div id="board-modal-status" style="font-size:12px;color:var(--sub);margin-bottom:10px">불러오는 중…</div>
+      <div id="board-modal-list" style="display:flex;flex-direction:column;gap:10px"></div>
     </div>
   </div>
 </div>

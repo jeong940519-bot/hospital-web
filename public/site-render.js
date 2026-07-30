@@ -407,6 +407,10 @@
         return '<div class="el fx-slider'+(peek?' peek':'')+'"'+lnk+ea+' style="'+s3+slv.vars+'" data-sl-auto="'+(fx.auto!==false?'1':'0')+'" data-sl-iv="'+(fx.interval||3000)+'">'+sImgs+sArrows+sDots+'</div>';
       }
       return '<div class="el"'+lnk+ea+' style="'+s3+'"><img src="'+e.src+'" style="width:100%;height:100%;display:block;object-fit:'+e.fit+'"></div>';
+    } else if(e.type==='board'){
+      var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
+      return '<div class="el hw-board" data-board-id="'+e.id+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
+        +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:16px;font-size:13px">불러오는 중…</div></div>';
     } else if(e.type==='shape'){
       if(e.shape==='line'||e.shape==='line-arrow'){
         var lcol=e.fill||'#333333', llw=Math.max(1,e.borderW||4);
@@ -480,7 +484,11 @@
     project.pages.forEach(function(p){ if(p.isHeader) headerPages.push(p); else if(p.isFooter) footerPages.push(p); else contentPages.push(p); });
     var firstId = contentPages[0]?contentPages[0].id:'';
     var roots = contentPages.filter(function(p){return !p.parentId;});
-    var title = esc((roots[0]&&roots[0].name)||(contentPages[0]&&contentPages[0].name)||'홈페이지');
+    var seo = project.seo||{};
+    var title = esc(seo.title||(roots[0]&&roots[0].name)||(contentPages[0]&&contentPages[0].name)||'홈페이지');
+    var seoDesc = esc(seo.desc||'');
+    var seoKeywords = esc(seo.keywords||'');
+    var seoImg = esc(seo.ogImage||'');
     // 직접 만든 상단 바가 있으면 자동 메뉴는 숨김
     var menu = headerPages.length ? '' : roots.filter(function(p){return p.id!==firstId;}).map(function(p){
       return '<a href="#" data-id="'+p.id+'" data-dev="'+(p.device||'both')+'">'+esc(p.name||'페이지')+'</a>';
@@ -594,6 +602,16 @@
     var _fontsUrl='https://fonts.googleapis.com/css2?'+_gFonts.map(function(f){var slug=f.replace(/ /g,'+');return 'family='+slug+(_noW.indexOf(f)>=0?'':':'+(_GFW[f]||'wght@300;400;500;700;900'));}).join('&')+'&display=swap';
 
     return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'
+      +(seoDesc?'<meta name="description" content="'+seoDesc+'">':'')
+      +(seoKeywords?'<meta name="keywords" content="'+seoKeywords+'">':'')
+      +'<meta property="og:type" content="website">'
+      +'<meta property="og:title" content="'+title+'">'
+      +(seoDesc?'<meta property="og:description" content="'+seoDesc+'">':'')
+      +(seoImg?'<meta property="og:image" content="'+seoImg+'">':'')
+      +'<meta name="twitter:card" content="'+(seoImg?'summary_large_image':'summary')+'">'
+      +'<meta name="twitter:title" content="'+title+'">'
+      +(seoDesc?'<meta name="twitter:description" content="'+seoDesc+'">':'')
+      +(seoImg?'<meta name="twitter:image" content="'+seoImg+'">':'')
       +(_gFonts.length?'<link href="'+_fontsUrl+'" rel="stylesheet">':'')
       +(_ff?'<style>'+_ff+'</style>':'')
       +'<style>*{margin:0;box-sizing:border-box}html,body{overflow-x:hidden;max-width:100%}body{background:#ffffff;font-family:\'Noto Sans KR\',sans-serif}'
@@ -677,7 +695,83 @@
       +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'
       +'window.addEventListener("resize",applyDevice);window.addEventListener("load",applyDevice);applyDevice();'
       +fxJs
-      +'<\/script></body></html>';
+      +'<\/script>'
+      +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='board';});})?boardRuntimeScript():'')
+      +'</body></html>';
+  }
+  function boardRuntimeScript(){
+    return '<script type="module">'
+      +'import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";'
+      +'import { getFirestore, collection, query, where, orderBy, limit, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";'
+      +'const _bfb=initializeApp({apiKey:"AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",authDomain:"newworld-1a1d5.firebaseapp.com",projectId:"newworld-1a1d5",storageBucket:"newworld-1a1d5.firebasestorage.app",messagingSenderId:"948363397391",appId:"1:948363397391:web:5d7dee7a383f3bdec0167a"},"hwboard");'
+      +'const _bdb=getFirestore(_bfb);'
+      +'function _e(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}'
+      +'async function _bdInit(box){'
+        +'var bid=box.dataset.boardId,title=box.dataset.boardTitle,pageSize=+box.dataset.boardPagesize||10,allowSecret=box.dataset.boardSecret==="1";'
+        +'var body=box.querySelector(".hwb-body");var posts=[];'
+        +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","==",bid),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:20px;text-align:center;opacity:.6;font-size:13px\\">게시판을 불러오지 못했습니다</div>";}}'
+        +'function listView(){'
+          +'var rows=posts.slice(0,pageSize).map(function(p){'
+            +'return "<div class=\\"hwb-row\\" data-id=\\""+p.id+"\\" style=\\"padding:12px 2px;border-bottom:1px solid rgba(0,0,0,.08);cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center\\">"'
+              +'+"<div style=\\"min-width:0\\"><div style=\\"font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
+              +'+"<div style=\\"font-size:11px;opacity:.6;margin-top:2px\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,10))+(p.reply?" · 답변완료":"")+"</div></div>"'
+              +'+"<span style=\\"opacity:.4\\">›</span></div>";'
+          +'}).join("")||"<div style=\\"padding:26px 2px;text-align:center;opacity:.55;font-size:13px\\">아직 작성된 글이 없습니다</div>";'
+          +'body.innerHTML="<div style=\\"display:flex;align-items:center;margin-bottom:8px\\"><b style=\\"flex:1;font-size:15px\\">"+_e(title)+"</b><button class=\\"hwb-write-btn\\" style=\\"background:var(--hwb-acc);color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;cursor:pointer;font-weight:700\\">✎ 글쓰기</button></div>"+rows;'
+          +'body.querySelectorAll(".hwb-row").forEach(function(r){r.addEventListener("click",function(){detailView(r.dataset.id);});});'
+          +'var wb=body.querySelector(".hwb-write-btn");if(wb)wb.addEventListener("click",writeView);'
+        +'}'
+        +'function detailView(id){'
+          +'var p=posts.filter(function(x){return x.id===id;})[0];if(!p)return;'
+          +'if(p.secret){'
+            +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button><div style=\\"text-align:center;padding:20px 4px\\"><div style=\\"font-size:13px;margin-bottom:10px\\">🔒 비밀글입니다. 비밀번호를 입력하세요.</div><input type=\\"password\\" class=\\"hwb-pw\\" placeholder=\\"비밀번호\\" style=\\"padding:8px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;width:140px;text-align:center\\"><button class=\\"hwb-pw-go\\" style=\\"margin-left:6px;padding:8px 14px;background:var(--hwb-acc);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px\\">확인</button></div>";'
+            +'body.querySelector(".hwb-back").addEventListener("click",listView);'
+            +'body.querySelector(".hwb-pw-go").addEventListener("click",function(){var v=body.querySelector(".hwb-pw").value;if(v&&v===p.pass)renderDetail(p);else alert("비밀번호가 틀렸습니다");});'
+            +'return;'
+          +'}'
+          +'renderDetail(p);'
+        +'}'
+        +'function renderDetail(p){'
+          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button>"'
+            +'+"<div style=\\"font-size:15px;font-weight:700;margin-bottom:4px\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
+            +'+"<div style=\\"font-size:11.5px;opacity:.6;margin-bottom:12px\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,16).replace("T"," "))+"</div>"'
+            +'+"<div style=\\"font-size:13.5px;white-space:pre-wrap;line-height:1.6;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.08)\\">"+_e(p.content)+"</div>"'
+            +'+(p.reply?"<div style=\\"margin-top:12px;background:rgba(0,0,0,.04);border-radius:8px;padding:10px 12px\\"><div style=\\"font-size:11.5px;font-weight:700;color:var(--hwb-acc);margin-bottom:4px\\">💬 답변</div><div style=\\"font-size:13px;white-space:pre-wrap;line-height:1.6\\">"+_e(p.reply)+"</div></div>":"");'
+          +'body.querySelector(".hwb-back").addEventListener("click",listView);'
+        +'}'
+        +'function writeView(){'
+          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button>"'
+            +'+"<div style=\\"display:flex;flex-direction:column;gap:8px\\">"'
+            +'+"<input class=\\"hwb-f-name\\" placeholder=\\"이름\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">"'
+            +'+"<input class=\\"hwb-f-title\\" placeholder=\\"제목\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">"'
+            +'+"<textarea class=\\"hwb-f-content\\" placeholder=\\"내용\\" rows=\\"5\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;resize:vertical\\"></textarea>"'
+            +'+(allowSecret?"<label style=\\"display:flex;align-items:center;gap:6px;font-size:12.5px\\"><input type=\\"checkbox\\" class=\\"hwb-f-secret\\" style=\\"width:auto\\"> 비밀글로 작성</label><input type=\\"password\\" class=\\"hwb-f-pass\\" placeholder=\\"비밀글 비밀번호\\" style=\\"display:none;padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">":"")'
+            +'+"<input type=\\"text\\" class=\\"hwb-f-hp\\" style=\\"position:absolute;left:-9999px\\" tabindex=\\"-1\\" autocomplete=\\"off\\">"'
+            +'+"<button class=\\"hwb-submit\\" style=\\"margin-top:4px;padding:10px;background:var(--hwb-acc);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13.5px\\">등록</button></div>";'
+          +'body.querySelector(".hwb-back").addEventListener("click",listView);'
+          +'var scb=body.querySelector(".hwb-f-secret"),spw=body.querySelector(".hwb-f-pass");'
+          +'if(scb)scb.addEventListener("change",function(){spw.style.display=scb.checked?"block":"none";});'
+          +'body.querySelector(".hwb-submit").addEventListener("click",async function(){'
+            +'if(body.querySelector(".hwb-f-hp").value)return;'
+            +'var name=body.querySelector(".hwb-f-name").value.trim();'
+            +'var ttl=body.querySelector(".hwb-f-title").value.trim();'
+            +'var cnt=body.querySelector(".hwb-f-content").value.trim();'
+            +'var secret=scb?scb.checked:false;var pass=spw?spw.value:"";'
+            +'if(!ttl||!cnt){alert("제목과 내용을 입력해주세요");return;}'
+            +'if(secret&&!pass){alert("비밀글 비밀번호를 입력해주세요");return;}'
+            +'var btn=body.querySelector(".hwb-submit");btn.disabled=true;btn.textContent="등록 중…";'
+            +'try{'
+              +'var data={boardId:bid,name:name||"익명",title:ttl,content:cnt,createdAt:new Date().toISOString()};'
+              +'if(secret){data.secret=true;data.pass=pass;}'
+              +'await addDoc(collection(_bdb,"boardPosts"),data);'
+              +'await load();listView();'
+            +'}catch(err){alert("등록 실패: "+(err.message||err));btn.disabled=false;btn.textContent="등록";}'
+          +'});'
+        +'}'
+        +'await load();listView();'
+      +'}'
+      +'document.querySelectorAll(".hw-board").forEach(_bdInit);'
+      +'<\/script>';
   }
 
   window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS};

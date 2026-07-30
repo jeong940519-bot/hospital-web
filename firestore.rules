@@ -11,5 +11,18 @@ service cloud.firestore {
     match /config/{doc} {
       allow read, write: if request.auth != null;
     }
+    // 게시판(문의·후기) — 누구나 읽기/작성 가능(방문자용), 수정·삭제(답변·모더레이션)는 관리자만.
+    match /boardPosts/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['boardId','name','pass','title','content','secret','createdAt'])
+        && request.resource.data.boardId is string && request.resource.data.boardId.size() > 0 && request.resource.data.boardId.size() < 60
+        && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() < 200
+        && request.resource.data.content is string && request.resource.data.content.size() > 0 && request.resource.data.content.size() < 4000
+        && request.resource.data.name is string && request.resource.data.name.size() < 60
+        && request.resource.data.createdAt is string
+        && (!('pass' in request.resource.data) || (request.resource.data.pass is string && request.resource.data.pass.size() < 40))
+        && (!('secret' in request.resource.data) || request.resource.data.secret is bool);
+      allow update, delete: if request.auth != null;
+    }
   }
 }
