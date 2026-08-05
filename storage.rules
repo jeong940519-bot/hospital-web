@@ -1,8 +1,15 @@
-rules_version = '2';
+﻿rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /editor/{allPaths=**} {
       allow read, write, list, delete: if request.auth != null;
     }
+    match /media/{allPaths=**} {
+      allow read, write, list, delete: if request.auth != null;
+    }
+    match /fonts/{allPaths=**} {
+      allow read, write, list, delete: if request.auth != null;
+    }
   }
 }
+
