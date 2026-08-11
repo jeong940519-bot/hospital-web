@@ -3466,6 +3466,11 @@ function bindProps(e){
         current:()=>{ const x=selId?el(selId):null; return (x&&x.accent)||'#2b6cff'; },
         set:v=>{ const x=selId?el(selId):null; if(x){ x.accent=v; renderCanvas(); save(true); } } };
     }
+  }else if(e.type==='map'){
+    $('mp-address').addEventListener('input',()=>{ e.address=$('mp-address').value; renderCanvas(); save(true); });
+    $('mp-address').addEventListener('change',snapshot);
+    $('mp-level').addEventListener('input',()=>{ e.level=Math.max(1,Math.min(14,parseInt($('mp-level').value)||3)); save(true); });
+    $('mp-level').addEventListener('change',snapshot);
   }else if(e.type==='shape'){
     $('s-fill').addEventListener('input',()=>{ e.fill=$('s-fill').value; liveStyle(); });
     $('s-fill').addEventListener('change',snapshot);
