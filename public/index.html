@@ -44,6 +44,16 @@ const db = getFirestore(app);
     if(!project.pages || !project.pages.length){ showEmpty(); return; }
     const baseW = (project.pages[0] && project.pages[0].w) || 1200;
     const html = SiteRender.buildSiteHtml(project, baseW);
+    const fontFaces = (html.match(/@font-face\{[^}]*\}/g) || []).join('');
+    if (fontFaces) {
+      const preStyle = document.createElement('style');
+      preStyle.textContent = fontFaces;
+      document.head.appendChild(preStyle);
+      await Promise.race([
+        document.fonts.ready,
+        new Promise(res => setTimeout(res, 2500))
+      ]);
+    }
     document.open(); document.write(html); document.close();
   }catch(e){
     document.getElementById('loading').innerHTML = '<div>홈페이지를 불러오지 못했습니다.</div><div style="font-size:13px;color:#889">'+(e.message||e)+'</div>';
