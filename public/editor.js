@@ -1563,6 +1563,13 @@ function renderPartsEditor(){
     list.innerHTML='';
   }
 }
+function addMapElement(){
+  const w=600,h=400, c=getViewCenter(w,h), p=page();
+  const x=Math.max(0,Math.min(p.w-w,Math.round(c.x-w/2))), y=Math.max(0,Math.min(p.h-h,Math.round(c.y-h/2)));
+  const ne={ id:uid(), type:'map', x, y, w, h, rot:0, address:'경남 진주시 진주대로 871', level:3 };
+  _tabTagNew(ne); page().elements.push(ne); selId=ne.id; selIds=new Set([ne.id]); afterMutate();
+  toast('🗺️ 지도 추가됨 — 오른쪽 패널에서 주소 확인, 발행 후 실제 지도가 표시됩니다');
+}
 function addBoardElement(){
   const w=420,h=520, c=getViewCenter(w,h), p=page();
   const x=Math.max(0,Math.min(p.w-w,Math.round(c.x-w/2))), y=Math.max(0,Math.min(p.h-h,Math.round(c.y-h/2)));
@@ -1697,6 +1704,7 @@ function _loadSvgFile(file){
 {
   const gb=document.getElementById('rb2-icon'); if(gb) gb.addEventListener('click',openIconModal);
   const bb=document.getElementById('rb2-board'); if(bb) bb.addEventListener('click',addBoardElement);
+  const mb=document.getElementById('rb2-map'); if(mb) mb.addEventListener('click',addMapElement);
   const cb=document.getElementById('icon-close'); if(cb) cb.onclick=()=>document.getElementById('icon-modal').style.display='none';
   const im=document.getElementById('icon-modal'); if(im) im.addEventListener('mousedown',e=>{ if(e.target.id==='icon-modal') e.currentTarget.style.display='none'; });
   const gg=document.getElementById('icon-go'); if(gg) gg.onclick=()=>{ const b=document.getElementById('icon-suggest'); if(b)b.style.display='none'; iconSearch(); };
