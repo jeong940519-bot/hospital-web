@@ -54,6 +54,28 @@ const db = getFirestore(app);
         new Promise(res => setTimeout(res, 2500))
       ]);
     }
+    const fontLinks = (html.match(/<link[^>]*fonts\.googleapis[^>]*>/g) || []);
+    const fontFaces = (html.match(/@font-face\{[^}]*\}/g) || []).join('');
+    const waits = [];
+    fontLinks.forEach(function(tag){
+      const m = tag.match(/href="([^"]+)"/);
+      if (m) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = m[1];
+        document.head.appendChild(link);
+        waits.push(new Promise(function(res){ link.onload = res; link.onerror = res; }));
+      }
+    });
+    if (fontFaces) {
+      const preStyle = document.createElement('style');
+      preStyle.textContent = fontFaces;
+      document.head.appendChild(preStyle);
+    }
+    await Promise.race([
+      Promise.all(waits).then(function(){ return document.fonts.ready; }),
+      new Promise(function(res){ setTimeout(res, 3000); })
+    ]);
     document.open(); document.write(html); document.close();
   }catch(e){
     document.getElementById('loading').innerHTML = '<div>홈페이지를 불러오지 못했습니다.</div><div style="font-size:13px;color:#889">'+(e.message||e)+'</div>';
