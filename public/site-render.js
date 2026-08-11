@@ -718,6 +718,7 @@
                 +'var coord=new kakao.maps.LatLng(result[0].y,result[0].x);'
                 +'var map=new kakao.maps.Map(box,{center:coord,level:level});'
                 +'new kakao.maps.Marker({map:map,position:coord});'
+              +'if(window.ResizeObserver){new ResizeObserver(function(){if(box.offsetWidth>0){map.relayout();map.setCenter(coord);}}).observe(box);}'
               +'});'
             +'});'
           +'});'
