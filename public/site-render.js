@@ -407,6 +407,8 @@
         return '<div class="el fx-slider'+(peek?' peek':'')+'"'+lnk+ea+' style="'+s3+slv.vars+'" data-sl-auto="'+(fx.auto!==false?'1':'0')+'" data-sl-iv="'+(fx.interval||3000)+'">'+sImgs+sArrows+sDots+'</div>';
       }
       return '<div class="el"'+lnk+ea+' style="'+s3+'"><img src="'+e.src+'" style="width:100%;height:100%;display:block;object-fit:'+e.fit+'"></div>';
+    } else if(e.type==='map'){
+      return '<div class="el hw-map" data-map-address="'+esc(e.address||'')+'" data-map-level="'+(e.level||3)+'" style="'+base+'overflow:hidden;border-radius:8px;background:#eef0f5"></div>';
     } else if(e.type==='board'){
       var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
       return '<div class="el hw-board" data-board-id="'+e.id+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
@@ -697,7 +699,29 @@
       +fxJs
       +'<\/script>'
       +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='board';});})?boardRuntimeScript():'')
+      +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='map';});})?mapRuntimeScript():'')
       +'</body></html>';
+  }
+  function mapRuntimeScript(){
+    return '<script src="https://dapi.kakao.com/v2/maps/sdk.js?appkey=2d0b5e4ef796d30e44cbbe749ec19060&libraries=services&autoload=false"><\/script>'
+      +'<script>'
+      +'window.addEventListener("load",function(){'
+        +'if(typeof kakao==="undefined"||!kakao.maps){return;}'
+        +'kakao.maps.load(function(){'
+          +'var geocoder=new kakao.maps.services.Geocoder();'
+          +'document.querySelectorAll(".hw-map").forEach(function(box){'
+            +'var addr=box.dataset.mapAddress,level=+box.dataset.mapLevel||3;'
+            +'if(!addr){return;}'
+            +'geocoder.addressSearch(addr,function(result,status){'
+              +'if(status!==kakao.maps.services.Status.OK){box.innerHTML="<div style=\\"display:flex;align-items:center;justify-content:center;height:100%;font-size:12px;color:#889;text-align:center;padding:10px\\">지도를 표시할 수 없습니다</div>";return;}'
+              +'var coord=new kakao.maps.LatLng(result[0].y,result[0].x);'
+              +'var map=new kakao.maps.Map(box,{center:coord,level:level});'
+              +'new kakao.maps.Marker({map:map,position:coord});'
+            +'});'
+          +'});'
+        +'});'
+      +'});'
+      +'<\/script>';
   }
   function boardRuntimeScript(){
     return '<script type="module">'

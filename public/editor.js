@@ -2294,6 +2294,16 @@ function renderEl(e){
     const lb=document.createElement('div'); lb.textContent=e.title||'게시판';
     const sub=document.createElement('div'); sub.style.cssText='font-size:11px;font-weight:400;color:#889'; sub.textContent='발행 후 실제 목록·글쓰기가 표시됩니다 · 우클릭=글 관리';
     node.appendChild(ic); node.appendChild(lb); node.appendChild(sub);
+  }else if(e.type==='map'){
+    node.style.background='#eef0f5';
+    node.style.border='2px dashed #6c7bff';
+    node.style.borderRadius='10px';
+    node.style.display='flex'; node.style.flexDirection='column'; node.style.alignItems='center'; node.style.justifyContent='center'; node.style.gap='6px';
+    node.style.color='#4a56c8'; node.style.fontSize='13px'; node.style.fontWeight='700'; node.style.textAlign='center'; node.style.padding='10px'; node.style.boxSizing='border-box';
+    const ic=document.createElement('div'); ic.style.fontSize='30px'; ic.textContent='🗺️';
+    const lb=document.createElement('div'); lb.textContent='카카오맵';
+    const sub=document.createElement('div'); sub.style.cssText='font-size:11px;font-weight:400;color:#889'; sub.textContent=(e.address||'주소 미설정')+' · 발행 후 실제 지도 표시';
+    node.appendChild(ic); node.appendChild(lb); node.appendChild(sub);
   }else if(e.type==='shape'){
    if(e.shape==='line'||e.shape==='line-arrow'){
     const col=e.fill||'#333333', lw=Math.max(1,e.borderW||4);
@@ -3171,6 +3181,10 @@ function renderProps(){
     html += `<div class="grp"><label>페이지당 글 수</label><input type="number" id="bd-pagesize" min="3" max="50" value="${e.pageSize||10}"></div>`;
     html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-secret" ${e.allowSecret!==false?'checked':''} style="width:auto"> 비밀글 허용(작성자가 비밀번호로 잠금)</label></div>`;
     html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
+  }else if(e.type==='map'){
+    html += `<div class="grp"><label>주소</label><input type="text" id="mp-address" value="${escapeHtml(e.address||'')}" placeholder="예: 경남 진주시 진주대로 871"></div>`;
+    html += `<div class="grp"><label>확대 레벨 (1=가까이 ~ 14=멀리)</label><input type="number" id="mp-level" min="1" max="14" value="${e.level||3}"></div>`;
+    html += `<div style="font-size:11px;color:var(--sub);padding:0 2px">지도는 미리보기엔 안 보이고, 발행 후 실제 사이트에서 표시됩니다.</div>`;
   }else if(e.type==='shape'){
     // ── 채우기 (PPT 도형 서식) ──
     html += `<div class="sec-hd">▾ 채우기</div>`;
