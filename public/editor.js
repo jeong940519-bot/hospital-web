@@ -519,6 +519,12 @@ function expandAiComponents(elements){
   return out;
 }
 
+// 원본 파일을 Storage에 그대로(화질 손실 없이) 업로드하고 다운로드 URL을 반환
+function _uploadImageToStorage(file){
+  const ext=(file.type.split('/')[1]||'png').replace('+xml','');
+  const r=sRef(storage, `editor/${uid()}.${ext}`);
+  return uploadBytes(r, file).then(()=>getDownloadURL(r));
+}
 // 이미지 dataURL을 캔버스에 배치 (cx,cy 주면 그 지점 중심, 없으면 화면 중앙)
 function placeImage(dataURL, cx, cy){
   const img = new Image();
@@ -537,7 +543,34 @@ function placeImage(dataURL, cx, cy){
   };
   img.src = dataURL;
 }
-function addImageFromFile(file, cx, cy){ if(!file||!/^image\//.test(file.type)) return; const r=new FileReader(); r.onload=()=>placeImage(r.result,cx,cy); r.readAsDataURL(file); }
+// 사진 파일 추가 — 로그인 상태면 원본 그대로 즉시 Storage 업로드(화질 손실 없음, 로컬 용량도 안 씀).
+// 업로드 완료 전엔 blob: 미리보기로 즉시 보여주고(저장은 안 됨), 끝나면 실제 URL로 교체.
+function addImageFromFile(file, cx, cy){
+  if(!file||!/^image\//.test(file.type)) return;
+  if(!isAdmin){
+    toast('⚠ 로그인하지 않아 원본 화질 업로드가 안 돼요 — 로그인 후 넣으면 자동으로 클라우드에 저장됩니다');
+    const r=new FileReader(); r.onload=()=>placeImage(r.result,cx,cy); r.readAsDataURL(file);
+    return;
+  }
+  const blobUrl=URL.createObjectURL(file);
+  const img=new Image();
+  img.onload=()=>{
+    const ratio=img.height/img.width, w=Math.min(500,img.width), h=w*ratio;
+    let x,y; const p=page();
+    if(cx!=null){ x=cx-w/2; y=cy-h/2; } else { const c=getViewCenter(w,h); x=c.x; y=c.y; }
+    x=Math.max(0,Math.min(p.w-w,Math.round(x))); y=Math.max(0,Math.min(p.h-h,Math.round(y)));
+    const ne={ id:uid(), type:'image', x, y, w, h, rot:0, src:blobUrl, _uploading:true, fit:'cover', radius:0, clip:'none', borderW:0, borderColor:'#333333' };
+    _tabTagNew(ne); page().elements.push(ne); selId=ne.id; selIds=new Set([ne.id]); afterMutate();
+    toast('⬆ 업로드 중…');
+    _uploadImageToStorage(file).then(url=>{
+      ne.src=url; delete ne._uploading; URL.revokeObjectURL(blobUrl); renderCanvas(); save(true);
+    }).catch(err=>{
+      toast('업로드 실패, 임시로 로컬 저장합니다: '+(err.message||err));
+      const r=new FileReader(); r.onload=()=>{ ne.src=r.result; delete ne._uploading; renderCanvas(); save(true); }; r.readAsDataURL(file);
+    });
+  };
+  img.src=blobUrl;
+}
 
 // ── 아이콘 삽입 (Iconify 무료 API) ──
 let _iconColor='#333333';
@@ -1757,7 +1790,19 @@ document.getElementById('img-file').addEventListener('change', e=>{
   if(!f) return;
   const target = document.getElementById('img-target').value;
   if(target){ // 기존 이미지 교체
-    const r=new FileReader(); r.onload=()=>{ const obj=el(target); if(obj){ obj.src=r.result; afterMutate(); } }; r.readAsDataURL(f);
+    const obj=el(target);
+    if(obj){
+      if(!isAdmin){
+        toast('⚠ 로그인하지 않아 원본 화질 업로드가 안 돼요 — 로그인 후 교체하면 자동으로 클라우드에 저장됩니다');
+        const r=new FileReader(); r.onload=()=>{ obj.src=r.result; afterMutate(); }; r.readAsDataURL(f);
+      } else {
+        const blobUrl=URL.createObjectURL(f);
+        obj.src=blobUrl; obj._uploading=true; afterMutate();
+        toast('⬆ 업로드 중…');
+        _uploadImageToStorage(f).then(url=>{ obj.src=url; delete obj._uploading; URL.revokeObjectURL(blobUrl); renderCanvas(); save(true); })
+          .catch(err=>{ toast('업로드 실패, 임시로 로컬 저장합니다: '+(err.message||err)); const r=new FileReader(); r.onload=()=>{ obj.src=r.result; delete obj._uploading; renderCanvas(); save(true); }; r.readAsDataURL(f); });
+      }
+    }
   } else if(_isSvgFile(f)){
     _loadSvgFile(f); // SVG는 사진이 아니라 편집 가능한 아이콘으로
   } else {
@@ -4175,7 +4220,18 @@ function renderFxPanel(){
   const effSlAdd=document.getElementById('eff-sl-add');
   if(effSlAdd) effSlAdd.addEventListener('click',()=>{
     const fi=document.createElement('input');fi.type='file';fi.accept='image/*';
-    fi.onchange=()=>{const f=fi.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{if(!e.fx)e.fx={};if(!e.fx.slides)e.fx.slides=[];e.fx.slides.push(r.result);renderFxPanel();save(true);snapshot();};r.readAsDataURL(f);};fi.click();
+    fi.onchange=()=>{
+      const f=fi.files[0]; if(!f)return;
+      if(!e.fx)e.fx={}; if(!e.fx.slides)e.fx.slides=[];
+      if(!isAdmin){
+        toast('⚠ 로그인하지 않아 원본 화질 업로드가 안 돼요');
+        const r=new FileReader(); r.onload=()=>{ e.fx.slides.push(r.result); renderFxPanel(); save(true); snapshot(); }; r.readAsDataURL(f);
+        return;
+      }
+      const idx=e.fx.slides.length; e.fx.slides.push(URL.createObjectURL(f)); renderFxPanel(); toast('⬆ 업로드 중…');
+      _uploadImageToStorage(f).then(url=>{ e.fx.slides[idx]=url; renderFxPanel(); save(true); snapshot(); })
+        .catch(err=>{ toast('업로드 실패: '+(err.message||err)); const r=new FileReader(); r.onload=()=>{ e.fx.slides[idx]=r.result; renderFxPanel(); save(true); snapshot(); }; r.readAsDataURL(f); });
+    };fi.click();
   });
   (fx.slides||[]).forEach((_,i)=>{const d=document.getElementById(`sl-del-${i}`);if(d)d.addEventListener('click',()=>{e.fx.slides.splice(i,1);renderFxPanel();save(true);snapshot();});});
   ['eff-auto','eff-arrows','eff-dots'].forEach(bid=>{const b=document.getElementById(bid);if(b)b.addEventListener('click',()=>{if(!e.fx)e.fx={};const k=bid==='eff-auto'?'auto':bid==='eff-arrows'?'arrows':'dots';e.fx[k]=e.fx[k]===false;renderFxPanel();save(true);snapshot();});});
@@ -5488,8 +5544,10 @@ async function openBoardManage(e){
 }
 document.getElementById('board-close')?.addEventListener('click',()=>{ document.getElementById('board-modal').style.display='none'; });
 document.getElementById('board-modal')?.addEventListener('mousedown',ev=>{ if(ev.target.id==='board-modal') ev.currentTarget.style.display='none'; });
+function _hasPendingUploads(){ return project.pages.some(p=>(p.elements||[]).some(e=>e._uploading || (e.fx&&e.fx.slides&&e.fx.slides.some(s=>typeof s==='string'&&s.indexOf('blob:')===0)))); }
 async function cloudSave(name, targetId){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  if(_hasPendingUploads()){ toast('⏳ 이미지 업로드가 아직 끝나지 않았어요 — 잠시 후 다시 시도해주세요'); return; }
   const btn=document.getElementById('btn-cloud'); const prev=btn.textContent;
   btn.textContent='저장중…';
   try{
@@ -5511,6 +5569,7 @@ async function cloudSave(name, targetId){
 // 발행 — 현재 프로젝트를 공개 홈(site/editorProject)에 덮어씀. 도메인 루트(/)가 이걸 읽는다.
 async function publishSite(){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  if(_hasPendingUploads()){ toast('⏳ 이미지 업로드가 아직 끝나지 않았어요 — 잠시 후 다시 시도해주세요'); return; }
   if(!confirm('현재 편집 중인 프로젝트를 공개 홈페이지로 발행할까요?\n도메인 루트(/)에 즉시 반영됩니다. (기존 공개본은 대체됩니다)')) return;
   const btn=document.getElementById('btn-publish'); const prev=btn?btn.textContent:'';
   if(btn){ btn.textContent='발행 중…'; btn.disabled=true; }
@@ -7100,7 +7159,17 @@ function toggleColorPopup(key, btn){ const dd=document.getElementById('fill-dd')
   document.getElementById('cp-image').onclick=()=>{
     if(!selShapeEls().length){ toast('도형을 선택하세요'); return; }
     const fi=document.getElementById('cp-fill-file');
-    fi.onchange=()=>{ const f=fi.files[0]; fi.value=''; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ cpApply(`url("${rd.result}") center/cover no-repeat`); }; rd.readAsDataURL(f); };
+    fi.onchange=()=>{
+      const f=fi.files[0]; fi.value=''; if(!f) return;
+      if(!isAdmin){
+        toast('⚠ 로그인하지 않아 원본 화질 업로드가 안 돼요');
+        const rd=new FileReader(); rd.onload=()=>{ cpApply(`url("${rd.result}") center/cover no-repeat`); }; rd.readAsDataURL(f);
+        return;
+      }
+      cpApply(`url("${URL.createObjectURL(f)}") center/cover no-repeat`); toast('⬆ 업로드 중…');
+      _uploadImageToStorage(f).then(url=>{ cpApply(`url("${url}") center/cover no-repeat`); })
+        .catch(err=>{ toast('업로드 실패: '+(err.message||err)); const rd=new FileReader(); rd.onload=()=>{ cpApply(`url("${rd.result}") center/cover no-repeat`); }; rd.readAsDataURL(f); });
+    };
     fi.click();
   };
 })();
