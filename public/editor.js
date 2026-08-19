@@ -6752,41 +6752,121 @@ function applyToShapes(fn){ const arr=selShapeEls(); if(!arr.length) return; arr
 function applyToShapesQuiet(fn){ const arr=selShapeEls(); if(!arr.length) return; arr.forEach(fn); arr.forEach(liveStyleEl); updateRibbonState(); }
 
 // ── 편집 그룹: 찾기/바꾸기 + 선택 ──
+// PPT/엑셀식 전체 찾기·바꾸기. 텍스트 상자뿐 아니라 도형 안 글자·표 셀·고정탭·햄버거 메뉴·
+// 게시판 제목·지도 주소·페이지 이름까지 한 번에 처리한다.
 (function(){
   const modal=document.getElementById('find-modal');
   let lastIdx=-1;
-  function openFind(){ modal.style.display='flex'; setTimeout(()=>document.getElementById('find-q').focus(),0); }
+  const $f=id=>document.getElementById(id);
+  function openFind(){ modal.style.display='flex'; lastIdx=-1; setTimeout(()=>$f('find-q').focus(),0); }
   function closeFind(){ modal.style.display='none'; }
-  function targetEls(){
-    const allPages=document.getElementById('find-all-pages').checked;
+  function findRegex(q){
+    const esc=q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    // "온전한 단어만" — 앞뒤가 글자/숫자/밑줄이 아닐 때만 매치 (한글 포함 유니코드 기준)
+    const pat=$f('find-word').checked ? `(?<![\\p{L}\\p{N}_])${esc}(?![\\p{L}\\p{N}_])` : esc;
+    try{ return new RegExp(pat, 'gu'+($f('find-case').checked?'':'i')); }
+    catch(_){ return new RegExp(esc, 'g'+($f('find-case').checked?'':'i')); } // lookbehind 미지원 브라우저 폴백
+  }
+  function countIn(str, re){ if(!str) return 0; re.lastIndex=0; const m=String(str).match(re); return m?m.length:0; }
+  // 바꿀 내용은 항상 그대로(리터럴) 들어가야 함 — $&, $1 같은 치환 패턴으로 해석되지 않게 $를 이스케이프
+  function litRep(s){ return String(s==null?'':s).replace(/\$/g,'$$$$'); }
+  // 부분 폰트(richFonts) 구간별로 치환 — 매치가 서로 다른 폰트 구간에 걸치면 flattened=true로 알림
+  let _flattened=0;
+  function replaceRich(e, textField, richField, re, rep){
+    const flat=e[textField]||'';
+    const total=countIn(flat, re);
+    if(!total) return 0;
+    const runs=e[richField];
+    if(runs&&runs.length){
+      let sub=0;
+      const nr=runs.map(r=>{ const c=countIn(r.text, re); sub+=c; if(!c) return r; re.lastIndex=0; return Object.assign({}, r, {text:String(r.text).replace(re,rep)}); });
+      if(sub===total){ e[richField]=nr; e[textField]=nr.map(r=>r.text).join(''); return total; }
+      delete e[richField]; _flattened++;   // 구간에 걸친 매치 → 부분 폰트 유지 불가
+    }
+    re.lastIndex=0; e[textField]=flat.replace(re,rep);
+    return total;
+  }
+  // 검색 대상 전체를 통일된 형태로 수집 — {label, pIndex, elId, get, set}
+  function targets(){
+    const all=$f('find-all-pages').checked;
+    const pages=all?project.pages:[page()];
     const out=[];
-    (allPages?project.pages:[page()]).forEach((p,pi)=>{ p.elements.forEach(e=>{ if(e.type==='text') out.push({e,p,pIndex:allPages?project.pages.indexOf(p):curPage}); }); });
+    pages.forEach(p=>{
+      const pIndex=project.pages.indexOf(p);
+      if(all) out.push({ label:'페이지 이름', pIndex, elId:null, get:()=>p.name||'', set:v=>p.name=v });
+      (p.elements||[]).forEach(e=>{
+        if(e.type==='text') out.push({ label:'텍스트', pIndex, elId:e.id, get:()=>e.text||'', rich:{e,t:'text',r:'richFonts'} });
+        else if(e.type==='shape') out.push({ label:'도형 안 글자', pIndex, elId:e.id, get:()=>e.stext||'', rich:{e,t:'stext',r:'stRichFonts'} });
+        else if(e.type==='table') (e.cells||[]).forEach(c=>out.push({ label:'표 셀', pIndex, elId:e.id, get:()=>c.text||'', set:v=>c.text=v }));
+        else if(e.type==='board') out.push({ label:'게시판 제목', pIndex, elId:e.id, get:()=>e.title||'', set:v=>e.title=v });
+        else if(e.type==='map') out.push({ label:'지도 주소', pIndex, elId:e.id, get:()=>e.address||'', set:v=>e.address=v });
+      });
+    });
+    if(all){
+      (project.fixedTabs||[]).forEach(t=>(t.items||[]).forEach(it=>out.push({ label:'고정탭', pIndex:-1, elId:null, get:()=>it.label||'', set:v=>it.label=v })));
+      const hi=(project.hamburger&&project.hamburger.items)||[];
+      hi.forEach(it=>{
+        out.push({ label:'메뉴', pIndex:-1, elId:null, get:()=>it.name||'', set:v=>it.name=v });
+        (it.children||[]).forEach(k=>out.push({ label:'하위 메뉴', pIndex:-1, elId:null, get:()=>k.name||'', set:v=>k.name=v }));
+      });
+    }
     return out;
   }
-  document.getElementById('rb-find')?.addEventListener('click',openFind);
-  document.getElementById('find-close').onclick=closeFind;
+  function applyTo(tg, re, rep){
+    if(tg.rich) return replaceRich(tg.rich.e, tg.rich.t, tg.rich.r, re, rep);
+    const cur=tg.get(), n=countIn(cur, re);
+    if(n){ re.lastIndex=0; tg.set(String(cur).replace(re,rep)); }
+    return n;
+  }
+  function goTo(tg){
+    if(tg.pIndex>=0 && tg.pIndex!==curPage) curPage=tg.pIndex;
+    if(tg.elId){ selId=tg.elId; selIds=new Set([tg.elId]); } else { selId=null; selIds=new Set(); }
+    renderCanvas(); renderPages(); renderProps(); updateRibbonState();
+    if(tg.elId){ const node=canvas.querySelector(`[data-id="${tg.elId}"]`); if(node) node.scrollIntoView({block:'center',behavior:'smooth'}); }
+  }
+  $f('rb-find')?.addEventListener('click',openFind);
+  $f('find-close').onclick=closeFind;
   modal.addEventListener('mousedown',e=>{ if(e.target.id==='find-modal') closeFind(); });
-  document.getElementById('find-next').onclick=()=>{
-    const q=document.getElementById('find-q').value; if(!q){return;}
-    const list=targetEls(); const n=list.length; if(!n){document.getElementById('find-status').textContent='텍스트 요소가 없습니다';return;}
-    for(let k=1;k<=n;k++){ const idx=(lastIdx+k)%n; const {e,pIndex}=list[idx];
-      if(e.text.includes(q)){ lastIdx=idx; if(pIndex!==curPage){curPage=pIndex;} selId=e.id; selIds=new Set([e.id]); renderCanvas(); renderPages(); renderProps(); updateRibbonState();
-        const node=canvas.querySelector(`[data-id="${e.id}"]`); if(node)node.scrollIntoView({block:'center',behavior:'smooth'});
-        document.getElementById('find-status').textContent=`${idx+1}/${n} 요소에서 발견`; return; } }
-    document.getElementById('find-status').textContent='찾을 수 없습니다';
+  // 옵션을 바꾸면 순회 위치 초기화(엉뚱한 지점부터 찾는 것 방지)
+  ['find-q','find-all-pages','find-case','find-word'].forEach(id=>$f(id)?.addEventListener('input',()=>{ lastIdx=-1; }));
+  ['find-all-pages','find-case','find-word'].forEach(id=>$f(id)?.addEventListener('change',()=>{ lastIdx=-1; }));
+  $f('find-next').onclick=()=>{
+    const q=$f('find-q').value; if(!q) return;
+    const re=findRegex(q), list=targets(), hits=list.filter(t=>countIn(t.get(),re)>0);
+    if(!hits.length){ $f('find-status').textContent='찾을 수 없습니다'; return; }
+    lastIdx=(lastIdx+1)%hits.length;
+    const tg=hits[lastIdx]; goTo(tg);
+    const totalCount=hits.reduce((s,t)=>s+countIn(t.get(),re),0);
+    $f('find-status').textContent=`${lastIdx+1}/${hits.length}번째 위치 · ${tg.label}${tg.pIndex>=0?` (${project.pages[tg.pIndex].name||'페이지'})`:''} · 전체 ${totalCount}건`;
   };
-  document.getElementById('find-rep').onclick=()=>{
-    const q=document.getElementById('find-q').value, r=document.getElementById('find-r').value; if(!q)return;
-    const e=selId?el(selId):null;
-    if(e&&e.type==='text'&&e.text.includes(q)){ e.text=e.text.split(q).join(r); e._caseOrig=null; afterMutate(); document.getElementById('find-status').textContent='1건 바꿈'; }
-    else document.getElementById('find-next').click();
+  $f('find-rep').onclick=()=>{
+    const q=$f('find-q').value, rep=litRep($f('find-r').value); if(!q) return;
+    const re=findRegex(q), hits=targets().filter(t=>countIn(t.get(),re)>0);
+    if(!hits.length){ $f('find-status').textContent='찾을 수 없습니다'; return; }
+    // 지금 선택된 곳에 매치가 있으면 그걸, 없으면 첫 번째 매치를 바꿈
+    const tg=hits.find(t=>t.elId&&t.elId===selId)||hits[0];
+    _flattened=0;
+    const n=applyTo(tg, re, rep);
+    goTo(tg); afterMutate();
+    $f('find-status').textContent=`${n}건 바꿈 (${tg.label})`+(_flattened?' · 부분 폰트 해제됨':'');
+    lastIdx=-1;
   };
-  document.getElementById('find-repall').onclick=()=>{
-    const q=document.getElementById('find-q').value, r=document.getElementById('find-r').value; if(!q)return;
-    let cnt=0; targetEls().forEach(({e})=>{ if(e.text.includes(q)){ cnt+=e.text.split(q).length-1; e.text=e.text.split(q).join(r); e._caseOrig=null; } });
-    if(cnt){ afterMutate(); document.getElementById('find-status').textContent=`${cnt}건 모두 바꿈`; }
-    else document.getElementById('find-status').textContent='찾을 수 없습니다';
+  $f('find-repall').onclick=()=>{
+    const q=$f('find-q').value, rep=litRep($f('find-r').value); if(!q) return;
+    const re=findRegex(q);
+    _flattened=0;
+    let cnt=0, spots=0;
+    targets().forEach(t=>{ const n=applyTo(t, re, rep); if(n){ cnt+=n; spots++; } });
+    if(cnt){
+      afterMutate(); renderPages(); refreshHambMenu();
+      $f('find-status').textContent=`${spots}곳에서 ${cnt}건 모두 바꿈`+(_flattened?` · ${_flattened}곳은 부분 폰트가 해제됨`:'');
+      toast(`🔁 ${cnt}건 바꿈`);
+    } else $f('find-status').textContent='찾을 수 없습니다';
+    lastIdx=-1;
   };
+  // Enter=다음 찾기 (PPT와 동일)
+  $f('find-q').addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); $f('find-next').click(); } });
+  $f('find-r').addEventListener('keydown',ev=>{ if(ev.key==='Enter'){ ev.preventDefault(); $f('find-rep').click(); } });
   document.getElementById('rb-selall')?.addEventListener('click',()=>{ selIds=new Set(page().elements.map(e=>e.id)); selId=selIds.size?[...selIds].at(-1):null; renderCanvas(); renderProps(); updateRibbonState(); });
   document.getElementById('rb-selnone')?.addEventListener('click',()=>{ selId=null; selIds=new Set(); renderCanvas(); renderProps(); updateRibbonState(); });
 })();
@@ -7272,7 +7352,7 @@ window.addEventListener('keydown',ev=>{
     if(code==='KeyR'&&!ev.shiftKey){ ev.preventDefault(); applyToTexts(e=>e.align='right'); return; }
     if(code==='KeyJ'){ ev.preventDefault(); applyToTexts(e=>e.align='justify'); return; }
   }
-  if(ck&&code==='KeyF'){ ev.preventDefault(); document.getElementById('rb-find')?.click(); return; }
+  if(ck&&(code==='KeyF'||code==='KeyH')){ ev.preventDefault(); document.getElementById('rb-find')?.click(); return; }
   if(ck&&code==='KeyZ'&&!ev.shiftKey){ ev.preventDefault(); undo(); }
   else if(ck&&(code==='KeyY'||(ev.shiftKey&&code==='KeyZ'))){ ev.preventDefault(); redo(); }
   else if(ck&&code==='KeyC'){ ev.preventDefault(); if(ev.shiftKey){ startFmtPaint(); } else if(selIds.size) copySel(); else toast('복사할 요소를 먼저 선택하세요'); }

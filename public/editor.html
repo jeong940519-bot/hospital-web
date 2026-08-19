@@ -1086,9 +1086,14 @@
   <div class="modal" style="width:440px">
     <div class="modal-head"><h3>🔍 찾기 및 바꾸기</h3><button class="sp-close" id="find-close">✕</button></div>
     <div class="modal-body">
-      <div class="grp"><label>찾을 내용</label><input type="text" id="find-q" placeholder="검색할 텍스트"></div>
-      <div class="grp"><label>바꿀 내용</label><input type="text" id="find-r" placeholder="바꿀 텍스트 (비우면 삭제)"></div>
-      <div class="grp"><label style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer"><input type="checkbox" id="find-all-pages"> 모든 페이지에서 검색</label></div>
+      <div class="grp"><label>찾을 내용</label><input type="text" id="find-q" placeholder="검색할 단어 또는 문장"></div>
+      <div class="grp"><label>바꿀 내용</label><input type="text" id="find-r" placeholder="바꿀 내용 (비우면 삭제)"></div>
+      <div class="grp" style="display:flex;flex-wrap:wrap;gap:12px">
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer"><input type="checkbox" id="find-all-pages" checked> 모든 페이지</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer"><input type="checkbox" id="find-case"> 대/소문자 구분</label>
+        <label style="display:flex;align-items:center;gap:6px;text-transform:none;cursor:pointer"><input type="checkbox" id="find-word"> 온전한 단어만</label>
+      </div>
+      <div style="font-size:11px;color:var(--sub);line-height:1.6;margin:-2px 0 8px">텍스트 상자 · 도형 안 글자 · 표 셀 · 고정탭 · 햄버거 메뉴 · 게시판 제목 · 지도 주소 · 페이지 이름까지 모두 검색합니다.</div>
       <div class="modal-status" id="find-status"></div>
       <div style="display:flex;gap:8px;margin-top:6px">
         <button class="tb-btn" id="find-next" style="flex:1">다음 찾기</button>
