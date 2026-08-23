@@ -56,6 +56,9 @@
     }
     .sidebar-logo span { font-size: 11px; color: rgba(255,255,255,0.4); display: block; margin-top: 2px; }
     .sidebar-menu { flex: 1; padding: 12px 0; overflow-y: auto; }
+    .menu-link { display: flex; align-items: center; gap: 10px; padding: 11px 20px; cursor: pointer; font-size: 14px; color: rgba(255,255,255,0.7); transition: background 0.15s, color 0.15s; text-decoration: none; }
+    .menu-link:hover { background: var(--sidebar-active); color: #fff; }
+    .menu-sep { height: 1px; background: rgba(255,255,255,0.08); margin: 10px 20px; }
     .menu-item {
       display: flex; align-items: center; gap: 10px;
       padding: 11px 20px; cursor: pointer; font-size: 14px;
@@ -237,6 +240,8 @@
     <div class="menu-item" data-panel="design"><span class="icon">🎨</span> 디자인·폰트</div>
     <div class="menu-item" data-panel="seo"><span class="icon">🔍</span> SEO</div>
     <div class="menu-item" data-panel="ai"><span class="icon">🤖</span> AI 어시스턴트</div>
+    <div class="menu-sep"></div>
+    <a class="menu-link" href="/blog-studio.html"><span class="icon">📝</span> 블로그 스튜디오</a>
   </div>
   <div class="sidebar-bottom">
     <button class="btn-logout" id="logout-btn">로그아웃</button>

@@ -42,6 +42,8 @@ const db = getFirestore(app);
   try{
     const snap = await getDoc(doc(db, 'site', 'editorProject'));
     if(!snap.exists() || !snap.data().data){ showEmpty(); return; }
+    // 관리자가 편집기에서 홈페이지를 내려둔 상태 — 발행본 데이터는 그대로 두고 노출만 막는다.
+    if(snap.data().published === false){ await showPaused(); return; }
     const project = JSON.parse(snap.data().data);
     if(!project.pages || !project.pages.length){ showEmpty(); return; }
     const baseW = (project.pages[0] && project.pages[0].w) || 1200;
@@ -73,6 +75,22 @@ const db = getFirestore(app);
     document.getElementById('loading').innerHTML = '<div>홈페이지를 불러오지 못했습니다.</div><div style="font-size:13px;color:#889">'+(e.message||e)+'</div>';
   }
 })();
+
+// 내려둔 상태 화면 — 병원 연락처가 등록돼 있으면 함께 안내한다(환자가 전화는 걸 수 있도록).
+async function showPaused(){
+  let name = '', phone = '', addr = '';
+  try{
+    const c = await getDoc(doc(db, 'site', 'content'));
+    if(c.exists()){ const d = c.data()||{}; name = d.hospitalName||''; phone = d.phone||''; addr = d.address||''; }
+  }catch(e){}
+  document.getElementById('loading').innerHTML =
+    '<div style="font-size:38px">🛠️</div>'
+    + '<div style="font-size:19px;font-weight:700;color:#334">홈페이지 준비 중입니다</div>'
+    + '<div style="font-size:14px;color:#667">잠시 후 다시 방문해 주세요.</div>'
+    + (name ? '<div style="margin-top:18px;font-size:15px;font-weight:700;color:#334">'+name+'</div>' : '')
+    + (phone ? '<div style="font-size:14px"><a href="tel:'+phone.replace(/[^0-9+]/g,'')+'">'+phone+'</a></div>' : '')
+    + (addr ? '<div style="font-size:13px;color:#889">'+addr+'</div>' : '');
+}
 
 function showEmpty(){
   document.getElementById('loading').innerHTML =

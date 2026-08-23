@@ -35,7 +35,8 @@ let _prjId = localStorage.getItem('hw_prj_id') || null; // 현재 활성 프로�
 onAuthStateChanged(auth, async (user)=>{
   isAdmin = !!user;
   updateAuthUI();
-  if(user){ await loadAiKey(); await loadCloud(); }
+  if(user){ await loadAiKey(); await loadCloud(); await loadLiveState(); }
+  else renderLiveBtn();
 });
 async function loadAiKey(){
   try{ const snap=await getDoc(doc(db,'config','ai')); if(snap.exists()&&snap.data().key) DEFAULT_AI_KEY=snap.data().key; }catch(e){ console.log('AI키 로드 실패',e); }
@@ -167,7 +168,76 @@ let _clipboard = null; // 복수 요소(배열) 저장 — MS식 멀티 복사/�
 let _clipboardPageId = null; // 복사 시점의 페이지 — 다른 페이지에 붙여넣을 땐 위치를 그대로 유지하기 위함
 function copySel(){ const a=selAll(); if(!a.length) return; _clipboard=a.map(e=>JSON.parse(JSON.stringify(e))); _clipboardPageId=page().id; toast(`${a.length}개 복사됨`); updateRibbonState(); }
 function cutSel(){ const a=selAll(); if(!a.length) return; _clipboard=a.map(e=>JSON.parse(JSON.stringify(e))); _clipboardPageId=page().id; const ids=new Set(a.map(e=>e.id)); page().elements=page().elements.filter(x=>!ids.has(x.id)); selId=null; selIds=new Set(); afterMutate(); toast('잘라내기 됨'); updateRibbonState(); }
-function pasteClones(list, off){ if(!list||!list.length) return; const gmap={}; const ns=new Set(); list.forEach(src=>{ const c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.x=(c.x||0)+off; c.y=(c.y||0)+off; if(c.groupId){ gmap[c.groupId]=gmap[c.groupId]||('grp_'+uid()); c.groupId=gmap[c.groupId]; } page().elements.push(c); ns.add(c.id); }); selIds=ns; selId=[...ns].at(-1); afterMutate(); toast(`${ns.size}개 붙여넣기 됨`); }
+// ── 복제 요소의 내부 참조 재발급 ──
+// 페이지/요소를 복제할 때 id만 새로 주고 fx.group·twin·groupId 를 그대로 두면
+// 여러 페이지가 같은 탭 배선을 공유해 클릭이 엉킨다(발행 런타임이 idx당 하나만 인식).
+// remapFx=true 면 탭 배선도 새 그룹으로 발급한다.
+function remapClonedRefs(els, remapFx){
+  const gm={}, om={};
+  els.forEach(e=>{
+    if(remapFx && e.fx && e.fx.group && !gm[e.fx.group]) gm[e.fx.group]='tabs_'+uid().slice(0,6);
+    if(e.groupId && !om[e.groupId]) om[e.groupId]='grp_'+uid();
+  });
+  els.forEach(e=>{
+    if(e.fx && e.fx.group && gm[e.fx.group]) e.fx.group=gm[e.fx.group];
+    if(e.groupId && om[e.groupId]) e.groupId=om[e.groupId];
+    // twin 은 group 에서 파생된 이름(G_b0 / G_c) — 접미사(_b0,_c)는 의미가 있으니 접두사만 교체
+    if(typeof e.twin==='string'){
+      for(const o in gm){ if(e.twin===o || e.twin.slice(0,o.length+1)===o+'_'){ e.twin=gm[o]+e.twin.slice(o.length); break; } }
+    }
+  });
+  return els;
+}
+// 이미 만들어진 프로젝트 복구 — 같은 fx.group 이 두 페이지 이상에 걸쳐 있으면 페이지별로 분리한다.
+// 요소를 지우지 않고 이름만 새로 주는 안전한 수선이라 되돌리기(Ctrl+Z)로 취소할 수 있다.
+function _reportTabFix(n){ if(n>0) setTimeout(()=>toast('🔧 여러 페이지가 공유하던 탭 배선 '+n+'건을 페이지별로 분리했습니다 — 저장/발행하면 반영됩니다'), 900); }
+function normalizeTabWiring(prj){
+  if(!prj || !Array.isArray(prj.pages)) return 0;
+  const seen={};   // group -> 처음 등장한 페이지 index
+  let fixed=0;
+  prj.pages.forEach((pg,pi)=>{
+    const els=pg.elements||[];
+    const mine=new Set();
+    els.forEach(e=>{ if(e.fx&&e.fx.group) mine.add(e.fx.group); });
+    const gm={};
+    mine.forEach(g=>{
+      if(seen[g]===undefined){ seen[g]=pi; return; }   // 첫 페이지는 원래 이름 유지
+      gm[g]='tabs_'+uid().slice(0,6); fixed++;
+    });
+    if(!Object.keys(gm).length) return;
+    els.forEach(e=>{
+      if(e.fx&&e.fx.group&&gm[e.fx.group]) e.fx.group=gm[e.fx.group];
+      if(typeof e.twin==='string'){
+        for(const o in gm){ if(e.twin===o || e.twin.slice(0,o.length+1)===o+'_'){ e.twin=gm[o]+e.twin.slice(o.length); break; } }
+      }
+    });
+  });
+
+  // 2차: 같은 페이지에 짝(tab-content)이 없는 유령 트리거를 그 페이지의 정상 탭 그룹에 흡수시킨다.
+  // 요소를 지우지 않는다 — 배선만 바꿔서 눌리게 만든다.
+  prj.pages.forEach(pg=>{
+    const els=pg.elements||[];
+    const withCt={};
+    els.forEach(e=>{ if(e.fx&&e.fx.type==='tab-content'&&e.fx.group) withCt[e.fx.group]=1; });
+    const targets=Object.keys(withCt);
+    if(targets.length!==1) return;          // 그 페이지에 정상 탭이 하나일 때만 (애매하면 손대지 않음)
+    const T=targets[0];
+    els.forEach(e=>{
+      if(e.fx&&e.fx.type==='tab-trigger'&&e.fx.group&&!withCt[e.fx.group]){
+        const old=e.fx.group;
+        e.fx.group=T; fixed++;
+        if(typeof e.twin==='string'&&e.twin.slice(0,old.length)===old) e.twin=T+e.twin.slice(old.length);
+      }
+    });
+  });
+  return fixed;
+}
+function pasteClones(list, off){ if(!list||!list.length) return; const ns=new Set();
+  const clones=list.map(src=>{ const c=JSON.parse(JSON.stringify(src)); c.id=uid(); c.x=(c.x||0)+off; c.y=(c.y||0)+off; return c; });
+  // 탭 버튼(트리거)까지 통째로 복사됐을 때만 새 탭으로 발급 — 내용 요소만 복사할 땐 기존 탭에 붙도록 유지
+  remapClonedRefs(clones, clones.some(c=>c.fx&&c.fx.type==='tab-trigger'));
+  clones.forEach(c=>{ page().elements.push(c); ns.add(c.id); });
+  selIds=ns; selId=[...ns].at(-1); afterMutate(); toast(`${ns.size}개 붙여넣기 됨`); }
 function pasteClipboard(){ const samePage = _clipboardPageId===page().id; pasteClones(_clipboard, samePage?24:0); }   // 다른 페이지면 원래 자리 그대로
 function dupSel(){ pasteClones(selAll(),20); }
 // ── 서식 복사(Format Painter) — 이펙트 포함, 그룹 단위 ──
@@ -195,8 +265,10 @@ function _styleOf(e){
   if(e.type==='table') return pick(['fontFamily','fontSize','fontWeight','headerWeight','headerBg','headerColor','cellBg','cellColor','borderW','borderColor']);
   return {};
 }
-function _captureFmt(els){ return els.map(e=>({type:e.type, style:_styleOf(e), fx:e.fx?JSON.parse(JSON.stringify(e.fx)):null})); }
-function _paintFxTo(srcFx,t){
+function _captureFmt(els){ return els.map(e=>({type:e.type, style:_styleOf(e), fx:e.fx?JSON.parse(JSON.stringify(e.fx)):null, fx2:e.fx2?JSON.parse(JSON.stringify(e.fx2)):null})); }
+function _paintFxTo(srcFx,t,srcFx2){
+  // 두 번째 효과는 탭/호버 배선과 무관한 시각 효과라 대상 상태와 상관없이 항상 함께 옮긴다
+  if(srcFx2) t.fx2=JSON.parse(JSON.stringify(srcFx2)); else delete t.fx2;
   if(t.fx && _LINKED_FX.includes(t.fx.type)) return;                                   // 대상의 탭/호버 연동 이펙트 보존
   if(srcFx && srcFx.type && !_LINKED_FX.includes(srcFx.type)) t.fx=JSON.parse(JSON.stringify(srcFx));  // 시각 이펙트 복사
   else if((!srcFx||!srcFx.type) && t.fx && !_LINKED_FX.includes(t.fx.type)) delete t.fx;               // 소스에 이펙트 없으면 대상 시각 이펙트 제거
@@ -205,12 +277,42 @@ function _applyFmtTo(els){
   if(!_fmtClip||!_fmtClip.length||!els.length) return 0;
   const byType={}; _fmtClip.forEach(f=>{ (byType[f.type]||(byType[f.type]=[])).push(f); });
   const cnt={}; let n=0;
-  els.forEach(t=>{ const list=byType[t.type]; if(!list||!list.length) return; const i=cnt[t.type]||0; cnt[t.type]=i+1; const f=list[Math.min(i,list.length-1)]; Object.assign(t, JSON.parse(JSON.stringify(f.style))); _paintFxTo(f.fx,t); n++; });
+  els.forEach(t=>{ const list=byType[t.type]; if(!list||!list.length) return; const i=cnt[t.type]||0; cnt[t.type]=i+1; const f=list[Math.min(i,list.length-1)]; Object.assign(t, JSON.parse(JSON.stringify(f.style))); _paintFxTo(f.fx,t,f.fx2); n++; });
   if(n) afterMutate();
   return n;
 }
 function startFmtPaint(){ const src=selAll(); if(!src.length){ toast('서식을 복사할 요소를 먼저 선택하세요'); return; } _fmtClip=_captureFmt(src); _fmtPaint=true; document.body.style.cursor='copy'; toast('🖌 서식 복사 — 적용할 요소(또는 그룹)를 클릭하세요 · Esc로 종료'); }
 function endFmtPaint(){ if(!_fmtPaint) return; _fmtPaint=false; document.body.style.cursor=''; }
+
+// ── 이펙트 복사(Effect Painter) — 서식은 두고 첫/두 번째 효과만 그대로 옮긴다 ──
+let _fxClip=null, _fxPaint=false;
+function _captureFx(els){ return els.map(e=>({ fx:e.fx?JSON.parse(JSON.stringify(e.fx)):null, fx2:e.fx2?JSON.parse(JSON.stringify(e.fx2)):null })); }
+function _applyFxTo(els){
+  if(!_fxClip||!_fxClip.length||!els.length) return 0;
+  let n=0;
+  els.forEach((t,i)=>{
+    const f=_fxClip[Math.min(i,_fxClip.length-1)];
+    if(t.fx && _LINKED_FX.includes(t.fx.type)){
+      // 대상이 탭 버튼·호버 대상이면 배선을 깨지 않고 '두 번째 효과' 자리에 넣는다
+      const s2 = f.fx2 || ((f.fx && !_LINKED_FX.includes(f.fx.type)) ? f.fx : null);
+      if(s2) t.fx2=JSON.parse(JSON.stringify(s2)); else delete t.fx2;
+      n++; return;
+    }
+    if(f.fx && !_LINKED_FX.includes(f.fx.type)) t.fx=JSON.parse(JSON.stringify(f.fx)); else delete t.fx;
+    if(f.fx2) t.fx2=JSON.parse(JSON.stringify(f.fx2)); else delete t.fx2;
+    n++;
+  });
+  if(n) afterMutate();
+  return n;
+}
+function startFxPaint(){
+  const src=selAll(); if(!src.length){ toast('이펙트를 복사할 요소를 먼저 선택하세요'); return; }
+  const c=_captureFx(src);
+  if(!c.some(x=>x.fx||x.fx2)){ toast('선택한 요소에 적용된 이펙트가 없습니다'); return; }
+  _fxClip=c; _fxPaint=true; document.body.style.cursor='copy';
+  toast('✨ 이펙트 복사 — 적용할 요소(또는 그룹)를 클릭하세요 · Esc로 종료');
+}
+function endFxPaint(){ if(!_fxPaint) return; _fxPaint=false; document.body.style.cursor=''; }
 let history = [], hist_i = -1;
 
 function newProject(){
@@ -2455,6 +2557,7 @@ function renderEl(e){
   if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=>{
+    if(_fxPaint && ev.button===0){ ev.stopPropagation(); ev.preventDefault(); const tgt = e.groupId ? page().elements.filter(x=>x.groupId===e.groupId) : [e]; const n=_applyFxTo(tgt); toast(n?('✨ 이펙트 적용됨'+(n>1?` (${n}개)`:'')):'적용하지 못했습니다'); return; }
     if(_fmtPaint && ev.button===0){ ev.stopPropagation(); ev.preventDefault(); const tgt = e.groupId ? page().elements.filter(x=>x.groupId===e.groupId) : [e]; const n=_applyFmtTo(tgt); toast(n?('🖌 서식 적용됨'+(n>1?` (${n}개)`:'')):'적용할 같은 종류 요소가 없습니다'); return; }
     if(_linkPick){ if(ev.button===0){ ev.stopPropagation(); ev.preventDefault(); lpToggle(e); } return; }
     if(e.type==='table'){
@@ -2957,6 +3060,7 @@ function applyFontToSelection(fontFamily){
 
 // 캔버스 빈 곳 클릭/드래그 → 마퀴 선택
 canvas.addEventListener('mousedown', ev=>{
+  if(_fxPaint){ endFxPaint(); toast('이펙트 복사 종료'); return; }
   if(_fmtPaint){ endFmtPaint(); toast('서식 복사 종료'); return; }
   if(_linkPick){ endLinkPick(); return; }
   if(ev.button!==0) return;
@@ -4083,7 +4187,18 @@ function renderFxPanel(){
           ${row('','없음 (두 번째 효과 제거)','🚫','없음 none 제거',!fx2t)}
           ${items.map(it=>row(it.k,it.name,it.icon,it.cat,fx2t===it.k)).join('')}
         </div>
-        <div style="font-size:11px;color:var(--sub);margin-top:5px">검색해서 진입·루프·호버 효과를 하나 더 겹쳐 적용 (예: 스크롤 등장 + 호버 떠오름).</div></div>`;
+        <div style="font-size:11px;color:var(--sub);margin-top:5px">검색해서 진입·루프·호버 효과를 하나 더 겹쳐 적용 (예: 스크롤 등장 + 호버 떠오름).</div>`;
+      // 두 번째 효과가 '호버 색변화'면 바뀔 색도 여기서 고른다 (색이 없으면 --fxhc 가 안 나가 아무 변화도 안 보인다)
+      if(fx2t==='hover-color'){
+        const c2=(e.fx2&&e.fx2.color)||'#2b6cff';
+        opts+=`<div style="margin-top:10px"><label class="lbl">마우스 올릴 때 색</label>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input type="color" id="fx2-hc" value="${c2}" style="width:46px;height:34px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);cursor:pointer;padding:2px">
+            <input type="text" id="fx2-hc-t" value="${c2}" placeholder="#2b6cff" style="flex:1">
+          </div>
+          <div style="font-size:11px;color:var(--sub);margin-top:5px">텍스트=글자색, 도형=배경색이 이 색으로 전환됩니다</div></div>`;
+      }
+      opts+=`</div>`;
     }
     opts+=`</div>`;
   }
@@ -4183,7 +4298,15 @@ function renderFxPanel(){
     if(sInp&&list){
       sInp.addEventListener('input',()=>{ const q=sInp.value.trim().toLowerCase(); list.querySelectorAll('.fx2-item').forEach(it=>{ const m=!q||(it.dataset.search||'').indexOf(q)>=0; it.style.display=m?'flex':'none'; }); });
     }
-    if(list) list.querySelectorAll('.fx2-item').forEach(it=>it.addEventListener('click',()=>{ const v=it.dataset.fx2; if(!v) delete e.fx2; else e.fx2={type:v}; renderFxPanel(); renderCanvas(); save(true); snapshot(); }));
+    if(list) list.querySelectorAll('.fx2-item').forEach(it=>it.addEventListener('click',()=>{ const v=it.dataset.fx2; if(!v) delete e.fx2; else { e.fx2={type:v}; if(v==='hover-color') e.fx2.color='#2b6cff'; } renderFxPanel(); renderCanvas(); save(true); snapshot(); }));
+    // 두 번째 효과가 호버 색변화일 때의 색 입력 — 선택한 요소 전부에 같은 색 적용
+    {
+      const c2=document.getElementById('fx2-hc'), c2t=document.getElementById('fx2-hc-t');
+      const setC2=(v)=>{ if(!/^#[0-9a-fA-F]{6}$/.test(v)) return; const t=selAll(); (t.length?t:[e]).forEach(x=>{ if(x.fx2&&x.fx2.type==='hover-color') x.fx2.color=v; }); if(c2)c2.value=v; if(c2t)c2t.value=v; renderCanvas(); save(true); };
+      if(c2) c2.addEventListener('input',ev=>setC2(ev.target.value));
+      if(c2t) c2t.addEventListener('input',ev=>setC2(ev.target.value.trim()));
+      if(c2) c2.addEventListener('change',()=>snapshot());
+    }
   }
   // range/text 바인딩
   function rangeSync(id,cb){
@@ -4354,13 +4477,33 @@ document.getElementById('ai-mobile-convert').onclick=()=>{
     : src.isHeader ? '상단 바를 모바일 형식으로 — 로고만 크게 남기고 메뉴 탭은 햄버거(☰)로 이동합니다.'
     : src.isFooter ? '하단 바를 모바일 형식으로 — 글자를 가운데·크게 세로로 배치합니다.'
     : 'PC 페이지를 모바일(430px)로 변환해 새 모바일 페이지를 만듭니다. 원본은 PC 전용이 됩니다.';
-  aimobStatus(''); document.getElementById('aimob-modal').style.display='flex';
+  renderMobRefThumbs();
+  const _ln=getMobLearn().length;
+  aimobStatus(_ln?('📐 학습된 배치 표본 '+_ln+'개가 이번 변환에 반영됩니다'):'');
+  document.getElementById('aimob-modal').style.display='flex';
   setTimeout(()=>document.getElementById('aimob-desc').focus(),0);
 };
 document.getElementById('aimob-close').onclick=()=>document.getElementById('aimob-modal').style.display='none';
 document.getElementById('aimob-modal').addEventListener('mousedown',e=>{ if(e.target.id==='aimob-modal') e.currentTarget.style.display='none'; });
 document.querySelectorAll('#aimob-modal [data-aimob-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aimob-desc').value=b.dataset.aimobPreset; }));
 document.getElementById('aimob-go').onclick=()=>runMobileConvert(document.getElementById('aimob-desc').value.trim());
+// ── 참고 이미지(레퍼런스) ──
+function renderMobRefThumbs(){
+  const host=document.getElementById('aimob-thumbs'); if(!host) return;
+  host.innerHTML=_mobRefImgs.map((im,i)=>'<span style="position:relative;display:inline-block;margin-right:6px"><img src="data:'+im.mediaType+';base64,'+im.data+'" style="width:52px;height:52px;object-fit:cover;border-radius:6px;border:1px solid var(--border)"><span data-rmmob="'+i+'" title="제거" style="position:absolute;top:-6px;right:-6px;width:16px;height:16px;background:#000a;color:#fff;border-radius:50%;font-size:11px;display:flex;align-items:center;justify-content:center;cursor:pointer">✕</span></span>').join('');
+  host.querySelectorAll('[data-rmmob]').forEach(b=>b.addEventListener('click',()=>{ _mobRefImgs.splice(+b.dataset.rmmob,1); renderMobRefThumbs(); }));
+  const c=document.getElementById('aimob-ref-count'); if(c) c.textContent=_mobRefImgs.length?('참고 이미지 '+_mobRefImgs.length+'장'):'';
+}
+document.getElementById('aimob-ref')?.addEventListener('change', async (ev)=>{
+  const fs2=[...(ev.target.files||[])];
+  for(const f of fs2){
+    if(_mobRefImgs.length>=3){ toast('참고 이미지는 최대 3장'); break; }
+    try{ const {mediaType,data}=await downscaleToB64(f); _mobRefImgs.push({mediaType,data}); }
+    catch(e){ toast('이미지를 읽지 못했습니다'); }
+  }
+  ev.target.value=''; renderMobRefThumbs();
+});
+document.getElementById('aimob-ref-clear')?.addEventListener('click',()=>{ _mobRefImgs=[]; renderMobRefThumbs(); });
 
 // 텍스트 요소가 실제로 차지하는 높이를 브라우저에서 측정 (줄바꿈 반영)
 function _measureTextH(e){
@@ -4387,6 +4530,148 @@ function _fitMobileText(elsArr){
     }
   }
 }
+// ══════════ 모바일 변환 학습 ══════════
+// AI 변환 결과를 사람이 다듬은 '완성본'에서 배치 규칙을 뽑아 다음 변환 프롬프트에 주입한다.
+// 픽셀을 그대로 베끼지 않고 여백·간격·글자위계 같은 '규칙'만 뽑아야 다른 페이지에도 통한다.
+const MOB_LEARN_KEY='hw_mob_learn', MOB_LEARN_MAX=40;
+let _mobRefImgs=[];          // 참고 이미지(레퍼런스)
+let _mobLastAuto=null;       // 직전 AI 변환 결과 — 사람 손을 거친 뒤 차이를 뽑는 기준
+function getMobLearn(){ try{ return JSON.parse(localStorage.getItem(MOB_LEARN_KEY)||'[]'); }catch(e){ return []; } }
+function setMobLearn(a){ try{ localStorage.setItem(MOB_LEARN_KEY, JSON.stringify(a.slice(0,MOB_LEARN_MAX))); }catch(e){ toast('학습 저장 공간이 부족합니다'); } }
+function _med(a){ if(!a||!a.length) return null; const s=[...a].sort((x,y)=>x-y); return s[Math.floor(s.length/2)]; }
+function _avg(a){ if(!a||!a.length) return null; return Math.round(a.reduce((x,y)=>x+y,0)/a.length); }
+function _mobSample(pg){
+  const els=(pg.elements||[]).filter(e=>e&&e.w>0&&e.h>0);
+  if(els.length<3) return null;
+  const W=pg.w||MOBILE_W, sorted=[...els].sort((a,b)=>a.y-b.y);
+  const gaps=[]; for(let i=1;i<sorted.length;i++){ const g=Math.round(sorted[i].y-(sorted[i-1].y+sorted[i-1].h)); if(g>=0&&g<240) gaps.push(g); }
+  const full=els.filter(e=>e.w>=W*0.7);
+  const tx=els.filter(e=>e.type==='text'&&e.text&&e.text.trim());
+  const slack=[]; tx.forEach(e=>{ try{ const need=_measureTextH(e); if(need>4) slack.push(+(e.h/need).toFixed(2)); }catch(_){} });
+  const fsz=[...new Set(tx.map(e=>Math.round(e.fontSize||16)))].sort((a,b)=>b-a);
+  const im=els.filter(e=>e.type==='image');
+  return { at:new Date().toISOString(), name:pg.name||'', W, n:els.length,
+    pad:_med(els.map(e=>Math.round(e.x)).filter(x=>x>=0&&x<W/2)),
+    contentW:_med(full.map(e=>Math.round(e.w))),
+    gap:_med(gaps), gapMax:gaps.length?Math.max(...gaps):null,
+    firstY:Math.round(sorted[0].y),
+    sizes:fsz.slice(0,6), body:_med(tx.map(e=>Math.round(e.fontSize||16))),
+    slack:_med(slack),
+    imgFull: im.length? +(im.filter(e=>e.w>=W*0.7).length/im.length).toFixed(2) : null };
+}
+function _mobDeltaNotes(auto, pg){
+  if(!auto||!auto.els||!auto.els.length) return [];
+  const cur={}; (pg.elements||[]).forEach((e,i)=>{ cur[i]=e; });
+  const notes=[], dx=[], dfs=[], dh=[];
+  auto.els.forEach(o=>{ const e=cur[o.i]; if(!e) return;
+    if(o.x!=null) dx.push(Math.round(e.x-o.x));
+    if(o.h!=null&&o.h>0) dh.push(+(e.h/o.h).toFixed(2));
+    if(e.type==='text'&&o.fontSize) dfs.push(Math.round((e.fontSize||16)-o.fontSize));
+  });
+  const mx=_avg(dx), mh=_med(dh), mf=_avg(dfs);
+  if(mx!=null&&Math.abs(mx)>=4) notes.push('좌우 여백을 AI 제안보다 '+(mx>0?'+':'')+mx+'px 조정했다');
+  if(mh!=null&&Math.abs(mh-1)>=0.08) notes.push('요소 높이를 AI 제안의 '+mh+'배로 '+(mh>1?'키웠다(글자 잘림 방지)':'줄였다'));
+  if(mf!=null&&Math.abs(mf)>=2) notes.push('글자 크기를 평균 '+(mf>0?'+':'')+mf+'px 조정했다');
+  return notes;
+}
+function deriveMobilePrefs(){
+  const arr=getMobLearn(); if(!arr.length) return '';
+  const L=[], pick=k=>arr.map(x=>x[k]).filter(v=>v!=null&&!isNaN(v));
+  const pad=_med(pick('pad')), cw=_med(pick('contentW')), gap=_med(pick('gap')),
+        gmax=_med(pick('gapMax')), fy=_med(pick('firstY')), sl=_med(pick('slack')), bd=_med(pick('body'));
+  if(pad!=null) L.push('좌우 여백은 '+pad+'px 를 기준으로 한다');
+  if(cw!=null) L.push('본문 콘텐츠 폭은 '+cw+'px 안팎(풀폭 요소)');
+  if(gap!=null) L.push('요소 사이 기본 간격은 '+gap+'px, 섹션 사이는 '+(gmax||gap*2)+'px 까지');
+  if(fy!=null) L.push('첫 요소는 y='+fy+' 부근에서 시작');
+  if(bd!=null) L.push('본문 글자 크기는 '+bd+'px 를 기준으로');
+  // 큰 값만 뽑히면 본문 크기가 빠진다 — 최대~최소 구간에 고르게 퍼진 계단을 만든다
+  const all=[...new Set(arr.flatMap(x=>x.sizes||[]))].sort((a,b)=>b-a);
+  let sz=all;
+  if(all.length>6){ sz=[]; const step=(all.length-1)/5; for(let k=0;k<6;k++) sz.push(all[Math.round(k*step)]); sz=[...new Set(sz)]; }
+  if(bd!=null && !sz.includes(bd)){ sz.push(bd); sz.sort((a,b)=>b-a); }
+  if(sz.length) L.push('실제로 쓰는 글자 크기 단계: '+sz.join(' / ')+'px — 이 값들 안에서 고를 것(본문은 '+(bd!=null?bd:'중간값')+'px)');
+  if(sl!=null&&sl>1) L.push('텍스트 박스 높이는 계산한 글자 높이의 '+sl+'배로 여유를 준다');
+  const notes=[...new Set(arr.flatMap(x=>x.notes||[]))].slice(0,6);
+  if(notes.length) L.push('과거 AI 결과를 사람이 이렇게 고쳤다 → 같은 실수를 반복하지 말 것: ' + notes.join(' / '));
+  if(!L.length) return '';
+  return '\n★ [학습된 배치 규칙 — 이 사이트에서 사람이 실제로 확정한 값들이다. 최우선으로 따를 것]\n- ' + L.join('\n- ');
+}
+function learnMobileLayout(){
+  const pg=page();
+  if(pageDevice(pg)!=='mobile'){ toast('모바일 페이지에서 눌러주세요'); return; }
+  const smp=_mobSample(pg);
+  if(!smp){ toast('요소가 너무 적어 배울 게 없습니다'); return; }
+  if(_mobLastAuto && _mobLastAuto.pageId===pg.id) smp.notes=_mobDeltaNotes(_mobLastAuto, pg);
+  const arr=getMobLearn();
+  const i=arr.findIndex(x=>x.name===smp.name && x.W===smp.W);
+  if(i>=0) arr[i]=smp; else arr.unshift(smp);
+  setMobLearn(arr);
+  toast('📐 이 배치를 학습했습니다 ('+Math.min(arr.length,MOB_LEARN_MAX)+'개 표본) — 다음 변환부터 반영됩니다'
+    + (smp.notes&&smp.notes.length ? ' · 수정점 '+smp.notes.length+'건' : ''));
+}
+document.getElementById('rb-moblearn')?.addEventListener('click', openMobLearnModal);
+
+// ── 어떤 페이지를 기준으로 삼을지 직접 고른다 ──
+function _mobLearnablePages(){
+  return (project.pages||[]).map((pg,i)=>({pg,i}))
+    .filter(x=>pageDevice(x.pg)==='mobile' && (x.pg.elements||[]).length>=3);
+}
+function _mobLearnKeyOf(pg){ return (pg.name||'')+'@@'+(pg.w||MOBILE_W); }
+function openMobLearnModal(){
+  const list=_mobLearnablePages();
+  if(!list.length){ toast('학습할 모바일 페이지가 없습니다'); return; }
+  const learned=new Set(getMobLearn().map(x=>(x.name||'')+'@@'+x.W));
+  const curId=page().id;
+  const host=document.getElementById('moblearn-list');
+  host.innerHTML=list.map(({pg,i})=>{
+    const on=learned.has(_mobLearnKeyOf(pg));
+    const isCur=pg.id===curId;
+    const delta=(_mobLastAuto&&_mobLastAuto.pageId===pg.id);
+    return '<label style="display:flex;align-items:center;gap:9px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px'+(isCur?';background:rgba(108,123,255,.10)':'')+'">'
+      +'<input type="checkbox" data-mlp="'+i+'" '+(on?'checked':'')+' style="width:auto;margin:0">'
+      +'<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(pg.name||'(이름 없음)')+(isCur?' <b style="color:var(--accent);font-size:11px">현재</b>':'')+'</span>'
+      +(delta?'<span title="AI 결과와 비교해 수정점까지 학습됩니다" style="font-size:10px;color:#16a34a;font-weight:700">수정점 비교 가능</span>':'')
+      +'<span style="font-size:11px;color:var(--sub);flex-shrink:0">요소 '+(pg.elements||[]).length+'</span></label>';
+  }).join('');
+  host.querySelectorAll('[data-mlp]').forEach(cb=>cb.addEventListener('change',_mobLearnCount));
+  _mobLearnCount(); _mobLearnPreview();
+  document.getElementById('moblearn-modal').style.display='flex';
+}
+function _mobLearnCount(){
+  const n=document.querySelectorAll('#moblearn-list [data-mlp]:checked').length;
+  const t=document.querySelectorAll('#moblearn-list [data-mlp]').length;
+  const el=document.getElementById('moblearn-count'); if(el) el.textContent=n+' / '+t+' 선택';
+}
+function _mobLearnPreview(){
+  const el=document.getElementById('moblearn-preview'); if(!el) return;
+  const arr=getMobLearn();
+  const txt=deriveMobilePrefs();
+  el.textContent = arr.length ? ('현재 학습된 표본 '+arr.length+'개'+txt) : '아직 학습된 표본이 없습니다 — 페이지를 골라 「선택한 페이지로 학습」을 누르세요.';
+}
+document.getElementById('moblearn-close')?.addEventListener('click',()=>document.getElementById('moblearn-modal').style.display='none');
+document.getElementById('moblearn-modal')?.addEventListener('mousedown',e=>{ if(e.target.id==='moblearn-modal') e.currentTarget.style.display='none'; });
+document.getElementById('moblearn-all')?.addEventListener('click',()=>{ document.querySelectorAll('#moblearn-list [data-mlp]').forEach(c=>c.checked=true); _mobLearnCount(); });
+document.getElementById('moblearn-none')?.addEventListener('click',()=>{ document.querySelectorAll('#moblearn-list [data-mlp]').forEach(c=>c.checked=false); _mobLearnCount(); });
+document.getElementById('moblearn-clear')?.addEventListener('click',()=>{
+  if(!confirm('학습된 배치 규칙을 모두 지울까요?')) return;
+  setMobLearn([]); document.querySelectorAll('#moblearn-list [data-mlp]').forEach(c=>c.checked=false);
+  _mobLearnCount(); _mobLearnPreview(); toast('학습 내용을 지웠습니다');
+});
+document.getElementById('moblearn-apply')?.addEventListener('click',()=>{
+  const picked=[...document.querySelectorAll('#moblearn-list [data-mlp]:checked')].map(c=>+c.dataset.mlp);
+  if(!picked.length){ setMobLearn([]); _mobLearnPreview(); toast('선택이 없어 학습을 비웠습니다'); return; }
+  const out=[]; let withDelta=0;
+  picked.forEach(i=>{
+    const pg=project.pages[i]; if(!pg) return;
+    const smp=_mobSample(pg); if(!smp) return;
+    if(_mobLastAuto && _mobLastAuto.pageId===pg.id){ smp.notes=_mobDeltaNotes(_mobLastAuto,pg); if(smp.notes.length) withDelta++; }
+    out.push(smp);
+  });
+  if(!out.length){ toast('학습할 수 있는 페이지가 없습니다'); return; }
+  setMobLearn(out); _mobLearnPreview();
+  toast('📐 '+out.length+'개 페이지를 기준으로 학습했습니다'+(withDelta?(' · 수정점 비교 '+withDelta+'건'):'')+' — 다음 변환부터 반영됩니다');
+});
+
 async function runMobileConvert(desc){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
   const src=page();
@@ -4409,14 +4694,17 @@ async function runMobileConvert(desc){
 - 요소 사이 간격 16~40px, 섹션 사이는 더 넉넉히. 맨 위는 y≥24. 박스끼리 세로로 겹치지 않게(앞 요소 y+h < 다음 요소 y).
 - 위치·크기·(텍스트)글자크기만 정하라. 색·폰트·문구·이미지·링크·효과는 유지된다.
 ${isHeader?`\n★이것은 상단 바(헤더)다: 로고로 보이는 "가장 큰 글자" 1개만 남기고 x=76(좌측 햄버거 메뉴 자리)·세로 가운데에 두고 fontSize 24~28. 네비게이션 탭(병원소개/진료안내/오시는길 등 작은 글자)은 els에서 모두 빼라(햄버거로 대체됨). 전체 높이 h는 56~72.`:''}${isFooter?`\n★이것은 하단 바(푸터)다: 모든 글자를 가운데 정렬(x=24,w=${cw})로 세로로 쌓아라. 큰글자/회사명 22, 본문 16, 저작권 13. 충분한 높이.`:''}
-${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
+${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}${_mobRefImgs.length?`
+★ 첨부한 참고 이미지처럼 배치하라. 이미지는 원하는 최종 모바일 화면의 예시다 — 여백·간격·글자 위계·요소 순서를 그대로 따라라(색·문구는 기존 것 유지).`:''}${deriveMobilePrefs()}
 출력 JSON 하나만: {"h":전체페이지높이, "els":[{"i":원본인덱스,"x":,"y":,"w":,"h":,"fontSize":(텍스트만)} ...]}`;
   const go=document.getElementById('aimob-go'); go.disabled=true; const ot=go.textContent; go.textContent='🤖 처리 중…';
   aimobStatus('AI가 모바일 레이아웃을 구성 중…');
   try{
-    const parsed=await aiCall(sys, JSON.stringify(payload), 6000);
+    const parsed=await aiCall(sys, JSON.stringify(payload), 6000, _mobRefImgs);
     const els=Array.isArray(parsed.els)?parsed.els:[];
     if(!els.length) throw new Error('결과가 비었습니다 (다시 시도)');
+    // 사람이 다듬은 뒤 '무엇을 고쳤는지' 비교할 기준으로 AI 결과를 보관
+    _mobLastAuto={ pageId:null, els:JSON.parse(JSON.stringify(els)) };
     if(isAdjust){
       // 현재 모바일 페이지를 제자리 재배치 (요소 유지, 위치/크기만 갱신)
       const byI={}; els.forEach(o=>{ if(o&&o.i!=null) byI[o.i]=o; });
@@ -4427,13 +4715,15 @@ ${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
       if(!isBar){ _fitMobileText(src.elements); const _mb=Math.max(...src.elements.map(e=>e.y+e.h)); src.h=Math.max(MOBILE_H, parsed.h?Math.round(parsed.h):0, _mb+40); }
       else if(parsed.h) src.h=Math.max(48,Math.round(parsed.h));
       selId=null; selIds=new Set(); afterMutate(); document.getElementById('aimob-modal').style.display='none';
-      toast('📱 모바일 레이아웃 수정됨');
+      if(_mobLastAuto) _mobLastAuto.pageId=src.id;
+      toast('📱 모바일 레이아웃 수정됨 — 손보신 뒤 「📐 배치 학습」을 누르면 다음 변환부터 반영됩니다');
     } else {
       const srcEls=src.elements;
       const newEls=els.filter(o=>o&&srcEls[o.i]).map(o=>{ const s=JSON.parse(JSON.stringify(srcEls[o.i])); s.id=uid();
         s.x=Math.round(o.x)||0; s.y=Math.round(o.y)||0; s.w=Math.max(8,Math.round(o.w)||cw); s.h=Math.max(8,Math.round(o.h)||40);
         if(o.fontSize&&s.type==='text') s.fontSize=Math.round(o.fontSize); return s; });
       if(!newEls.length) throw new Error('결과가 비었습니다');
+      remapClonedRefs(newEls, true);   // PC 원본과 탭 배선이 겹치지 않도록 새 그룹 발급
       if(!isBar) _fitMobileText(newEls);   // 텍스트 잘림 방지 — 실제 높이로 박스 키우고 아래 요소 밀어냄
       const fitBottom=Math.max(...newEls.map(e=>e.y+e.h));
       const rawH = isBar ? (Math.round(parsed.h)||fitBottom+(isHeader?12:40)) : Math.max(Math.round(parsed.h)||0, fitBottom+40);
@@ -4443,7 +4733,8 @@ ${desc?`★ 사용자 요청을 최우선 반영: "${desc}"`:''}
       src.device='pc';
       project.pages.push(mp); if(!isBar) ensureMobileBars(); curPage=pageIndex(mp.id); editorDevice='mobile'; selId=null; selIds=new Set();
       afterMutate(); document.getElementById('aimob-modal').style.display='none';
-      toast(isBar?`📱 모바일 ${isHeader?'상단':'하단'} 바 생성됨 — 원본은 PC 전용`:'📱 모바일 페이지 + 모바일 상단/하단 바 생성됨 — 원본은 PC 전용');
+      if(_mobLastAuto) _mobLastAuto.pageId=mp.id;
+      toast(isBar?`📱 모바일 ${isHeader?'상단':'하단'} 바 생성됨 — 원본은 PC 전용`:'📱 모바일 페이지 생성 — 손보신 뒤 「📐 배치 학습」을 누르면 다음 변환부터 반영됩니다');
     }
   }catch(e){ aimobStatus('실패: '+_aiErr(e)); }
   finally{ go.disabled=false; go.textContent=ot; }
@@ -4704,6 +4995,7 @@ function showElementCtx(x,y,e){
   h+=row('✂','잘라내기','Ctrl+X','cut')+row('📋','복사','Ctrl+C','copy')+row('📄','붙여넣기','Ctrl+V','paste');
   h+='<div class="sep"></div>';
   h+=row('🖌','서식 복사','Ctrl+Shift+C','fmtcopy');
+  h+=row('✨','이펙트 복사','Ctrl+Shift+E','fxcopy');
   h+='<div class="sep"></div>';
   h+=fl('🗂','레이어','layer');
   if(hasShape) h+=fl('🔷','도형 모양 변경','shape');
@@ -4791,6 +5083,7 @@ function showElementCtx(x,y,e){
     else if(a==='copy') copySel();
     else if(a==='paste') pasteClipboard();
     else if(a==='fmtcopy') startFmtPaint();
+    else if(a==='fxcopy') startFxPaint();
     else if(a==='fx'){ selId=e.id; renderProps(); switchPropTab('fx'); }
     else if(a==='format'){ selId=e.id; renderProps(); switchPropTab('attrs'); }
     else if(a==='elcut'){ openElementCut(e); }
@@ -5576,14 +5869,63 @@ async function publishSite(){
   try{
     await uploadEmbeddedImages();
     await uploadEmbeddedFonts();
-    const payload={ name: project.name||'홈페이지', data: JSON.stringify(project), updatedAt: new Date().toISOString() };
+    // published:true — 내려둔 상태였다면 발행과 동시에 다시 공개된다.
+    const payload={ name: project.name||'홈페이지', data: JSON.stringify(project), updatedAt: new Date().toISOString(), published: true };
     await setDoc(doc(db, DOC_PATH[0], DOC_PATH[1]), payload, {merge:true});
     save(true); renderCanvas();
+    await loadLiveState();
     toast('🚀 발행 완료 — 공개 홈에 반영되었습니다');
   }catch(e){ toast('발행 실패: '+(e.message||e)); }
   finally{ if(btn){ btn.textContent=prev; btn.disabled=false; } }
 }
 document.getElementById('btn-publish')?.addEventListener('click', publishSite);
+
+// ───────────────────────── 공개 상태(내리기/다시 올리기) ─────────────────────────
+// 도메인 루트(/)가 읽는 site/editorProject 문서의 published 플래그만 토글한다.
+// data 필드는 절대 건드리지 않으므로, 내려도 발행본은 서버에 그대로 남아 있고 언제든 되돌릴 수 있다.
+let _live = null;   // { exists, published, name, updatedAt, unpublishedAt }
+async function loadLiveState(){
+  try{
+    const snap = await getDoc(doc(db, DOC_PATH[0], DOC_PATH[1]));
+    if(!snap.exists()){ _live = { exists:false }; }
+    else{
+      const d = snap.data()||{};
+      _live = { exists: !!d.data, published: d.published !== false, name: d.name||'', updatedAt: d.updatedAt||'', unpublishedAt: d.unpublishedAt||'' };
+    }
+  }catch(e){ _live = null; console.warn('live state', e); }
+  renderLiveBtn();
+}
+function renderLiveBtn(){
+  const ic=document.getElementById('rb-live-ic'), lb=document.getElementById('rb-live-lb'), bt=document.getElementById('rb-live');
+  if(!ic||!lb||!bt) return;
+  if(!_live){ ic.textContent='🌐'; lb.textContent='공개 상태'; bt.title='로그인하면 공개 상태를 확인할 수 있습니다'; return; }
+  if(!_live.exists){ ic.textContent='◽'; lb.textContent='미발행'; bt.title='아직 발행된 홈페이지가 없습니다 — 🚀 발행을 먼저 하세요'; return; }
+  if(_live.published){ ic.textContent='🟢'; lb.textContent='공개 중'; bt.title='공개 홈페이지를 서버에서 내립니다 (발행본은 보존됩니다)'; }
+  else{ ic.textContent='🔴'; lb.textContent='내려짐'; bt.title='내려둔 홈페이지를 다시 공개합니다'; }
+}
+async function toggleLive(){
+  if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
+  await loadLiveState();
+  if(!_live){ toast('공개 상태를 확인하지 못했습니다'); return; }
+  if(!_live.exists){ toast('아직 발행된 홈페이지가 없습니다 — 🚀 발행을 먼저 하세요'); return; }
+  const when = (_live.updatedAt||'').slice(0,16).replace('T',' ');
+  const bt=document.getElementById('rb-live'); const on=_live.published;
+  if(on){
+    if(!confirm('공개 홈페이지를 서버에서 내릴까요?\n\n발행본: '+(_live.name||'홈페이지')+(when?'  (발행 '+when+')':'')
+      +'\n\n· 방문자에게는 «준비 중» 안내가 표시됩니다.\n· 발행본 데이터는 서버에 그대로 남습니다 — 언제든 다시 올릴 수 있습니다.')) return;
+  }else{
+    if(!confirm('내려둔 홈페이지를 다시 공개할까요?\n\n발행본: '+(_live.name||'홈페이지')+(when?'  (발행 '+when+')':''))) return;
+  }
+  if(bt) bt.disabled=true;
+  try{
+    const patch = on ? { published:false, unpublishedAt:new Date().toISOString() } : { published:true };
+    await setDoc(doc(db, DOC_PATH[0], DOC_PATH[1]), patch, {merge:true});
+    await loadLiveState();
+    toast(on ? '🔴 홈페이지를 내렸습니다 — 발행본은 보존되어 있습니다' : '🟢 홈페이지를 다시 공개했습니다');
+  }catch(e){ toast('변경 실패: '+(e.message||e)); }
+  finally{ if(bt) bt.disabled=false; }
+}
+document.getElementById('rb-live')?.addEventListener('click', toggleLive);
 // ── SEO 설정 모달 ──
 function seoCfg(){ if(!project.seo) project.seo={}; return project.seo; }
 function openSeoModal(){
@@ -5620,6 +5962,7 @@ async function loadCloud(){
       const nm = snap.data().name||'';
       if(confirm(`클라우드에 저장된 프로젝트${nm?` "${nm}"`:''}가 있습니다. 불러올까요?\n(현재 편집 중 내용은 대체됩니다)`)){
         project=JSON.parse(snap.data().data); curPage=0; selId=null;
+        _reportTabFix(normalizeTabWiring(project));
         history=[]; hist_i=-1; snapshot();
         renderCanvas(); renderPages(); renderProps(); save(true);
         toast('클라우드에서 불러왔습니다 ☁');
@@ -5697,6 +6040,7 @@ async function renderPrjList(){
           const s=await getDoc(doc(db,'editorProjects',prj.id));
           if(s.exists()&&s.data().data){
             project=JSON.parse(s.data().data); curPage=0; selId=null;
+            _reportTabFix(normalizeTabWiring(project));
             history=[]; hist_i=-1; snapshot();
             renderCanvas(); renderPages(); renderProps(); save(true);
             _prjId=prj.id; localStorage.setItem('hw_prj_id',_prjId);
@@ -6046,7 +6390,7 @@ function saveCurrentTemplate(){
 }
 function applyTemplate(t, asNew){
   const src=t.page||{};
-  const els=(src.elements||[]).map(e=>Object.assign(JSON.parse(JSON.stringify(e)),{id:uid()}));
+  const els=remapClonedRefs((src.elements||[]).map(e=>Object.assign(JSON.parse(JSON.stringify(e)),{id:uid()})), true);
   if(asNew){
     const np=newPage(src.name||t.name); np.w=src.w||PAGE_W; np.h=src.h||PAGE_H; np.bg=src.bg||'#ffffff'; np.elements=els;
     addContentPage(np);
@@ -6425,8 +6769,12 @@ document.getElementById('aifx-go').onclick=()=>runAiFx(document.getElementById('
 document.querySelectorAll('#aifx-modal [data-aifx-preset]').forEach(b=>b.addEventListener('click',()=>{ document.getElementById('aifx-desc').value=b.dataset.aifxPreset; }));
 
 // ── 공통 AI 호출 ──
-async function aiCall(system, content, maxTokens){
-  const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:maxTokens||4000,system:system,messages:[{role:'user',content:content}]}});
+async function aiCall(system, content, maxTokens, imgs){
+  // imgs: [{mediaType,data(base64)}] — 참고 이미지를 함께 보낼 때
+  const msg = (imgs&&imgs.length)
+    ? [ ...imgs.map(im=>({type:'image',source:{type:'base64',media_type:im.mediaType,data:im.data}})), {type:'text',text:content} ]
+    : content;
+  const res=await aiProxy({body:{model:'claude-sonnet-4-6',max_tokens:maxTokens||4000,system:system,messages:[{role:'user',content:msg}]}});
   const parsed=parseAiJson(res.data?.content?.[0]?.text||'');
   if(!parsed) throw new Error('AI 응답 해석 실패 (다시 시도)');
   return parsed;
@@ -7355,6 +7703,7 @@ window.addEventListener('keydown',ev=>{
   if(ck&&(code==='KeyF'||code==='KeyH')){ ev.preventDefault(); document.getElementById('rb-find')?.click(); return; }
   if(ck&&code==='KeyZ'&&!ev.shiftKey){ ev.preventDefault(); undo(); }
   else if(ck&&(code==='KeyY'||(ev.shiftKey&&code==='KeyZ'))){ ev.preventDefault(); redo(); }
+  else if(ck&&ev.shiftKey&&code==='KeyE'){ ev.preventDefault(); startFxPaint(); }
   else if(ck&&code==='KeyC'){ ev.preventDefault(); if(ev.shiftKey){ startFmtPaint(); } else if(selIds.size) copySel(); else toast('복사할 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyX'){ ev.preventDefault(); if(selIds.size) cutSel(); else toast('잘라낼 요소를 먼저 선택하세요'); }
   else if(ck&&code==='KeyV'){ ev.preventDefault(); if(_clipboard&&_clipboard.length) pasteClipboard(); else toast('붙여넣을 내용이 없습니다 (먼저 Ctrl+C)'); }
@@ -7365,6 +7714,7 @@ window.addEventListener('keydown',ev=>{
   else if(ck&&code==='KeyG'&&ev.shiftKey){ ev.preventDefault(); arrUngroup(); }
   else if(ck&&code==='KeyG'){ ev.preventDefault(); arrGroup(); }
   else if(ck&&code==='KeyA'){ ev.preventDefault(); selIds=new Set(page().elements.map(e=>e.id)); selId=selIds.size>0?[...selIds].at(-1):null; renderCanvas(); renderProps(); updateRibbonState(); }
+  else if(ev.key==='Escape'&&_fxPaint){ endFxPaint(); toast('이펙트 복사 종료'); }
   else if(ev.key==='Escape'&&_fmtPaint){ endFmtPaint(); toast('서식 복사 종료'); }
   else if(ev.key==='Escape'&&selIds.size>0){ selId=null; selIds=new Set(); renderCanvas(); renderProps(); updateRibbonState(); }
   else if(selId && ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(ev.key)){ ev.preventDefault(); const d=ev.shiftKey?10:1; for(const id of selIds){const e2=el(id);if(!e2)continue;if(ev.key==='ArrowUp')e2.y-=d;if(ev.key==='ArrowDown')e2.y+=d;if(ev.key==='ArrowLeft')e2.x-=d;if(ev.key==='ArrowRight')e2.x+=d;} renderCanvas(); const primary=el(selId); if(primary) syncPosInputs(primary); save(true); }

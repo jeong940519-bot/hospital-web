@@ -418,6 +418,21 @@
         </div>
         <div class="rgroup-lbl">클립보드</div>
       </div>
+      <!-- 도구 -->
+      <div class="rgroup">
+        <div class="rgi">
+          <a class="rbtn" id="rb-blog" href="/blog-studio.html" title="네이버 블로그 초안 작성·관리 (별도 페이지)" style="min-height:44px;text-decoration:none"><span class="ri">📝</span><span class="rl">블로그</span></a>
+          <button class="rbtn" id="rb-moblearn" title="지금 보고 있는 모바일 페이지의 배치를 학습해 다음 AI 변환에 반영합니다" style="min-height:44px"><span class="ri">📐</span><span class="rl">배치 학습</span></button>
+        </div>
+        <div class="rgroup-lbl">도구</div>
+      </div>
+      <!-- 공개 -->
+      <div class="rgroup">
+        <div class="rgi">
+          <button class="rbtn" id="rb-live" title="공개 홈페이지 내리기/올리기" style="min-height:44px"><span class="ri" id="rb-live-ic">🌐</span><span class="rl" id="rb-live-lb">공개 상태</span></button>
+        </div>
+        <div class="rgroup-lbl">공개</div>
+      </div>
       <!-- 페이지 -->
       <div class="rgroup">
         <div class="rgiv">
@@ -1025,6 +1040,30 @@
 </div>
 
 <!-- AI 모바일 변환/수정 모달 -->
+<!-- 배치 학습 선택 모달 -->
+<div class="modal-bg" id="moblearn-modal" style="display:none">
+  <div class="modal" style="width:600px;max-height:84vh;display:flex;flex-direction:column">
+    <div class="modal-head"><h3>📐 배치 학습 — 어떤 페이지를 기준으로 삼을까요?</h3><button class="sp-close" id="moblearn-close">✕</button></div>
+    <div class="modal-body" style="overflow-y:auto;flex:1">
+      <div style="font-size:12px;color:var(--sub);line-height:1.7;margin-bottom:10px">
+        사람이 직접 다듬어 완성한 모바일 페이지만 골라주세요. 체크한 페이지의 <b>여백·간격·글자 위계·높이 여유</b>를 규칙으로 뽑아
+        다음 AI 모바일 변환에 반영합니다. (체크 해제하면 반영에서 빠집니다)
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+        <button class="tb-btn" id="moblearn-all" style="font-size:12px;padding:5px 10px">전체 선택</button>
+        <button class="tb-btn" id="moblearn-none" style="font-size:12px;padding:5px 10px">전체 해제</button>
+        <span id="moblearn-count" style="font-size:12px;color:var(--sub);align-self:center;margin-left:auto"></span>
+      </div>
+      <div id="moblearn-list" style="border:1px solid var(--border);border-radius:8px;max-height:300px;overflow-y:auto;background:var(--panel2)"></div>
+      <div id="moblearn-preview" style="margin-top:12px;font-size:11.5px;color:var(--sub);line-height:1.7;white-space:pre-wrap"></div>
+    </div>
+    <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end">
+      <button class="tb-btn" id="moblearn-clear">학습 전체 지우기</button>
+      <button class="tb-btn primary" id="moblearn-apply">선택한 페이지로 학습</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="aimob-modal" style="display:none">
   <div class="modal" style="width:480px">
     <div class="modal-head"><h3 id="aimob-title">🤖 AI 모바일 변환</h3><button class="sp-close" id="aimob-close">✕</button></div>
@@ -1037,6 +1076,18 @@
           <button class="tb-btn" data-aimob-preset="제목과 버튼을 크고 강조, 본문은 간결하게" style="font-size:12px;padding:6px 10px">🔠 큰 글씨·강조</button>
         </div>
         <div id="aimob-hint" style="font-size:11px;color:var(--sub);margin-top:8px"></div>
+      </div>
+      <div class="grp">
+        <label>레퍼런스 (선택)</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <label class="tb-btn" style="font-size:12px;padding:6px 10px;cursor:pointer;margin:0">🖼 이미지 첨부
+            <input type="file" id="aimob-ref" accept="image/*" multiple style="display:none">
+          </label>
+          <button class="tb-btn" id="aimob-ref-clear" style="font-size:12px;padding:6px 10px">비우기</button>
+          <span id="aimob-ref-count" style="font-size:11px;color:var(--sub)"></span>
+        </div>
+        <div id="aimob-thumbs" style="margin-top:8px"></div>
+        <div style="font-size:11px;color:var(--sub);margin-top:6px">원하는 모바일 화면을 캡처해 올리면 그 여백·간격·글자 위계를 따라 배치합니다. (최대 3장)</div>
       </div>
       <div class="modal-status" id="aimob-status"></div>
       <button class="tb-btn primary" id="aimob-go" style="width:100%;margin-top:4px">변환 실행</button>

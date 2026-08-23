@@ -147,7 +147,10 @@
     '[data-fx-sr="left"]{transform:translateX(-48px)}',
     '[data-fx-sr="right"]{transform:translateX(48px)}',
     '[data-fx-sr="fade"]{transform:none}',
-    '.fx-sr-in{opacity:1!important;transform:none!important}',
+    '.fx-sr-in{opacity:1!important}',
+    // 등장 트랜지션 동안만 transform 을 풀어준다. 끝나면 런타임이 data-fx-sr 을 떼므로
+    // 이 규칙도 함께 풀려서 호버·루프 등 다른 transform 효과와 충돌하지 않는다.
+    '.fx-sr-in[data-fx-sr]{transform:none!important}',
     '[data-fx-hs-content]{opacity:0;transition:opacity .42s ease,transform .5s cubic-bezier(.22,.61,.36,1);pointer-events:none}',
     '.fx-slider{position:absolute;inset:0;overflow:hidden}',
     '.fx-sl-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .6s}',
@@ -218,27 +221,33 @@
     '[data-fx-loop="blink"]{animation:fx-blink 1.6s ease-in-out infinite}',
     // ── 호버 마이크로 인터랙션 (data-fx-hover, 순수 CSS) ──
     '[data-fx-hover]{transition:transform .25s ease,box-shadow .25s ease,filter .25s ease}',
-    '[data-fx-hover="lift"]:hover{transform:translateY(-8px);box-shadow:0 16px 34px rgba(0,0,0,.20)}',
+    '[data-fx-hover="lift"]:hover{transform:translateY(-8px)!important;box-shadow:0 16px 34px rgba(0,0,0,.20)}',
     '[data-fx-hover="glow"]:hover{box-shadow:0 0 26px rgba(108,123,255,.6);filter:brightness(1.06)}',
-    '[data-fx-hover="tilt"]:hover{transform:perspective(600px) rotateX(6deg) rotateY(-6deg)}',
-    '[data-fx-hover="grow"]:hover{transform:scale(1.06)}',
-    '[data-fx-hover="sink"]:hover{transform:translateY(4px);filter:brightness(.94)}',
-    '[data-fx-hover="rotate"]:hover{transform:rotate(4deg) scale(1.03)}',
+    '[data-fx-hover="tilt"]:hover{transform:perspective(600px) rotateX(6deg) rotateY(-6deg)!important}',
+    '[data-fx-hover="grow"]:hover{transform:scale(1.06)!important}',
+    '[data-fx-hover="sink"]:hover{transform:translateY(4px)!important;filter:brightness(.94)}',
+    '[data-fx-hover="rotate"]:hover{transform:rotate(4deg) scale(1.03)!important}',
     '[data-fx-hover="bright"]:hover{filter:brightness(1.15)}',
     '[data-fx-hover="border"]:hover{box-shadow:0 0 0 3px #6c7bff}',
     '[data-fx-hover="dim"]:hover{filter:brightness(.8)}',
-    '[data-fx-hover="float-h"]:hover{transform:translateY(-8px) scale(1.03);box-shadow:0 18px 36px rgba(0,0,0,.22)}',
+    '[data-fx-hover="float-h"]:hover{transform:translateY(-8px) scale(1.03)!important;box-shadow:0 18px 36px rgba(0,0,0,.22)}',
     '[data-fx-hover="hct"]>div{transition:color .3s ease}',
     '[data-fx-hover="hct"]:hover>div{color:var(--fxhc)!important}',
     '[data-fx-hover="hcb"]{transition:background-color .3s ease,background .3s ease}',
     '[data-fx-hover="hcb"]:hover{background-color:var(--fxhc)!important;background:var(--fxhc)!important}',
   ].join('');
+  // 카드 위에 겹쳐 놓은 글자로 마우스가 옮겨가면 카드의 :hover 가 풀려 효과가 끊긴다.
+  // 모든 :hover 규칙을 .fx-hov 클래스 버전으로 복제해두고, 런타임이 겹친 요소의
+  // 마우스 진입/이탈을 카드로 전달해 이 클래스를 붙였다 뗀다.
+  FX_CSS += (function(){ var d=''; FX_CSS.replace(/([^{}]+){([^{}]*)}/g, function(m,sel,body){
+    if(sel.indexOf(':hover')>=0) d += sel.replace(/:hover/g,'.fx-hov')+'{'+body+'}';
+    return m; }); return d; })();
 
   /* ── 효과 JS 블록 (사용된 것만 삽입) ── */
   var FX_JS = {
-    'scroll-reveal':'(function(){var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){e.target.classList.add("fx-sr-in");io.unobserve(e.target);}});},{threshold:0.12});document.querySelectorAll("[data-fx-sr]").forEach(function(el){el.style.transitionDelay=(el.dataset.fxDelay||0)+"ms";io.observe(el);});})();',
+    'scroll-reveal':'(function(){var io=new IntersectionObserver(function(en){en.forEach(function(e){if(e.isIntersecting){var el=e.target;el.classList.add("fx-sr-in");io.unobserve(el);var d=parseInt(el.dataset.fxDelay||0,10)||0;setTimeout(function(){el.removeAttribute("data-fx-sr");el.style.transitionDelay="";},d+750);}});},{threshold:0.12});document.querySelectorAll("[data-fx-sr]").forEach(function(el){el.style.transitionDelay=(el.dataset.fxDelay||0)+"ms";io.observe(el);});})();',
     'hover-show':'(function(){var G={};function g(k){return G[k]||(G[k]={tr:[],ct:[]});}document.querySelectorAll("[data-fx-hs-trigger]").forEach(function(t){g(t.dataset.fxHsTrigger).tr.push(t);});document.querySelectorAll("[data-fx-hs-content]").forEach(function(c){g(c.dataset.fxHsContent).ct.push(c);});function offFor(c){var a=c.getAttribute("data-fx-hs-anim")||"fade";return a==="top"?"translateY(-46px)":a==="bottom"?"translateY(46px)":a==="left"?"translateX(-46px)":a==="right"?"translateX(46px)":a==="zoom"?"scale(.82)":"none";}Object.keys(G).forEach(function(k){var gr=G[k],tmo=null;function doHide(){gr.ct.forEach(function(c){c.style.opacity="0";c.style.transform=offFor(c);c.style.pointerEvents="none";});}function sh(){if(tmo){clearTimeout(tmo);tmo=null;}gr.ct.forEach(function(c){c.style.opacity="1";c.style.transform="none";c.style.pointerEvents="auto";});}function hi(){if(tmo)clearTimeout(tmo);tmo=setTimeout(doHide,140);}gr.tr.forEach(function(t){t.addEventListener("mouseenter",sh);t.addEventListener("mouseleave",hi);});gr.ct.forEach(function(c){c.addEventListener("mouseenter",sh);c.addEventListener("mouseleave",hi);});doHide();});})();',
-    'tab':'(function(){var G={};function g(k){return G[k]||(G[k]={tr:[],ct:[]});}document.querySelectorAll("[data-fx-tab-trigger]").forEach(function(t){var gr=g(t.dataset.fxTabTrigger),i=+(t.dataset.fxTabIdx||0);gr.tr[i]=t;t.style.cursor="pointer";});document.querySelectorAll("[data-fx-tab-content]").forEach(function(c){var gr=g(c.dataset.fxTabContent),i=+(c.dataset.fxTabIdx||0);(gr.ct[i]=gr.ct[i]||[]).push(c);});Object.keys(G).forEach(function(k){var gr=G[k],cur=-1;function reveal(c){try{c.animate([{opacity:0},{opacity:1}],{duration:260,easing:"ease"});}catch(_){}}function setDisp(n){gr.ct.forEach(function(arr,i){if(arr)arr.forEach(function(c){c.style.display=i===n?"block":"none";});});cur=n;}function act(n){if(n===cur)return;setDisp(n);if(gr.ct[n])gr.ct[n].forEach(reveal);}gr.tr.forEach(function(t,i){if(t)t.addEventListener("click",function(){act(i);});});setDisp(0);});})();',
+    'tab':'(function(){var PG=[].slice.call(document.querySelectorAll("section.pgwrap"));function key(el,gn){var s=el.closest?el.closest("section.pgwrap"):null;return gn+"##"+PG.indexOf(s);}var G={};function g(k){return G[k]||(G[k]={tr:[],ct:[]});}document.querySelectorAll("[data-fx-tab-trigger]").forEach(function(t){var gr=g(key(t,t.dataset.fxTabTrigger)),i=+(t.dataset.fxTabIdx||0);(gr.tr[i]=gr.tr[i]||[]).push(t);t.style.cursor="pointer";});document.querySelectorAll("[data-fx-tab-content]").forEach(function(c){var gr=g(key(c,c.dataset.fxTabContent)),i=+(c.dataset.fxTabIdx||0);(gr.ct[i]=gr.ct[i]||[]).push(c);});Object.keys(G).forEach(function(k){var gr=G[k],cur=-1;function reveal(c){try{c.animate([{opacity:0},{opacity:1}],{duration:260,easing:"ease"});}catch(_){}}function setDisp(n){gr.ct.forEach(function(arr,i){if(arr)arr.forEach(function(c){c.style.display=i===n?"block":"none";});});cur=n;}function act(n){if(n===cur)return;setDisp(n);if(gr.ct[n])gr.ct[n].forEach(reveal);}gr.tr.forEach(function(arr,i){if(arr)arr.forEach(function(t){t.addEventListener("click",function(){act(i);});});});setDisp(0);});})();',
     'counter':'(function(){var io=new IntersectionObserver(function(en){en.forEach(function(e){if(!e.isIntersecting)return;var el=e.target,from=+(el.dataset.fxFrom||0),to=+(el.dataset.fxTo||100),dur=+(el.dataset.fxDur||2000),suf=el.dataset.fxSuf||"",inner=el.querySelector("div")||el;io.unobserve(el);var s=null;(function step(ts){if(!s)s=ts;var p=Math.min(1,(ts-s)/dur);inner.textContent=Math.round(from+(to-from)*p).toLocaleString()+suf;if(p<1)requestAnimationFrame(step);})(performance.now());});},{threshold:0.5});document.querySelectorAll("[data-fx-counter]").forEach(function(el){io.observe(el);});})();',
     'slider':'(function(){document.querySelectorAll(".fx-slider").forEach(function(sl){var imgs=sl.querySelectorAll(".fx-sl-img"),dots=sl.querySelectorAll(".fx-sl-dot"),cur=0,auto=sl.dataset.slAuto==="1",iv=+(sl.dataset.slIv||3000),tm=null,peek=sl.classList.contains("peek"),track=sl.querySelector(".fx-sl-track");function lay(){if(peek&&track&&imgs[cur]){var im=imgs[cur],off=im.offsetLeft+im.offsetWidth/2-sl.clientWidth/2;track.style.transform="translateX("+(-off)+"px)";}}function go(n){n=(n+imgs.length)%imgs.length;if(peek){imgs[cur].classList.remove("on");}else{imgs[cur].style.opacity="0";}if(dots[cur])dots[cur].classList.remove("on");cur=n;if(peek){imgs[cur].classList.add("on");lay();}else{imgs[cur].style.opacity="1";}if(dots[cur])dots[cur].classList.add("on");}function rst(){clearInterval(tm);if(auto)tm=setInterval(function(){go(cur+1);},iv);}sl.querySelectorAll(".fx-sl-prev").forEach(function(b){b.addEventListener("click",function(ev){ev.stopPropagation();go(cur-1);rst();});});sl.querySelectorAll(".fx-sl-next").forEach(function(b){b.addEventListener("click",function(ev){ev.stopPropagation();go(cur+1);rst();});});dots.forEach(function(d,i){d.addEventListener("click",function(ev){ev.stopPropagation();go(i);rst();});});window.addEventListener("resize",lay);go(0);rst();});})();',
     'hover-expand':'(function(){document.querySelectorAll("[data-fx-expand]").forEach(function(el){var col=+(el.dataset.fxColH||60),full=+(el.dataset.fxFullH||200);el.style.height=col+"px";el.style.cursor="pointer";el.addEventListener("mouseenter",function(){el.style.height=full+"px";});el.addEventListener("mouseleave",function(){el.style.height=col+"px";});});})();',
@@ -672,11 +681,14 @@
       +'function devOk(el){var x=el.getAttribute("data-dev")||"both";var d=curDev();return x==="both"||x===d;}'
       +'function pickBar(sel){var bars=[].slice.call(document.querySelectorAll(sel));if(!bars.length)return;var d=curDev(),spec=null,both=null;bars.forEach(function(b){var x=b.getAttribute("data-dev")||"both";if(x===d&&!spec)spec=b;if(x==="both"&&!both)both=b;});var ch=spec||both||bars[0];bars.forEach(function(b){b.style.display=(b===ch)?"block":"none";});}'
       +'function hmToggle(o){var dr=document.getElementById("hmdrawer"),ov=document.getElementById("hmoverlay");if(!dr)return;var open=(o!=null)?o:!dr.classList.contains("open");dr.classList.toggle("open",open);ov.classList.toggle("open",open);}'
-      +'function show(id){'
+      +'function show(id,noPush){'
         +'document.querySelectorAll(".pgwrap").forEach(function(wr){wr.style.display=(wr.getAttribute("data-id")===id)?"block":"none";});'
         +'document.querySelectorAll("nav a").forEach(function(a){a.classList.toggle("active",a.getAttribute("data-id")===id);});'
         +'fit();window.scrollTo(0,0);'
+      // 사이트 안 페이지 이동을 브라우저 히스토리에 남긴다 → 뒤로가기가 이전 페이지로 (PC·모바일 공통)
+      +'try{var _st={pg:id},_u="#"+encodeURIComponent(id);if(noPush)history.replaceState(_st,"",_u);else history.pushState(_st,"",_u);}catch(_e){}'
       +'}'
+      +'function hasPg(id){var ok=false;document.querySelectorAll(".pgwrap").forEach(function(w){if(w.getAttribute("data-id")===id)ok=true;});return ok;}'
       +'function applyDevice(){'
         +'pickBar(".topbar");pickBar(".footerbar");'
         +'var d=curDev();'
@@ -687,7 +699,7 @@
         +'if(!cur||!devOk(cur)){var first=null;'
           +'document.querySelectorAll(".pgwrap[data-root=\\"1\\"]").forEach(function(w){if(!first&&devOk(w))first=w;});'
           +'if(!first)document.querySelectorAll(".pgwrap").forEach(function(w){if(!first&&devOk(w))first=w;});'
-          +'if(first){show(first.getAttribute("data-id"));return;}}'
+          +'if(first){show(first.getAttribute("data-id"),true);return;}}'
         +'fit();'
       +'}'
       +'document.querySelectorAll("nav a").forEach(function(a){a.addEventListener("click",function(ev){ev.preventDefault();show(a.getAttribute("data-id"));if(a.closest("#hmdrawer"))hmToggle(false);});});'
@@ -696,7 +708,24 @@
       +'var _ho=document.getElementById("hmoverlay");if(_ho)_ho.addEventListener("click",function(){hmToggle(false);});'
       +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'
       +'window.addEventListener("resize",applyDevice);window.addEventListener("load",applyDevice);applyDevice();'
+      +'try{var _h0=location.hash?decodeURIComponent(location.hash.slice(1)):"";if(_h0&&hasPg(_h0))show(_h0,true);else{var _c0=null;document.querySelectorAll(".pgwrap").forEach(function(w){if(!_c0&&w.style.display!=="none")_c0=w;});if(_c0)show(_c0.getAttribute("data-id"),true);}}catch(_e){}'
+      +'window.addEventListener("popstate",function(ev){var id=(ev.state&&ev.state.pg)||"";if(!id&&location.hash){try{id=decodeURIComponent(location.hash.slice(1));}catch(_e){}}if(id&&hasPg(id))show(id,true);});'
       +fxJs
+      // 겹친 요소(카드 위 글자 등)의 마우스 진입/이탈을 아래 카드로 전달한다.
+      // 위치는 인라인 좌표로 계산해서, 아직 표시되지 않은 페이지의 요소도 정확히 묶인다.
+      +'(function(){var hs=[].slice.call(document.querySelectorAll("[data-fx-hover],[data-fx-hz]"));if(!hs.length)return;'
+        +'function bx(el){var st=el.style,l=parseFloat(st.left)||0,t=parseFloat(st.top)||0;return[l,t,l+(parseFloat(st.width)||0),t+(parseFloat(st.height)||0)];}'
+        +'hs.forEach(function(h){var tm=null;'
+          +'function on(){if(tm){clearTimeout(tm);tm=null;}h.classList.add("fx-hov");}'
+          +'function off(){if(tm)clearTimeout(tm);tm=setTimeout(function(){h.classList.remove("fx-hov");},40);}'
+          +'h.addEventListener("mouseenter",on);h.addEventListener("mouseleave",off);'
+          +'var pg=h.parentElement;if(!pg)return;var a=bx(h);if(a[2]<=a[0]||a[3]<=a[1])return;'
+          +'[].slice.call(pg.children).forEach(function(o){if(o===h)return;var b=bx(o);'
+            +'if(b[2]<=b[0]||b[3]<=b[1])return;'
+            +'if(b[0]>=a[0]-2&&b[1]>=a[1]-2&&b[2]<=a[2]+2&&b[3]<=a[3]+2){o.addEventListener("mouseenter",on);o.addEventListener("mouseleave",off);}'
+          +'});'
+        +'});'
+      +'})();'
       +'<\/script>'
       +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='board';});})?boardRuntimeScript():'')
       +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='map';});})?mapRuntimeScript():'')

@@ -1,0 +1,1497 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>블로그 스튜디오 — 네이버 블로그 포스팅</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --primary: #1a6fad;
+      --naver: #03c75a;
+      --sidebar: #1e2535;
+      --sidebar-active: #2d3650;
+      --bg: #f0f2f5;
+      --white: #fff;
+      --border: #e0e4ec;
+      --text: #222;
+      --sub: #666;
+      --danger: #e53935;
+      --warn: #f39c12;
+    }
+    body { font-family: 'Noto Sans KR', sans-serif; background: var(--bg); display: flex; height: 100vh; overflow: hidden; color: var(--text); }
+
+    /* ── 로그인 ── */
+    #login-screen { position: fixed; inset: 0; background: var(--naver); display: flex; align-items: center; justify-content: center; z-index: 999; }
+    .login-box { background: var(--white); border-radius: 16px; padding: 44px 40px; width: 360px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .login-box h1 { font-size: 21px; font-weight: 700; margin-bottom: 6px; color: var(--naver); }
+    .login-box p { color: var(--sub); font-size: 13px; margin-bottom: 26px; }
+    .login-box input { width: 100%; padding: 12px 16px; border: 1px solid var(--border); border-radius: 8px; font-size: 15px; margin-bottom: 12px; font-family: inherit; outline: none; }
+    .login-box input:focus { border-color: var(--naver); }
+    .login-box button { width: 100%; padding: 13px; background: var(--naver); color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    #login-error { color: var(--danger); font-size: 13px; margin-top: 10px; display: none; }
+
+    /* ── 사이드바 ── */
+    .sidebar { width: 260px; background: var(--sidebar); color: #fff; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-logo { padding: 20px; font-size: 15px; font-weight: 700; border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .sidebar-logo span { font-size: 11px; color: rgba(255,255,255,0.4); display: block; margin-top: 3px; font-weight: 400; }
+    .sidebar-new { margin: 14px 16px 8px; padding: 10px; background: var(--naver); color: #fff; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .post-list { flex: 1; overflow-y: auto; padding: 6px 10px 10px; }
+    .post-item { padding: 10px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; transition: background 0.15s; }
+    .post-item:hover { background: var(--sidebar-active); }
+    .post-item.active { background: var(--sidebar-active); border-left: 3px solid var(--naver); }
+    .post-item .t { font-size: 13px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .post-item .m { font-size: 11px; color: rgba(255,255,255,0.42); margin-top: 3px; display: flex; gap: 6px; align-items: center; }
+    .pill { font-size: 10px; padding: 1px 6px; border-radius: 20px; font-weight: 700; }
+    .pill.draft { background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.75); }
+    .pill.published { background: var(--naver); color: #fff; }
+    .sidebar-bottom { padding: 14px 16px; border-top: 1px solid rgba(255,255,255,0.08); display: flex; gap: 8px; }
+    .sidebar-bottom a, .sidebar-bottom button { flex: 1; padding: 8px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.65); border: none; border-radius: 8px; font-size: 12px; cursor: pointer; font-family: inherit; text-align: center; text-decoration: none; }
+    .sidebar-bottom a:hover, .sidebar-bottom button:hover { background: rgba(255,255,255,0.16); color: #fff; }
+
+    /* ── 메인 ── */
+    .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .topbar { background: var(--white); border-bottom: 1px solid var(--border); padding: 0 24px; height: 56px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; gap: 12px; }
+    .topbar h2 { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .topbar-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid var(--border); background: var(--white); color: var(--text); }
+    .btn:hover { background: #f6f8fa; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn.primary { background: var(--primary); color: #fff; border-color: var(--primary); }
+    .btn.primary:hover { background: #145a8e; }
+    .btn.naver { background: var(--naver); color: #fff; border-color: var(--naver); }
+    .btn.naver:hover { background: #02a94c; }
+    .btn.sm { padding: 6px 12px; font-size: 12px; font-weight: 500; }
+    .status-txt { font-size: 12px; color: var(--sub); }
+
+    .content { flex: 1; overflow-y: auto; padding: 22px 24px 60px; }
+    .empty { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--sub); gap: 12px; text-align: center; }
+
+    .card { background: var(--white); border-radius: 12px; padding: 20px 24px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+    .card h3 .h-left { display: flex; align-items: center; gap: 8px; }
+    .card h3 .h-actions { display: flex; gap: 6px; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; }
+    .form-group { margin-bottom: 14px; flex: 1; min-width: 180px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 5px; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%; padding: 9px 13px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit; outline: none; background: var(--white); color: var(--text);
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); }
+    .form-group textarea { min-height: 70px; resize: vertical; line-height: 1.6; }
+    .hint { font-size: 11px; color: #98a0ad; margin-top: 4px; line-height: 1.5; }
+
+    /* 글감 후보 */
+    .idea-wrap { margin-bottom: 14px; }
+    .idea-head { font-size: 12px; font-weight: 700; color: var(--sub); margin-bottom: 7px; display: flex; align-items: center; gap: 8px; }
+    .idea-head .k { color: var(--primary); }
+    .idea-card { display: flex; gap: 10px; align-items: flex-start; padding: 11px 13px; border: 1px solid var(--border); border-radius: 9px; margin-bottom: 7px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+    .idea-card:hover { border-color: var(--primary); background: #f7fbff; }
+    .idea-card.sel { border-color: var(--primary); background: #eef6fd; }
+    .idea-card .num { flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: #e6eef7; color: var(--primary); font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+    .idea-card .t { font-size: 14px; font-weight: 700; line-height: 1.45; }
+    .idea-card .w { font-size: 12px; color: var(--sub); margin-top: 3px; line-height: 1.5; }
+    .idea-card .tp { font-size: 11px; color: #98a0ad; margin-top: 4px; }
+    .idea-card .dup { color: var(--warn); font-weight: 700; }
+
+    /* 제목 후보 */
+    .title-cand { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px; cursor: pointer; font-size: 14px; }
+    .title-cand:hover { border-color: var(--primary); background: #f7fbff; }
+    .title-cand.sel { border-color: var(--primary); background: #eef6fd; font-weight: 700; }
+    .title-cand .len { font-size: 11px; color: #98a0ad; margin-left: auto; flex-shrink: 0; }
+
+    /* 본문 에디터 */
+    #body-editor {
+      min-height: 320px; border: 1px solid var(--border); border-radius: 10px;
+      padding: 20px 24px; font-size: 15px; line-height: 1.9; outline: none; background: #fff;
+    }
+    #body-editor:focus { border-color: var(--primary); }
+    #body-editor h3 { font-size: 18px; font-weight: 700; margin: 24px 0 10px; color: #111; }
+    #body-editor h3:first-child { margin-top: 0; }
+    #body-editor p { margin: 0 0 14px; }
+    #body-editor ul, #body-editor ol { margin: 0 0 14px 20px; }
+    #body-editor li { margin-bottom: 6px; }
+    #body-editor blockquote { margin: 0 0 14px; padding: 12px 16px; border-left: 4px solid var(--primary); background: #f5f9fc; color: #445; }
+    #body-editor .imgph { margin: 0 0 14px; padding: 14px 16px; border: 1px dashed #bcc6d4; border-radius: 8px; background: #f8fafc; color: #7c8794; font-size: 13px; }
+
+    .meta-bar { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--sub); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+    .meta-bar b { color: var(--text); }
+
+    /* 태그 */
+    .tag-wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tag { background: #eef4f9; color: #2a6899; border-radius: 20px; padding: 5px 12px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .tag button { background: none; border: none; color: #7fa3c0; cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+
+    /* 광고법 검사 */
+    .chk-item { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; line-height: 1.6; align-items: flex-start; }
+    .chk-item.high { background: #fdeeee; border: 1px solid #f6cccc; }
+    .chk-item.warn { background: #fff7e8; border: 1px solid #f6e2bd; }
+    .chk-item.ok { background: #eefaf1; border: 1px solid #c9ecd5; }
+    .chk-item .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 20px; flex-shrink: 0; margin-top: 2px; }
+    .chk-item.high .badge { background: var(--danger); color: #fff; }
+    .chk-item.warn .badge { background: var(--warn); color: #fff; }
+    .chk-item.ok .badge { background: #27ae60; color: #fff; }
+    .chk-item .why { color: var(--sub); font-size: 12px; margin-top: 2px; }
+    .chk-item mark { background: #ffe08a; padding: 0 2px; border-radius: 2px; }
+    .chk-item .law { display: inline-block; font-size: 10.5px; font-weight: 700; color: #5b6472; background: #eceff4; border-radius: 4px; padding: 1px 6px; margin-top: 5px; }
+    .rv-state { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+    .rv-state.stale { background: #fff1d6; color: #9a6b06; }
+    .rv-state.pass { background: #e4f6ea; color: #1d7a44; }
+    .rv-state.fail { background: #fdeaea; color: #c22; }
+
+    /* 발행 */
+    .pub-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+    .pub-row .form-group { margin-bottom: 0; }
+
+    /* 로딩 */
+    #overlay { position: fixed; inset: 0; background: rgba(20,26,38,0.55); display: none; align-items: center; justify-content: center; z-index: 900; flex-direction: column; gap: 14px; color: #fff; }
+    #overlay.on { display: flex; }
+    .spin { width: 36px; height: 36px; border: 3px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: sp 0.8s linear infinite; }
+    @keyframes sp { to { transform: rotate(360deg); } }
+    #overlay .msg { font-size: 14px; }
+
+    #toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: #1e2535; color: #fff; padding: 12px 22px; border-radius: 10px; font-size: 14px; z-index: 1000; transition: transform 0.25s; box-shadow: 0 8px 30px rgba(0,0,0,0.25); }
+    #toast.on { transform: translateX(-50%) translateY(0); }
+
+    .notice { background: #fff8e6; border: 1px solid #f5e3b3; color: #7a5c12; border-radius: 10px; padding: 12px 16px; font-size: 12.5px; line-height: 1.7; margin-bottom: 16px; }
+    .notice b { color: #5d4409; }
+
+    /* ── 템플릿 ── */
+    .tpl-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 12px; border: 1px dashed var(--border); border-radius: 8px; margin-bottom: 14px; font-size: 13px; background: #fafbfd; }
+    .tpl-bar .none { color: #98a0ad; }
+    .tpl-bar .cur { font-weight: 700; color: var(--primary); }
+    .tpl-bar .outline { font-size: 11px; color: #98a0ad; width: 100%; line-height: 1.6; }
+
+    .modal { position: fixed; inset: 0; background: rgba(20,26,38,0.5); display: none; align-items: center; justify-content: center; z-index: 950; padding: 20px; }
+    .modal.on { display: flex; }
+    .modal-box { background: var(--white); border-radius: 14px; width: 100%; max-width: 760px; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 70px rgba(0,0,0,0.3); }
+    .modal-head { padding: 16px 22px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+    .modal-head h4 { font-size: 15px; font-weight: 700; }
+    .modal-head button { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--sub); line-height: 1; }
+    .modal-tabs { display: flex; gap: 4px; padding: 10px 22px 0; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .modal-tab { padding: 9px 16px; font-size: 13px; font-weight: 700; color: var(--sub); cursor: pointer; border-bottom: 2px solid transparent; }
+    .modal-tab.on { color: var(--primary); border-bottom-color: var(--primary); }
+    .modal-body { padding: 18px 22px 22px; overflow-y: auto; }
+    .tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(224px, 1fr)); gap: 10px; }
+    .tpl-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px; cursor: pointer; transition: border-color 0.15s, background 0.15s; }
+    .tpl-card:hover { border-color: var(--primary); background: #f7fbff; }
+    .tpl-card.on { border-color: var(--primary); background: #eef6fd; }
+    .tpl-card .n { font-size: 13.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .tpl-card .d { font-size: 11.5px; color: var(--sub); margin-top: 5px; line-height: 1.5; }
+    .tpl-card .o { font-size: 11px; color: #98a0ad; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); line-height: 1.6; }
+    .tpl-card .del { float: right; background: none; border: none; color: #c9ced8; cursor: pointer; font-size: 15px; line-height: 1; padding: 0; }
+    .tpl-card .del:hover { color: var(--danger); }
+    .modal-foot { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; flex-shrink: 0; background: #fafbfd; }
+    .modal-foot .left-note { margin-right: auto; font-size: 11.5px; color: #98a0ad; align-self: center; line-height: 1.5; }
+
+    /* 스니펫 메뉴 */
+    .snip-menu { position: absolute; background: var(--white); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 34px rgba(0,0,0,0.16); padding: 6px; z-index: 940; display: none; min-width: 230px; }
+    .snip-menu.on { display: block; }
+    .snip-menu div { padding: 9px 12px; font-size: 13px; border-radius: 7px; cursor: pointer; }
+    .snip-menu div:hover { background: #f0f5fa; color: var(--primary); }
+    .snip-menu .sep { padding: 6px 12px 4px; font-size: 10.5px; font-weight: 700; color: #b3bac6; cursor: default; }
+    .snip-menu .sep:hover { background: none; color: #b3bac6; }
+
+    @media (max-width: 900px) {
+      .sidebar { width: 200px; }
+      .content { padding: 16px 14px 60px; }
+      .card { padding: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <h1>📝 블로그 스튜디오</h1>
+    <p>네이버 블로그 포스팅 초안 작성·관리</p>
+    <input type="email" id="login-email" placeholder="이메일" />
+    <input type="password" id="login-pw" placeholder="비밀번호" />
+    <button id="login-btn">로그인</button>
+    <p id="login-error">이메일 또는 비밀번호가 올바르지 않습니다.</p>
+  </div>
+</div>
+
+<div class="sidebar">
+  <div class="sidebar-logo">📝 블로그 스튜디오<span id="hospital-label">병원 블로그</span></div>
+  <button class="sidebar-new" id="new-post-btn">+ 새 글 작성</button>
+  <div class="post-list" id="post-list"></div>
+  <div class="sidebar-bottom">
+    <a href="/admin/">관리자</a>
+    <button id="logout-btn">로그아웃</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="topbar">
+    <h2 id="top-title">글을 선택하세요</h2>
+    <div class="topbar-actions">
+      <span class="status-txt" id="save-status"></span>
+      <button class="btn sm" id="delete-btn">삭제</button>
+      <button class="btn primary" id="save-btn">저장</button>
+    </div>
+  </div>
+
+  <div class="content" id="content">
+    <div class="empty" id="empty-state">
+      <div style="font-size:40px">📝</div>
+      <div style="font-size:16px;font-weight:700;color:#445">왼쪽에서 글을 선택하거나 새 글을 작성하세요</div>
+      <div style="font-size:13px">AI가 병원 정보를 반영해 네이버 블로그 초안을 만들어 줍니다.</div>
+    </div>
+
+    <div id="editor-wrap" style="display:none">
+
+      <div class="notice">
+        <b>네이버는 공식 자동 발행 API를 제공하지 않습니다.</b> (2020년 5월 '글쓰기 API' 종료)<br />
+        여기서 초안을 완성한 뒤 <b>「스마트에디터용 복사」</b> → 네이버 블로그 글쓰기 창에 <b>Ctrl+V</b> 로 붙여넣어 발행하세요. 서식(소제목·목록·인용)이 그대로 옮겨집니다.
+      </div>
+
+      <!-- 1. 글감 설정 -->
+      <div class="card">
+        <h3>
+          <span class="h-left">1️⃣ 글감 설정</span>
+          <span class="h-actions">
+            <button class="btn sm" id="tpl-open-btn">📋 템플릿 넣기</button>
+            <button class="btn sm" id="tpl-save-btn">현재 글을 템플릿으로 저장</button>
+          </span>
+        </h3>
+        <div class="tpl-bar" id="tpl-bar">
+          <span class="none">선택된 템플릿 없음 — 「📋 템플릿 넣기」로 글의 뼈대를 고르면 AI가 그 구성대로 씁니다.</span>
+        </div>
+        <div class="row">
+          <div class="form-group" style="flex:2">
+            <label>주제 / 소재</label>
+            <input type="text" id="f-topic" placeholder="비워두면 키워드로 글감을 추천해 드립니다" />
+            <div class="hint">키워드만 넣고 「✨ AI로 초안 생성」을 눌러도 됩니다 — 글감 후보를 먼저 보여드립니다.</div>
+          </div>
+          <div class="form-group">
+            <label>글 유형</label>
+            <select id="f-type">
+              <option>질환 정보</option>
+              <option>치료법·시술 소개</option>
+              <option>자주 묻는 질문(Q&amp;A)</option>
+              <option>생활 관리·예방 수칙</option>
+              <option>계절·시즌 이슈</option>
+              <option>병원 소식·안내</option>
+              <option>의료진 칼럼</option>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <div class="form-group">
+            <label>주 키워드 (검색 노출 목표) *</label>
+            <input type="text" id="f-keyword" placeholder="예: 진주 어깨통증" />
+            <div class="hint">제목·첫 문단·소제목에 자연스럽게 배치됩니다.</div>
+          </div>
+          <div class="form-group">
+            <label>보조 키워드 (쉼표 구분)</label>
+            <input type="text" id="f-subkeywords" placeholder="예: 회전근개파열, 오십견, 비수술치료" />
+          </div>
+        </div>
+        <div class="row">
+          <div class="form-group">
+            <label>톤</label>
+            <select id="f-tone">
+              <option>전문적이고 신뢰감 있게</option>
+              <option>쉽고 친근하게</option>
+              <option>따뜻한 상담 톤</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>분량</label>
+            <select id="f-length">
+              <option value="short">짧게 (800~1,200자)</option>
+              <option value="normal" selected>보통 (1,500~2,000자)</option>
+              <option value="long">길게 (2,500~3,000자)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>이미지 삽입 안내</label>
+            <select id="f-imgmode">
+              <option value="on" selected>본문에 위치 안내 넣기</option>
+              <option value="off">넣지 않기</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>꼭 넣을 내용 / 참고사항 (선택)</label>
+          <textarea id="f-brief" placeholder="예: 도수치료실 새로 오픈, FIMS 시술 강조, 주차 안내 포함"></textarea>
+        </div>
+        <div class="idea-wrap" id="idea-wrap" style="display:none">
+          <div class="idea-head" id="idea-head"></div>
+          <div id="idea-list"></div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn primary" id="gen-btn">✨ AI로 초안 생성</button>
+          <button class="btn" id="idea-btn">💡 글감 다시 추천</button>
+          <button class="btn" id="regen-body-btn">본문만 다시 쓰기</button>
+          <button class="btn" id="gen-titles-btn">제목만 다시 뽑기</button>
+        </div>
+      </div>
+
+      <!-- 2. 제목 -->
+      <div class="card">
+        <h3>
+          <span class="h-left">2️⃣ 제목</span>
+          <span class="h-actions"><button class="btn sm" id="copy-title-btn">제목 복사</button></span>
+        </h3>
+        <div class="form-group">
+          <label>발행할 제목</label>
+          <input type="text" id="f-title" placeholder="제목을 입력하거나 아래 후보에서 고르세요" />
+          <div class="hint">네이버 검색 노출에는 <b>공백 포함 25~35자</b>가 무난합니다. 현재 <b id="title-len">0</b>자</div>
+        </div>
+        <div id="title-cands"></div>
+      </div>
+
+      <!-- 3. 본문 -->
+      <div class="card">
+        <h3>
+          <span class="h-left">3️⃣ 본문</span>
+          <span class="h-actions">
+            <button class="btn sm" id="snip-btn">＋ 문단 넣기</button>
+            <button class="btn sm" id="copy-body-btn">📋 스마트에디터용 복사</button>
+            <button class="btn sm" id="copy-plain-btn">텍스트만 복사</button>
+          </span>
+        </h3>
+        <div id="body-editor" contenteditable="true"></div>
+        <div class="meta-bar">
+          <span>공백 포함 <b id="cnt-all">0</b>자</span>
+          <span>공백 제외 <b id="cnt-nospace">0</b>자</span>
+          <span>주 키워드 <b id="cnt-kw">0</b>회</span>
+          <span>소제목 <b id="cnt-h">0</b>개</span>
+          <span>이미지 자리 <b id="cnt-img">0</b>개</span>
+        </div>
+      </div>
+
+      <!-- 4. 태그 -->
+      <div class="card">
+        <h3>
+          <span class="h-left">4️⃣ 해시태그</span>
+          <span class="h-actions"><button class="btn sm" id="copy-tags-btn">태그 복사</button></span>
+        </h3>
+        <div class="tag-wrap" id="tag-wrap"></div>
+        <div class="form-group" style="margin-top:12px;margin-bottom:0">
+          <input type="text" id="tag-input" placeholder="태그 입력 후 Enter (# 없이 입력해도 됩니다)" />
+          <div class="hint">네이버는 글당 최대 30개까지 등록됩니다.</div>
+        </div>
+      </div>
+
+      <!-- 5. 의료광고법 검사 -->
+      <div class="card">
+        <h3>
+          <span class="h-left">5️⃣ 의료광고법 검수 <span class="rv-state" id="review-state"></span></span>
+          <span class="h-actions">
+            <button class="btn sm" id="scan-btn">다시 검사</button>
+            <button class="btn sm" id="ai-review-btn">🔍 AI 정밀 검수</button>
+          </span>
+        </h3>
+        <div id="check-result"></div>
+        <div class="hint" style="margin-top:10px">
+          검수 기준: <b id="law-version"></b> 전문(국가법령정보센터)을 AI에게 그대로 제공해 판정합니다.
+          다만 이는 <b>보조 검사</b>이며 최종 책임은 게시 주체에 있습니다. 사전심의 대상 매체에 게재할 때는 별도 심의 절차를 확인하세요.
+        </div>
+      </div>
+
+      <!-- 6. 발행 기록 -->
+      <div class="card">
+        <h3><span class="h-left">6️⃣ 발행 기록</span></h3>
+        <div class="pub-row">
+          <div class="form-group" style="flex:2;min-width:240px">
+            <label>네이버 블로그 글 주소</label>
+            <input type="text" id="f-naverurl" placeholder="https://blog.naver.com/아이디/글번호" />
+          </div>
+          <button class="btn naver" id="mark-pub-btn">발행 완료로 표시</button>
+          <button class="btn" id="open-naver-btn">네이버 글쓰기 열기 ↗</button>
+        </div>
+        <div class="hint" style="margin-top:10px">붙여넣기로 발행한 뒤, 글 주소를 여기에 저장해 두면 목록에서 발행 여부를 한눈에 볼 수 있습니다.</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- 템플릿 모달 -->
+<div class="modal" id="tpl-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h4>📋 글 템플릿</h4>
+      <button id="tpl-close">×</button>
+    </div>
+    <div class="modal-tabs">
+      <div class="modal-tab on" data-tab="builtin">내장 템플릿</div>
+      <div class="modal-tab" data-tab="mine">내 템플릿 <span id="mine-count"></span></div>
+    </div>
+    <div class="modal-body">
+      <div class="tpl-grid" id="tpl-grid"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="left-note" id="tpl-note">템플릿을 고르면 AI가 그 구성대로 글을 씁니다.</span>
+      <button class="btn" id="tpl-clear">선택 해제</button>
+      <button class="btn" id="tpl-outline-btn">뼈대만 본문에 넣기</button>
+      <button class="btn primary" id="tpl-apply-btn">이 템플릿으로 쓰기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 문단 스니펫 메뉴 -->
+<div class="snip-menu" id="snip-menu"></div>
+
+<div id="overlay"><div class="spin"></div><div class="msg" id="overlay-msg">AI가 작성 중입니다…</div></div>
+<div id="toast"></div>
+
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
+
+const app = initializeApp({
+  apiKey: "AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",
+  authDomain: "newworld-1a1d5.firebaseapp.com",
+  projectId: "newworld-1a1d5",
+  storageBucket: "newworld-1a1d5.firebasestorage.app",
+  messagingSenderId: "948363397391",
+  appId: "1:948363397391:web:5d7dee7a383f3bdec0167a"
+});
+const db = getFirestore(app);
+const auth = getAuth(app);
+const functions = getFunctions(app, 'asia-northeast3');
+const aiProxy = httpsCallable(functions, 'aiProxy', { timeout: 300000 });
+
+const AI_MODEL = 'claude-opus-5';
+const $ = (id) => document.getElementById(id);
+
+/* ────────── 상태 ────────── */
+let posts = [];          // 목록
+let current = null;      // 편집 중인 글
+let site = {};           // 병원 기본 정보 (site/content)
+let tags = [];
+let dirty = false;
+
+/* ────────── 로그인 ────────── */
+onAuthStateChanged(auth, (user) => {
+  $('login-screen').style.display = user ? 'none' : 'flex';
+  if (user) { loadSite(); loadPosts(); }
+});
+$('login-btn').addEventListener('click', async () => {
+  try {
+    await signInWithEmailAndPassword(auth, $('login-email').value, $('login-pw').value);
+  } catch (e) { $('login-error').style.display = 'block'; }
+});
+['login-email', 'login-pw'].forEach((id) =>
+  $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') $('login-btn').click(); })
+);
+$('logout-btn').addEventListener('click', () => signOut(auth));
+
+/* ────────── 공통 UI ────────── */
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._tm); t._tm = setTimeout(() => t.classList.remove('on'), 2200);
+}
+function busy(on, msg) {
+  $('overlay').classList.toggle('on', !!on);
+  if (msg) $('overlay-msg').textContent = msg;
+}
+function markDirty() { dirty = true; $('save-status').textContent = '● 저장되지 않음'; }
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ────────── 병원 정보 ────────── */
+async function loadSite() {
+  try {
+    const snap = await getDoc(doc(db, 'site', 'content'));
+    if (snap.exists()) {
+      site = snap.data();
+      if (site.hospitalName) $('hospital-label').textContent = site.hospitalName;
+    }
+  } catch (e) { console.warn('site load', e); }
+}
+function hospitalContext() {
+  const L = [];
+  if (site.hospitalName) L.push('병원명: ' + site.hospitalName);
+  if (site.address) L.push('주소: ' + site.address);
+  if (site.phone) L.push('전화: ' + site.phone);
+  if (site.parking) L.push('주차: ' + site.parking);
+  const h = [site.hoursWeekday && ('평일 ' + site.hoursWeekday), site.hoursSat && ('토요일 ' + site.hoursSat),
+             site.hoursLunch && ('점심 ' + site.hoursLunch), site.hoursSun && ('일요일 ' + site.hoursSun)].filter(Boolean);
+  if (h.length) L.push('진료시간: ' + h.join(' / '));
+  if (Array.isArray(site.departments) && site.departments.length)
+    L.push('진료과목: ' + site.departments.map((d) => d.name).filter(Boolean).join(', '));
+  if (Array.isArray(site.doctors) && site.doctors.length)
+    L.push('의료진: ' + site.doctors.map((d) => [d.name, d.dept].filter(Boolean).join(' ')).filter(Boolean).join(', '));
+  return L.length ? L.join('\n') : '(등록된 병원 정보 없음)';
+}
+
+/* ────────── 목록 ────────── */
+async function loadPosts(selectId) {
+  try {
+    const q = query(collection(db, 'blogPosts'), orderBy('updatedAt', 'desc'), limit(100));
+    const snap = await getDocs(q);
+    posts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  } catch (e) {
+    console.warn('list', e);
+    posts = [];
+  }
+  renderPosts();
+  if (selectId) openPost(selectId);
+}
+function renderPosts() {
+  const el = $('post-list');
+  if (!posts.length) {
+    el.innerHTML = '<div style="padding:16px;font-size:12px;color:rgba(255,255,255,0.35);line-height:1.7">아직 작성한 글이 없습니다.<br />「+ 새 글 작성」을 눌러 시작하세요.</div>';
+    return;
+  }
+  el.innerHTML = posts.map((p) => {
+    const st = p.status === 'published' ? 'published' : 'draft';
+    const label = st === 'published' ? '발행' : '초안';
+    const d = (p.updatedAt || '').slice(0, 10);
+    return '<div class="post-item' + (current && current.id === p.id ? ' active' : '') + '" data-id="' + p.id + '">'
+      + '<div class="t">' + esc(p.title || p.topic || '(제목 없음)') + '</div>'
+      + '<div class="m"><span class="pill ' + st + '">' + label + '</span><span>' + d + '</span></div></div>';
+  }).join('');
+  el.querySelectorAll('.post-item').forEach((it) => {
+    it.addEventListener('click', () => {
+      if (dirty && !confirm('저장하지 않은 변경사항이 있습니다. 이동할까요?')) return;
+      openPost(it.dataset.id);
+    });
+  });
+}
+function esc(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* ────────── 글 열기 / 새 글 ────────── */
+$('new-post-btn').addEventListener('click', () => {
+  if (dirty && !confirm('저장하지 않은 변경사항이 있습니다. 새 글을 시작할까요?')) return;
+  current = {
+    id: null, title: '', topic: '', keyword: '', subKeywords: '',
+    type: '질환 정보', tone: '전문적이고 신뢰감 있게', length: 'normal',
+    imgMode: 'on', brief: '', bodyHtml: '', tags: [], titleCands: [], tplKey: '', ideas: [], review: null,
+    status: 'draft', naverUrl: ''
+  };
+  fillForm(); showEditor(true); renderPosts();
+  dirty = false; $('save-status').textContent = '';
+  $('f-topic').focus();
+});
+function openPost(id) {
+  const p = posts.find((x) => x.id === id);
+  if (!p) return;
+  current = JSON.parse(JSON.stringify(p));
+  fillForm(); showEditor(true); renderPosts();
+  dirty = false; $('save-status').textContent = '';
+}
+function showEditor(on) {
+  $('editor-wrap').style.display = on ? 'block' : 'none';
+  $('empty-state').style.display = on ? 'none' : 'flex';
+}
+function fillForm() {
+  const c = current;
+  $('f-topic').value = c.topic || '';
+  $('f-type').value = c.type || '질환 정보';
+  $('f-keyword').value = c.keyword || '';
+  $('f-subkeywords').value = c.subKeywords || '';
+  $('f-tone').value = c.tone || '전문적이고 신뢰감 있게';
+  $('f-length').value = c.length || 'normal';
+  $('f-imgmode').value = c.imgMode || 'on';
+  $('f-brief').value = c.brief || '';
+  $('f-title').value = c.title || '';
+  $('f-naverurl').value = c.naverUrl || '';
+  $('body-editor').innerHTML = c.bodyHtml || '';
+  tags = Array.isArray(c.tags) ? c.tags.slice() : [];
+  renderTags(); renderTitleCands(c.titleCands || []); renderTplBar(); renderIdeas(); updateStats(); scanAds();
+  if (c.review && (c.review.issues || []).length) renderReviewResult(c.review); else renderReviewState();
+  $('top-title').textContent = c.title || c.topic || '새 글';
+}
+function readForm() {
+  const c = current;
+  c.topic = $('f-topic').value.trim();
+  c.type = $('f-type').value;
+  c.keyword = $('f-keyword').value.trim();
+  c.subKeywords = $('f-subkeywords').value.trim();
+  c.tone = $('f-tone').value;
+  c.length = $('f-length').value;
+  c.imgMode = $('f-imgmode').value;
+  c.brief = $('f-brief').value.trim();
+  c.title = $('f-title').value.trim();
+  c.naverUrl = $('f-naverurl').value.trim();
+  c.bodyHtml = $('body-editor').innerHTML;
+  c.tags = tags.slice();
+  return c;
+}
+['f-topic','f-type','f-keyword','f-subkeywords','f-tone','f-length','f-imgmode','f-brief','f-title','f-naverurl']
+  .forEach((id) => $(id).addEventListener('input', () => {
+    markDirty();
+    if (id === 'f-title') { $('title-len').textContent = $('f-title').value.length; $('top-title').textContent = $('f-title').value || '새 글'; renderReviewState(); }
+    if (id === 'f-keyword') { updateStats(); renderIdeas(); }
+    if (id === 'f-topic') renderIdeas();   // 직접 고쳐도 선택 표시가 따라오도록
+  }));
+$('body-editor').addEventListener('input', () => { markDirty(); updateStats(); renderReviewState(); });
+$('body-editor').addEventListener('blur', scanAds);
+
+/* ────────── 저장 / 삭제 ────────── */
+$('save-btn').addEventListener('click', savePost);
+async function savePost() {
+  if (!current) return;
+  const c = readForm();
+  if (!c.title && !c.topic) { toast('제목이나 주제를 먼저 입력하세요.'); return; }
+  const now = new Date().toISOString();
+  const data = {
+    title: c.title, topic: c.topic, keyword: c.keyword, subKeywords: c.subKeywords,
+    type: c.type, tone: c.tone, length: c.length, imgMode: c.imgMode, brief: c.brief,
+    bodyHtml: c.bodyHtml, tags: c.tags, titleCands: c.titleCands || [],
+    tplKey: c.tplKey || '', ideas: c.ideas || [], review: c.review || null,
+    status: c.status || 'draft', naverUrl: c.naverUrl || '',
+    publishedAt: c.publishedAt || '', updatedAt: now, createdAt: c.createdAt || now
+  };
+  $('save-status').textContent = '저장 중…';
+  try {
+    if (c.id) {
+      await setDoc(doc(db, 'blogPosts', c.id), data);
+    } else {
+      const ref = await addDoc(collection(db, 'blogPosts'), data);
+      current.id = ref.id;
+    }
+    current.createdAt = data.createdAt;
+    dirty = false; $('save-status').textContent = '✓ 저장됨';
+    setTimeout(() => { if (!dirty) $('save-status').textContent = ''; }, 2500);
+    await loadPosts();
+    toast('저장되었습니다.');
+  } catch (e) {
+    $('save-status').textContent = '저장 실패';
+    toast('저장 실패: ' + (e.message || e));
+  }
+}
+$('delete-btn').addEventListener('click', async () => {
+  if (!current) return;
+  if (!current.id) { current = null; showEditor(false); dirty = false; renderPosts(); return; }
+  if (!confirm('이 글을 삭제할까요? 되돌릴 수 없습니다.')) return;
+  try {
+    await deleteDoc(doc(db, 'blogPosts', current.id));
+    current = null; showEditor(false); dirty = false;
+    await loadPosts(); toast('삭제했습니다.');
+  } catch (e) { toast('삭제 실패: ' + (e.message || e)); }
+});
+
+/* ────────── AI 호출 ────────── */
+function aiText(res) {
+  const blocks = (res && res.data && res.data.content) || [];
+  return blocks.filter((b) => b && b.type === 'text').map((b) => b.text || '').join('').trim();
+}
+function parseAiJson(txt) {
+  if (!txt) return null;
+  let s = txt.trim();
+  s = s.replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '').trim();
+  const a = s.indexOf('{'), b = s.lastIndexOf('}');
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try { return JSON.parse(s); } catch (e) { }
+  try { return JSON.parse(s.replace(/,\s*([}\]])/g, '$1')); } catch (e) { }
+  return null;
+}
+async function callAi(system, userText, maxTokens) {
+  const res = await aiProxy({
+    body: {
+      model: AI_MODEL,
+      max_tokens: maxTokens || 16000,
+      thinking: { type: 'adaptive' },
+      output_config: { effort: 'medium' },
+      system: system,
+      messages: [{ role: 'user', content: userText }]
+    }
+  });
+  return aiText(res);
+}
+
+const LENGTH_MAP = { short: '공백 포함 800~1,200자', normal: '공백 포함 1,500~2,000자', long: '공백 포함 2,500~3,000자' };
+
+/* ══════════════════════ 의료광고 관계 법령 전문 ══════════════════════
+   출처: 국가법령정보센터(law.go.kr).
+   의료법 [시행 2026. 4. 7.] 법률 제21524호 / 의료법 시행령 [시행 2026. 2. 10.] 대통령령 제36083호
+   ※ 법 개정 시 이 상수를 갱신할 것. LAW_VERSION 을 화면에 표시한다. */
+const LAW_VERSION = '의료법 제56조(시행 2026.4.7) · 시행령 제23조(시행 2026.2.10)';
+const MEDICAL_AD_LAW = [
+  '【의료법 제56조(의료광고의 금지 등)】 [시행 2026. 4. 7.] [법률 제21524호]',
+  '① 의료기관 개설자, 의료기관의 장 또는 의료인(이하 "의료인등"이라 한다)이 아닌 자는 의료에 관한 광고(의료인등이 신문·잡지·음성·음향·영상·인터넷·인쇄물·간판, 그 밖의 방법에 의하여 의료행위, 의료기관 및 의료인등에 대한 정보를 소비자에게 나타내거나 알리는 행위를 말한다. 이하 "의료광고"라 한다)를 하지 못한다.',
+  '② 의료인등은 다음 각 호의 어느 하나에 해당하는 의료광고를 하지 못한다.',
+  '  1. 제53조에 따른 평가를 받지 아니한 신의료기술에 관한 광고',
+  '  2. 환자에 관한 치료경험담 등 소비자로 하여금 치료 효과를 오인하게 할 우려가 있는 내용의 광고',
+  '  3. 거짓된 내용을 표시하는 광고',
+  '  4. 다른 의료인등의 기능 또는 진료 방법과 비교하는 내용의 광고',
+  '  5. 다른 의료인등을 비방하는 내용의 광고',
+  '  6. 수술 장면 등 직접적인 시술행위를 노출하는 내용의 광고',
+  '  7. 의료인등의 기능, 진료 방법과 관련하여 심각한 부작용 등 중요한 정보를 누락하는 광고',
+  '  8. 객관적인 사실을 과장하는 내용의 광고',
+  '  9. 법적 근거가 없는 자격이나 명칭을 표방하는 내용의 광고',
+  '  10. 신문, 방송, 잡지 등을 이용하여 기사(記事) 또는 전문가의 의견 형태로 표현되는 광고',
+  '  11. 제57조에 따른 심의를 받지 아니하거나 심의받은 내용과 다른 내용의 광고',
+  '  12. 제27조제3항에 따라 외국인환자를 유치하기 위한 국내광고',
+  '  13. 소비자를 속이거나 소비자로 하여금 잘못 알게 할 우려가 있는 방법으로 제45조에 따른 비급여 진료비용을 할인하거나 면제하는 내용의 광고',
+  '  14. 각종 상장·감사장 등을 이용하는 광고 또는 인증·보증·추천을 받았다는 내용을 사용하거나 이와 유사한 내용을 표현하는 광고. 다만, 다음 각 목의 어느 하나에 해당하는 경우는 제외한다.',
+  '     가. 제58조에 따른 의료기관 인증을 표시한 광고',
+  '     나. 「정부조직법」 제2조부터 제4조까지의 규정에 따른 중앙행정기관·특별지방행정기관 및 그 부속기관, 「지방자치법」 제2조에 따른 지방자치단체 또는 「공공기관의 운영에 관한 법률」 제4조에 따른 공공기관으로부터 받은 인증·보증을 표시한 광고',
+  '     다. 다른 법령에 따라 받은 인증·보증을 표시한 광고',
+  '     라. 세계보건기구와 협력을 맺은 국제평가기구로부터 받은 인증을 표시한 광고 등 대통령령으로 정하는 광고',
+  '  15. 그 밖에 의료광고의 방법 또는 내용이 국민의 보건과 건전한 의료경쟁의 질서를 해치거나 소비자에게 피해를 줄 우려가 있는 것으로서 대통령령으로 정하는 내용의 광고',
+  '③ 의료광고는 다음 각 호의 방법으로는 하지 못한다.',
+  '  1. 「방송법」 제2조제1호의 방송',
+  '  2. 그 밖에 국민의 보건과 건전한 의료경쟁의 질서를 유지하기 위하여 제한할 필요가 있는 경우로서 대통령령으로 정하는 방법',
+  '④ 제2항에 따라 금지되는 의료광고의 구체적인 내용 등 의료광고에 관하여 필요한 사항은 대통령령으로 정한다.',
+  '',
+  '【의료법 시행령 제23조(의료광고의 금지 기준)】 [시행 2026. 2. 10.] [대통령령 제36083호]',
+  '① 법 제56조제2항에 따라 금지되는 의료광고의 구체적인 기준은 다음 각 호와 같다.',
+  '  1. 법 제53조에 따른 신의료기술평가를 받지 아니한 신의료기술에 관하여 광고하는 것',
+  '  2. 특정 의료기관·의료인의 기능 또는 진료 방법이 질병 치료에 반드시 효과가 있다고 표현하거나 환자의 치료경험담이나 6개월 이하의 임상경력을 광고하는 것',
+  '  3. 의료인, 의료기관, 의료서비스 및 의료 관련 각종 사항에 대하여 객관적인 사실과 다른 내용 등 거짓된 내용을 광고하는 것',
+  '  4. 특정 의료기관 개설자, 의료기관의 장 또는 의료인(이하 "의료인등"이라 한다)이 수행하거나 광고하는 기능 또는 진료 방법이 다른 의료인등의 것과 비교하여 우수하거나 효과가 있다는 내용으로 광고하는 것',
+  '  5. 다른 의료인등을 비방할 목적으로 해당 의료인등이 수행하거나 광고하는 기능 또는 진료 방법에 관하여 불리한 사실을 광고하는 것',
+  '  6. 의료인이 환자를 수술하는 장면이나 환자의 환부(患部) 등을 촬영한 동영상·사진으로서 일반인에게 혐오감을 일으키는 것을 게재하여 광고하는 것',
+  '  7. 의료인등의 의료행위나 진료 방법 등을 광고하면서 예견할 수 있는 환자의 안전에 심각한 위해(危害)를 끼칠 우려가 있는 부작용 등 중요 정보를 빠뜨리거나 글씨 크기를 작게 하는 등의 방법으로 눈에 잘 띄지 않게 광고하는 것',
+  '  8. 의료인, 의료기관, 의료서비스 및 의료 관련 각종 사항에 대하여 객관적인 사실을 과장하는 내용으로 광고하는 것',
+  '  9. 법적 근거가 없는 자격이나 명칭을 표방하는 내용을 광고하는 것',
+  '  10. 특정 의료기관·의료인의 기능 또는 진료 방법에 관한 기사나 전문가의 의견을 신문·인터넷신문 또는 정기간행물이나 방송에 싣거나 방송하면서 특정 의료기관·의료인의 연락처나 약도 등의 정보도 함께 싣거나 방송하여 광고하는 것',
+  '  11. 법 제57조제1항에 따라 심의 대상이 되는 의료광고를 심의를 받지 아니하고 광고하거나 심의 받은 내용과 다르게 광고하는 것',
+  '  12. 외국인환자를 유치할 목적으로 법 제27조제3항에 따른 행위를 하기 위하여 국내광고 하는 것',
+  '  13. 법 제45조에 따른 비급여 진료비용의 할인·면제 금액, 대상, 기간이나 범위 또는 할인·면제 이전의 비급여 진료비용에 대하여 허위 또는 불명확한 내용이나 정보 등을 게재하여 광고하는 것',
+  '  14. 각종 상장·감사장 등을 이용하여 광고하는 것 또는 인증·보증·추천을 받았다는 내용을 사용하거나 이와 유사한 내용을 표현하여 광고하는 것. 다만, 법 제56조제2항제14호 각 목의 어느 하나에 해당하는 경우는 제외한다.'
+].join('\n');
+
+/* ══════════════════════ 템플릿 ══════════════════════ */
+/* outline = 소제목 흐름. AI 프롬프트에 그대로 주입되고, 「뼈대만 넣기」에도 쓰인다. */
+const BLOG_TEMPLATES = [
+  { key: 'disease', icon: '🩺', name: '질환 정보형', type: '질환 정보',
+    desc: '증상에 공감하며 시작해 질환을 설명하고 치료로 연결하는 가장 무난한 구성',
+    outline: ['이런 증상, 겪고 계신가요', '어떤 질환일까요', '왜 생기나요', '이럴 때는 진료를 받아보세요', '어떻게 치료하나요'] },
+  { key: 'treat', icon: '💉', name: '치료법 소개형', type: '치료법·시술 소개',
+    desc: '특정 치료·시술을 소개할 때. 대상 → 원리 → 과정 → 주의사항 순서',
+    outline: ['어떤 분들이 받게 되나요', '어떤 치료인가요', '치료는 이렇게 진행됩니다', '치료 후 주의할 점', '자주 묻는 질문'] },
+  { key: 'qna', icon: '💬', name: 'Q&A형', type: '자주 묻는 질문(Q&A)',
+    desc: '실제 진료실에서 자주 듣는 질문을 문답으로. 검색 유입에 강한 편',
+    outline: ['Q. 증상이 있으면 무조건 검사해야 하나요', 'Q. 꼭 수술을 해야 하나요', 'Q. 치료 기간은 얼마나 걸리나요', 'Q. 재발할 수도 있나요', 'Q. 일상생활은 언제부터 가능한가요'] },
+  { key: 'care', icon: '🧘', name: '생활 관리형', type: '생활 관리·예방 수칙',
+    desc: '집에서 할 수 있는 관리법 중심. 저장·공유가 잘 되는 유형',
+    outline: ['왜 평소 관리가 중요할까요', '집에서 할 수 있는 관리법', '이런 습관은 피해주세요', '이럴 때는 병원을 찾으세요'] },
+  { key: 'season', icon: '🍂', name: '계절·시즌형', type: '계절·시즌 이슈',
+    desc: '환절기·명절·휴가철 등 시기 이슈에 맞춰. 시의성 검색을 노릴 때',
+    outline: ['이맘때 유독 늘어나는 증상', '왜 이 시기에 많을까요', '미리 예방하는 방법', '증상이 생겼다면'] },
+  { key: 'news', icon: '📢', name: '병원 소식형', type: '병원 소식·안내',
+    desc: '장비 도입·진료 시간 변경·휴진 안내 등. 짧고 명확하게',
+    outline: ['안내드립니다', '자세한 내용', '이용에 참고해 주세요'] },
+  { key: 'column', icon: '✍️', name: '의료진 칼럼형', type: '의료진 칼럼',
+    desc: '진료실에서 본 사례로 시작하는 1인칭 칼럼. 신뢰감을 쌓을 때',
+    outline: ['진료실에서 자주 만나는 상황', '의학적으로는 이렇습니다', '흔한 오해 바로잡기', '환자분들께 드리고 싶은 말씀'] },
+  { key: 'compare', icon: '⚖️', name: '비교·선택 가이드형', type: '치료법·시술 소개',
+    desc: '치료 방법이 여러 개일 때 차이를 정리. "A와 B 차이" 검색 대응',
+    outline: ['두 가지를 헷갈리시는 이유', '무엇이 다른가요', '어떤 경우에 어느 쪽인가요', '결정 전 확인할 것'] }
+];
+
+/* 자주 쓰는 문단 — 병원 정보는 저장된 값으로 자동 채움 */
+function snippetDefs() {
+  const name = site.hospitalName || '저희 병원';
+  const hours = [site.hoursWeekday && ('평일 ' + site.hoursWeekday), site.hoursSat && ('토요일 ' + site.hoursSat),
+                 site.hoursLunch && ('점심시간 ' + site.hoursLunch), site.hoursSun && ('일요일 ' + site.hoursSun)].filter(Boolean);
+  return [
+    { grp: '마무리' },
+    { name: '상담 권유 마무리', html:
+      '<p>같은 증상이라도 원인은 사람마다 다르고, 그에 따라 필요한 치료도 달라집니다. 증상이 이어진다면 자가 판단보다 진료를 통해 정확한 상태를 확인해 보시는 것이 좋습니다.</p>' },
+    { name: '개인차 안내 문구', html:
+      '<p>본 내용은 일반적인 정보 제공을 위한 것으로, 실제 진단과 치료는 개인의 상태에 따라 달라질 수 있습니다.</p>' },
+    { grp: '병원 안내' },
+    { name: '병원 안내 (주소·전화·시간)', html:
+      '<h3>' + esc(name) + ' 안내</h3>'
+      + (site.address ? '<p>주소: ' + esc(site.address) + '</p>' : '')
+      + (site.phone ? '<p>전화: ' + esc(site.phone) + '</p>' : '')
+      + (hours.length ? '<ul>' + hours.map((h) => '<li>' + esc(h) + '</li>').join('') + '</ul>' : '')
+      + (site.parking ? '<p>주차: ' + esc(site.parking) + '</p>' : '') },
+    { name: '진료시간만', html: hours.length
+      ? '<h3>진료시간</h3><ul>' + hours.map((h) => '<li>' + esc(h) + '</li>').join('') + '</ul>'
+      : '<h3>진료시간</h3><p>관리자 페이지에 진료시간을 먼저 등록해 주세요.</p>' },
+    { name: '오시는 길·주차', html:
+      '<h3>오시는 길</h3>'
+      + (site.address ? '<p>' + esc(site.address) + '</p>' : '<p>주소를 입력해 주세요.</p>')
+      + (site.parking ? '<p>' + esc(site.parking) + '</p>' : '') },
+    { grp: '본문 조각' },
+    { name: '소제목', html: '<h3>소제목을 입력하세요</h3>' },
+    { name: '체크리스트', html: '<h3>이런 경우라면 확인해 보세요</h3><ul><li>항목을 입력하세요</li><li>항목을 입력하세요</li><li>항목을 입력하세요</li></ul>' },
+    { name: '강조 인용구', html: '<blockquote>강조하고 싶은 한 문장을 적어보세요.</blockquote>' },
+    { name: '사진 자리', html: '<div class="imgph">📷 이미지 자리 — 어떤 사진을 넣을지 적어두세요</div>' }
+  ];
+}
+
+/* ── 내 템플릿 (localStorage — 빌더의 내 템플릿 라이브러리와 같은 방식) ── */
+const MY_TPL_KEY = 'hw_blog_templates';
+function getMyTpls() { try { return JSON.parse(localStorage.getItem(MY_TPL_KEY) || '[]'); } catch (e) { return []; } }
+function setMyTpls(a) {
+  try { localStorage.setItem(MY_TPL_KEY, JSON.stringify(a)); }
+  catch (e) { toast('저장 공간이 부족합니다. 오래된 템플릿을 지워주세요.'); }
+}
+function currentOutline() {
+  return Array.from($('body-editor').querySelectorAll('h3'))
+    .map((h) => (h.textContent || '').trim()).filter(Boolean);
+}
+$('tpl-save-btn').addEventListener('click', () => {
+  const outline = currentOutline();
+  if (!outline.length) { toast('본문에 소제목이 있어야 템플릿으로 저장할 수 있습니다.'); return; }
+  const c = readForm();
+  const nm = (prompt('템플릿 이름:', c.type + ' 템플릿') || '').trim();
+  if (!nm) return;
+  const arr = getMyTpls();
+  const item = { key: 'my_' + Date.now(), icon: '⭐', name: nm, mine: true,
+    desc: '내가 저장한 템플릿 · 소제목 ' + outline.length + '개',
+    outline: outline, type: c.type, tone: c.tone, length: c.length };
+  const dup = arr.findIndex((t) => t.name === nm);
+  if (dup >= 0) { if (!confirm('같은 이름의 템플릿이 있습니다. 덮어쓸까요?')) return; arr[dup] = item; }
+  else arr.unshift(item);
+  setMyTpls(arr);
+  toast('"' + nm + '" 템플릿으로 저장했습니다.');
+});
+
+/* ── 모달 ── */
+let tplTab = 'builtin';
+let tplPick = null;   // 모달에서 고른 것 (아직 적용 전)
+function openTplModal() { tplPick = current && current.tplKey ? findTpl(current.tplKey) : null; renderTplGrid(); $('tpl-modal').classList.add('on'); }
+function closeTplModal() { $('tpl-modal').classList.remove('on'); }
+function findTpl(key) { return BLOG_TEMPLATES.concat(getMyTpls()).find((t) => t.key === key) || null; }
+$('tpl-open-btn').addEventListener('click', openTplModal);
+$('tpl-close').addEventListener('click', closeTplModal);
+$('tpl-modal').addEventListener('click', (e) => { if (e.target === $('tpl-modal')) closeTplModal(); });
+document.querySelectorAll('.modal-tab').forEach((t) =>
+  t.addEventListener('click', () => {
+    tplTab = t.dataset.tab;
+    document.querySelectorAll('.modal-tab').forEach((x) => x.classList.toggle('on', x === t));
+    renderTplGrid();
+  }));
+function renderTplGrid() {
+  const mine = getMyTpls();
+  $('mine-count').textContent = mine.length ? '(' + mine.length + ')' : '';
+  const list = tplTab === 'mine' ? mine : BLOG_TEMPLATES;
+  const el = $('tpl-grid');
+  if (!list.length) {
+    el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--sub);font-size:13px;line-height:1.8">저장된 템플릿이 없습니다.<br />마음에 드는 글을 완성한 뒤 「현재 글을 템플릿으로 저장」을 눌러보세요.</div>';
+    return;
+  }
+  el.innerHTML = list.map((t) =>
+    '<div class="tpl-card' + (tplPick && tplPick.key === t.key ? ' on' : '') + '" data-key="' + t.key + '">'
+    + (t.mine ? '<button class="del" data-del="' + t.key + '" title="삭제">×</button>' : '')
+    + '<div class="n">' + (t.icon || '📄') + ' ' + esc(t.name) + '</div>'
+    + '<div class="d">' + esc(t.desc || '') + '</div>'
+    + '<div class="o">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('<br />') + '</div></div>').join('');
+  el.querySelectorAll('.tpl-card').forEach((cd) =>
+    cd.addEventListener('click', (e) => {
+      if (e.target.dataset.del) return;
+      tplPick = findTpl(cd.dataset.key); renderTplGrid();
+    }));
+  el.querySelectorAll('.del').forEach((b) =>
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!confirm('이 템플릿을 삭제할까요?')) return;
+      setMyTpls(getMyTpls().filter((t) => t.key !== b.dataset.del));
+      if (tplPick && tplPick.key === b.dataset.del) tplPick = null;
+      renderTplGrid(); toast('삭제했습니다.');
+    }));
+}
+/* 템플릿에 딸린 설정(글 유형·톤·분량)을 폼에 반영 — 적용/뼈대넣기 양쪽에서 공통 사용 */
+function applyTplSettings(t) {
+  current.tplKey = t.key;
+  if (t.type) $('f-type').value = t.type;
+  if (t.tone) $('f-tone').value = t.tone;
+  if (t.length) $('f-length').value = t.length;
+}
+$('tpl-apply-btn').addEventListener('click', () => {
+  if (!tplPick) { toast('템플릿을 먼저 고르세요.'); return; }
+  applyTplSettings(tplPick);
+  renderTplBar(); markDirty(); closeTplModal();
+  toast('"' + tplPick.name + '" 적용 — 이제 「✨ AI로 초안 생성」을 누르세요.');
+});
+$('tpl-outline-btn').addEventListener('click', () => {
+  if (!tplPick) { toast('템플릿을 먼저 고르세요.'); return; }
+  const cur = $('body-editor').innerHTML.trim();
+  if (cur && !confirm('본문에 내용이 있습니다. 뼈대를 뒤에 이어붙일까요?')) return;
+  const skeleton = tplPick.outline.map((o) =>
+    '<h3>' + esc(o) + '</h3><p>내용을 입력하세요.</p>').join('');
+  $('body-editor').innerHTML = cur + skeleton;
+  applyTplSettings(tplPick);
+  renderTplBar(); markDirty(); updateStats(); closeTplModal();
+  toast('뼈대를 넣었습니다. 소제목 아래에 직접 작성하세요.');
+});
+$('tpl-clear').addEventListener('click', () => {
+  tplPick = null; current.tplKey = '';
+  renderTplBar(); renderTplGrid(); markDirty();
+});
+function renderTplBar() {
+  const t = current && current.tplKey ? findTpl(current.tplKey) : null;
+  $('tpl-bar').innerHTML = t
+    ? '<span class="cur">' + (t.icon || '📄') + ' ' + esc(t.name) + '</span>'
+      + '<span style="color:#98a0ad;font-size:12px">구성대로 작성됩니다</span>'
+      + '<div class="outline">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('　') + '</div>'
+    : '<span class="none">선택된 템플릿 없음 — 「📋 템플릿 넣기」로 글의 뼈대를 고르면 AI가 그 구성대로 씁니다.</span>';
+}
+
+/* ── 문단 스니펫 삽입 ── */
+let savedRange = null;
+$('body-editor').addEventListener('mouseup', saveRange);
+$('body-editor').addEventListener('keyup', saveRange);
+function saveRange() {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && $('body-editor').contains(sel.anchorNode)) savedRange = sel.getRangeAt(0).cloneRange();
+}
+$('snip-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const m = $('snip-menu');
+  if (m.classList.contains('on')) { m.classList.remove('on'); return; }
+  m.innerHTML = snippetDefs().map((s, i) => s.grp
+    ? '<div class="sep">' + esc(s.grp) + '</div>'
+    : '<div data-i="' + i + '">' + esc(s.name) + '</div>').join('');
+  m.querySelectorAll('[data-i]').forEach((d) =>
+    d.addEventListener('click', () => { insertSnippet(snippetDefs()[+d.dataset.i].html); m.classList.remove('on'); }));
+  const r = e.currentTarget.getBoundingClientRect();
+  m.style.top = (window.scrollY + r.bottom + 6) + 'px';
+  m.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 250)) + 'px';
+  m.classList.add('on');
+});
+document.addEventListener('click', () => $('snip-menu').classList.remove('on'));
+function insertSnippet(html) {
+  const ed = $('body-editor');
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  const frag = document.createDocumentFragment();
+  const nodes = Array.from(tmp.childNodes);
+  nodes.forEach((n) => frag.appendChild(n));
+  if (savedRange && ed.contains(savedRange.startContainer)) {
+    // 커서가 있던 블록 뒤에 넣는다 (블록 중간을 쪼개지 않도록)
+    let block = savedRange.startContainer;
+    while (block && block.parentNode !== ed) block = block.parentNode;
+    if (block) block.after(frag); else ed.appendChild(frag);
+  } else {
+    ed.appendChild(frag);
+  }
+  const last = nodes[nodes.length - 1];
+  if (last && last.scrollIntoView) last.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  markDirty(); updateStats(); scanAds();
+  toast('문단을 넣었습니다.');
+}
+
+function writerSystem() {
+  return [
+    '당신은 대한민국 병원 블로그를 전담하는 의료 콘텐츠 작가입니다. 네이버 블로그에 발행할 글을 씁니다.',
+    '',
+    '[병원 정보]',
+    hospitalContext(),
+    '',
+    '[반드시 지켜야 할 관계 법령 — 아래 조문을 위반하는 표현은 절대 쓰지 마라]',
+    MEDICAL_AD_LAW,
+    '',
+    '[위 조문을 블로그 글쓰기에 적용한 실무 지침]',
+    '- 시행령 제23조제1항제2호에 따라, 치료 효과를 단정하는 표현(반드시 효과가 있다, 완치, 부작용 없음, 무통, 통증 없이 등)은 쓰지 마라. "도움이 될 수 있습니다", "호전을 기대할 수 있습니다" 처럼 가능성으로 서술하라.',
+    '- 같은 호에 따라 환자 치료경험담·후기를 인용하거나 지어내지 마라. 6개월 이하 임상경력도 광고하지 마라.',
+    '- 법 제56조제2항제8호·시행령 제8호에 따라 객관적 사실을 과장하지 마라. 최고·최상·유일·제일·1위·최초·완벽·100% 같은 최상급 표현을 쓰지 마라.',
+    '- 법 제56조제2항제4호·제5호에 따라 다른 병원·의료인과 비교하거나 비방하지 마라.',
+    '- 법 제56조제2항제13호에 따라 비급여 진료비 할인·면제·무료·이벤트를 광고하지 마라.',
+    '- 법 제56조제2항제9호에 따라 법적 근거 없는 자격·명칭(전문병원, ○○센터 등)을 표방하지 마라.',
+    '- 법 제56조제2항제7호에 따라 시술·수술을 소개할 때는 부작용이나 주의사항 등 중요 정보를 빠뜨리지 마라.',
+    '- 법 제56조제2항제3호에 따라 근거 없는 통계·수치(성공률 O%, 만족도 O% 등)를 지어내지 마라.',
+    '- 진단·치료 결과는 개인차가 있으며 의료진 상담이 필요하다는 취지를 자연스럽게 포함하라.',
+    '',
+    '[문체 규칙]',
+    '- 한 문단은 2~4문장으로 짧게. 네이버 블로그는 모바일 가독성이 중요합니다.',
+    '- 소제목을 3~5개 사용해 흐름을 나눕니다.',
+    '- 과장 없이 담백하게. 이모지는 소제목에 쓰지 않습니다.',
+    '- 병원명·전화번호는 글 마지막 안내 부분에서만 자연스럽게 1회 언급합니다.'
+  ].join('\n');
+}
+
+function genUserPrompt(mode) {
+  const c = readForm();
+  const wantImg = c.imgMode !== 'off';
+  const L = [];
+  L.push('아래 조건으로 네이버 블로그 글을 작성하세요.');
+  L.push('');
+  L.push('- 주제: ' + (c.topic || '(미입력)'));
+  L.push('- 글 유형: ' + c.type);
+  L.push('- 주 키워드: ' + (c.keyword || '(없음)'));
+  if (c.subKeywords) L.push('- 보조 키워드: ' + c.subKeywords);
+  L.push('- 톤: ' + c.tone);
+  L.push('- 분량: ' + (LENGTH_MAP[c.length] || LENGTH_MAP.normal));
+  if (c.brief) L.push('- 꼭 포함할 내용: ' + c.brief);
+  L.push('');
+  const tpl = c.tplKey ? findTpl(c.tplKey) : null;
+  if (tpl && mode !== 'titles') {
+    L.push('[반드시 따를 글 구성 — "' + tpl.name + '" 템플릿]');
+    L.push('아래 순서대로 소제목(h 블록)을 두고, 각 소제목 아래에 해당 내용을 쓰세요.');
+    tpl.outline.forEach((o, i) => L.push((i + 1) + '. ' + o));
+    L.push('소제목 문구는 이 주제에 맞게 자연스럽게 다듬어도 되지만, 순서와 역할은 바꾸지 마세요.');
+    L.push('');
+  }
+  if (c.keyword) {
+    L.push('주 키워드 "' + c.keyword + '"는 제목에 1회, 첫 문단에 1회, 소제목 중 1곳, 본문 전체에서 3~5회 자연스럽게 등장시키세요. 억지로 반복하지 마세요.');
+    L.push('');
+  }
+  L.push('아래 JSON 형식으로만 답하세요. 설명·인사말·코드펜스 없이 JSON 객체 하나만 출력합니다.');
+  L.push('');
+  L.push('{');
+  if (mode !== 'body') L.push('  "titles": ["제목 후보 5개, 각 25~35자, 주 키워드 포함, 낚시성 금지"],');
+  if (mode !== 'titles') {
+    L.push('  "blocks": [');
+    L.push('    {"type":"p","text":"문단 본문"},');
+    L.push('    {"type":"h","text":"소제목"},');
+    L.push('    {"type":"list","items":["항목1","항목2"]},');
+    L.push('    {"type":"quote","text":"강조하고 싶은 한 문장"}' + (wantImg ? ',' : ''));
+    if (wantImg) L.push('    {"type":"image","text":"여기에 넣을 사진 설명 (예: 어깨 통증 부위를 짚는 사진)"}');
+    L.push('  ],');
+    L.push('  "tags": ["해시태그 10~15개, # 없이 단어만, 지역명+진료과목 조합 포함"]');
+  } else {
+    L.push('  "titles": ["..."]');
+  }
+  L.push('}');
+  if (mode !== 'titles') {
+    L.push('');
+    L.push('blocks 규칙: 첫 블록은 반드시 독자의 상황에 공감하는 도입 문단(p)입니다. 마지막에는 의료진 상담 권유와 병원 안내 문단을 넣습니다.');
+    if (wantImg) L.push('image 블록은 2~4개, 소제목 사이에 배치하세요.');
+    else L.push('image 블록은 사용하지 마세요.');
+  }
+  return L.join('\n');
+}
+
+/* ══════════════════════ 글감 추천 (키워드 → 후보 5개) ══════════════════════ */
+/* 이미 쓴 글과 겹치지 않게, 기존 글 제목·주제를 AI에게 알려준다 */
+function writtenSoFar(keyword) {
+  const mine = posts
+    .filter((p) => !keyword || (p.keyword || '').includes(keyword) || (keyword || '').includes(p.keyword || ''))
+    .map((p) => (p.topic || p.title || '').trim())
+    .filter(Boolean)
+    .slice(0, 25);
+  return Array.from(new Set(mine));
+}
+function ideaUserPrompt() {
+  const c = readForm();
+  const done = writtenSoFar(c.keyword);
+  const L = [];
+  L.push('네이버 블로그에 올릴 병원 글의 "글감"을 정하려 합니다.');
+  L.push('');
+  L.push('- 노리는 검색 키워드: ' + c.keyword);
+  if (c.subKeywords) L.push('- 보조 키워드: ' + c.subKeywords);
+  if (c.brief) L.push('- 참고사항: ' + c.brief);
+  L.push('');
+  L.push('이 키워드로 검색하는 사람이 실제로 궁금해할 만한 글감 5개를 제안하세요.');
+  L.push('규칙:');
+  L.push('- 5개가 서로 다른 각도여야 합니다. (증상 판별 / 질환 구분 / 치료 방법 / 자가 관리 / 내원 시점 등)');
+  L.push('- 각 글감은 하나의 글로 끝까지 쓸 수 있을 만큼 구체적이어야 합니다. 뭉뚱그린 주제는 금지입니다.');
+  L.push('- 병원 홍보 문구가 아니라, 독자의 궁금증을 담은 문장으로 적으세요.');
+  if (done.length) {
+    L.push('- 아래는 이미 쓴 글입니다. 주제가 겹치는 것은 제안하지 마세요.');
+    done.forEach((t) => L.push('  · ' + t));
+  }
+  L.push('');
+  L.push('각 글감에 어울리는 글 구성 템플릿도 아래에서 하나 고르세요.');
+  BLOG_TEMPLATES.forEach((t) => L.push('  ' + t.key + ' = ' + t.name + ' (' + t.outline.join(' → ') + ')'));
+  L.push('');
+  L.push('아래 JSON만 출력하세요(설명·코드펜스 금지).');
+  L.push('{"ideas":[{"topic":"글감 한 문장","why":"이 글감을 왜 검색하는지 한 줄","tpl":"위 키 중 하나"}]}');
+  return L.join('\n');
+}
+$('idea-btn').addEventListener('click', suggestIdeas);
+async function suggestIdeas() {
+  const c = readForm();
+  if (!c.keyword) { toast('주 키워드를 먼저 입력하세요.'); $('f-keyword').focus(); return; }
+  busy(true, '"' + c.keyword + '"로 쓸 만한 글감을 찾는 중…');
+  try {
+    const out = parseAiJson(await callAi(writerSystem(), ideaUserPrompt(), 4000));
+    const ideas = out && Array.isArray(out.ideas) ? out.ideas.filter((i) => i && i.topic) : [];
+    if (!ideas.length) { toast('글감을 받지 못했습니다. 다시 시도해 주세요.'); return; }
+    current.ideas = ideas;
+    renderIdeas();
+    markDirty();
+    toast('글감 ' + ideas.length + '개 — 하나 고르면 그 주제로 씁니다.');
+  } catch (e) {
+    toast('글감 추천 실패: ' + (e.message || e));
+  } finally { busy(false); }
+}
+function renderIdeas() {
+  const ideas = (current && current.ideas) || [];
+  const wrap = $('idea-wrap');
+  if (!ideas.length) { wrap.style.display = 'none'; $('idea-list').innerHTML = ''; return; }
+  wrap.style.display = 'block';
+  const kw = $('f-keyword').value.trim();
+  $('idea-head').innerHTML = '💡 <span class="k">' + esc(kw) + '</span> 로 쓸 만한 글감 — 하나를 고르세요';
+  const cur = $('f-topic').value.trim();
+  $('idea-list').innerHTML = ideas.map((it, i) => {
+    const t = findTpl(it.tpl);
+    return '<div class="idea-card' + (it.topic === cur ? ' sel' : '') + '" data-i="' + i + '">'
+      + '<span class="num">' + (i + 1) + '</span><div>'
+      + '<div class="t">' + esc(it.topic) + '</div>'
+      + (it.why ? '<div class="w">' + esc(it.why) + '</div>' : '')
+      + (t ? '<div class="tp">추천 구성 · ' + (t.icon || '📄') + ' ' + esc(t.name) + '</div>' : '')
+      + '</div></div>';
+  }).join('');
+  $('idea-list').querySelectorAll('.idea-card').forEach((cd) =>
+    cd.addEventListener('click', () => pickIdea(+cd.dataset.i)));
+}
+function pickIdea(i) {
+  const it = (current.ideas || [])[i];
+  if (!it) return;
+  $('f-topic').value = it.topic;
+  const t = findTpl(it.tpl);
+  if (t) applyTplSettings(t);
+  renderIdeas(); renderTplBar(); markDirty();
+  toast('"' + it.topic.slice(0, 20) + '…" 선택 — 「✨ AI로 초안 생성」을 누르세요.');
+}
+
+$('gen-btn').addEventListener('click', () => generate('all'));
+$('regen-body-btn').addEventListener('click', () => generate('body'));
+$('gen-titles-btn').addEventListener('click', () => generate('titles'));
+
+async function generate(mode) {
+  const c = readForm();
+  // 주제가 비어 있고 키워드만 있으면 → 글감 추천 단계를 먼저 (A안 흐름)
+  if (!c.topic) {
+    if (c.keyword) { await suggestIdeas(); return; }
+    toast('주제나 주 키워드 중 하나는 입력하세요.'); $('f-keyword').focus(); return;
+  }
+  busy(true, mode === 'titles' ? '제목 후보를 뽑는 중…' : 'AI가 글을 작성 중입니다… (30초~1분)');
+  try {
+    const txt = await callAi(writerSystem(), genUserPrompt(mode), 16000);
+    const out = parseAiJson(txt);
+    if (!out) { toast('AI 응답을 해석하지 못했습니다. 다시 시도해 주세요.'); return; }
+
+    if (mode !== 'body' && Array.isArray(out.titles) && out.titles.length) {
+      current.titleCands = out.titles;
+      renderTitleCands(out.titles);
+      if (mode === 'all' && !$('f-title').value) selectTitle(out.titles[0]);
+    }
+    if (mode !== 'titles' && Array.isArray(out.blocks) && out.blocks.length) {
+      $('body-editor').innerHTML = blocksToHtml(out.blocks);
+    }
+    if (mode !== 'titles' && Array.isArray(out.tags) && out.tags.length) {
+      tags = out.tags.map(normTag).filter(Boolean).slice(0, 30);
+      renderTags();
+    }
+    markDirty(); updateStats(); scanAds();
+    if (mode === 'titles') { toast('제목 후보를 새로 뽑았습니다.'); return; }
+    // 생성 직후 법조문 검수까지 자동으로 돌린다
+    busy(true, '생성된 글을 법조문에 대조해 검수 중…');
+    const r = await runAiReview(true);
+    const high = r ? (r.issues || []).filter((i) => i.level === 'high').length : -1;
+    toast(high === 0 ? '초안 생성 완료 — 검수 통과'
+        : high > 0 ? '초안 생성 완료 — 위반 위험 ' + high + '건, 5️⃣에서 확인하세요'
+        : '초안 생성 완료 (검수는 실패했습니다)');
+  } catch (e) {
+    toast('생성 실패: ' + (e.message || e));
+  } finally { busy(false); }
+}
+
+function blocksToHtml(blocks) {
+  return blocks.map((b) => {
+    if (!b || !b.type) return '';
+    if (b.type === 'h') return '<h3>' + esc(b.text) + '</h3>';
+    if (b.type === 'quote') return '<blockquote>' + esc(b.text) + '</blockquote>';
+    if (b.type === 'image') return '<div class="imgph">📷 이미지 자리 — ' + esc(b.text) + '</div>';
+    if (b.type === 'list') {
+      const items = Array.isArray(b.items) ? b.items : [];
+      return '<ul>' + items.map((i) => '<li>' + esc(i) + '</li>').join('') + '</ul>';
+    }
+    return '<p>' + esc(b.text) + '</p>';
+  }).join('');
+}
+
+/* ────────── 제목 후보 ────────── */
+function renderTitleCands(list) {
+  const el = $('title-cands');
+  if (!list || !list.length) { el.innerHTML = ''; return; }
+  const cur = $('f-title').value;
+  el.innerHTML = list.map((t) =>
+    '<div class="title-cand' + (t === cur ? ' sel' : '') + '" data-t="' + esc(t) + '">'
+    + '<span>' + esc(t) + '</span><span class="len">' + t.length + '자</span></div>').join('');
+  el.querySelectorAll('.title-cand').forEach((it) =>
+    it.addEventListener('click', () => selectTitle(it.dataset.t)));
+}
+function selectTitle(t) {
+  $('f-title').value = t;
+  $('title-len').textContent = t.length;
+  $('top-title').textContent = t;
+  renderTitleCands(current.titleCands || []);
+  markDirty();
+}
+
+/* ────────── 태그 ────────── */
+function normTag(t) {
+  return String(t || '').trim().replace(/^#+/, '').replace(/\s+/g, '').slice(0, 40);
+}
+function renderTags() {
+  $('tag-wrap').innerHTML = tags.map((t, i) =>
+    '<span class="tag">#' + esc(t) + '<button data-i="' + i + '">×</button></span>').join('');
+  $('tag-wrap').querySelectorAll('button').forEach((b) =>
+    b.addEventListener('click', () => { tags.splice(+b.dataset.i, 1); renderTags(); markDirty(); }));
+}
+$('tag-input').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const parts = e.target.value.split(/[,\s]+/).map(normTag).filter(Boolean);
+  parts.forEach((t) => { if (!tags.includes(t) && tags.length < 30) tags.push(t); });
+  e.target.value = ''; renderTags(); markDirty();
+});
+
+/* ────────── 통계 ────────── */
+function bodyText() {
+  const clone = $('body-editor').cloneNode(true);
+  clone.querySelectorAll('.imgph').forEach((n) => n.remove());
+  clone.querySelectorAll('h3,p,li,blockquote,div').forEach((n) => n.append('\n'));
+  return (clone.textContent || '').replace(/\n{2,}/g, '\n').trim();
+}
+function updateStats() {
+  const t = bodyText();
+  $('cnt-all').textContent = t.length;
+  $('cnt-nospace').textContent = t.replace(/\s/g, '').length;
+  const kw = $('f-keyword').value.trim();
+  let n = 0;
+  if (kw) { let i = 0; while ((i = t.indexOf(kw, i)) !== -1) { n++; i += kw.length; } }
+  $('cnt-kw').textContent = n;
+  $('cnt-h').textContent = $('body-editor').querySelectorAll('h3').length;
+  $('cnt-img').textContent = $('body-editor').querySelectorAll('.imgph').length;
+  $('title-len').textContent = $('f-title').value.length;
+}
+
+/* ────────── 의료광고법 검사 ────────── */
+const AD_RULES = [
+  { lv: 'high', why: '최상급·절대적 표현은 의료법 제56조에서 금지됩니다.', re: /최고|최상급|최우수|최첨단|유일한|국내\s*유일|제일\s*잘|1위|최초로|완벽(한|하게|히)?|100\s*%|가장\s*(좋|뛰어|정확|안전)/g },
+  { lv: 'high', why: '치료 효과를 보장·단정하는 표현은 금지됩니다.', re: /완치|반드시\s*(낫|좋아|호전)|부작용\s*(이)?\s*없|무통|통증\s*없이|즉시\s*효과|보장(합니다|해\s*드립니다|됩니다)/g },
+  { lv: 'high', why: '환자 치료경험담·후기 인용은 금지됩니다.', re: /치료\s*후기|환자\s*후기|체험담|후기를\s*보면|한\s*환자분(은|이|께서)/g },
+  { lv: 'high', why: '다른 의료기관과의 비교·비방은 금지됩니다.', re: /타\s*병원(보다|과\s*달리)|다른\s*병원(보다|과\s*달리)|타\s*의원보다/g },
+  { lv: 'high', why: '진료비 할인·무료 제공 등 환자 유인 표현은 금지됩니다.', re: /할인\s*이벤트|이벤트\s*가|무료\s*(시술|검진|치료|이벤트)|경품|사은품|선착순|반값/g },
+  { lv: 'warn', why: '객관적 근거 없는 수치·통계는 문제가 될 수 있습니다. 출처를 함께 밝히세요.', re: /성공률\s*\d|만족도\s*\d+\s*%|\d+\s*%\s*(이상\s*)?(완치|호전|성공)/g },
+  { lv: 'warn', why: '전문의·전문병원 표시는 실제 자격·지정이 있을 때만 사용할 수 있습니다.', re: /전문(의|병원|센터)/g },
+  { lv: 'warn', why: '효과를 단정하는 어감입니다. "도움이 될 수 있습니다" 등으로 완화하세요.', re: /확실히\s*(좋|낫|효과)|틀림없이|무조건/g },
+  { lv: 'warn', why: '시술·수술의 안전을 단정하는 표현은 신중해야 합니다.', re: /안전(합니다|해요|하게)\s*(시술|수술)|위험\s*(이)?\s*없/g }
+];
+$('scan-btn').addEventListener('click', scanAds);
+function scanAds() {
+  const target = $('f-title').value + '\n' + bodyText();
+  const found = [];
+  AD_RULES.forEach((r) => {
+    r.re.lastIndex = 0;
+    const hits = [];
+    let m;
+    while ((m = r.re.exec(target)) !== null) {
+      if (m[0] && !hits.includes(m[0])) hits.push(m[0]);
+      if (m.index === r.re.lastIndex) r.re.lastIndex++;
+      if (hits.length > 6) break;
+    }
+    if (hits.length) found.push({ lv: r.lv, why: r.why, hits: hits });
+  });
+  const el = $('check-result');
+  if (!target.trim()) { el.innerHTML = '<div class="chk-item ok"><span class="badge">-</span><div>본문을 작성하면 자동으로 검사합니다.</div></div>'; return; }
+  if (!found.length) {
+    el.innerHTML = '<div class="chk-item ok"><span class="badge">통과</span><div>규칙 기반 검사에서 걸린 표현이 없습니다.<div class="why">그래도 발행 전 「AI 정밀 검수」로 한 번 더 확인하는 것을 권합니다.</div></div></div>';
+    return;
+  }
+  el.innerHTML = found.map((f) =>
+    '<div class="chk-item ' + f.lv + '"><span class="badge">' + (f.lv === 'high' ? '위반 위험' : '주의') + '</span>'
+    + '<div>' + f.hits.map((h) => '<mark>' + esc(h) + '</mark>').join(' ')
+    + '<div class="why">' + esc(f.why) + '</div></div></div>').join('');
+}
+
+/* ── AI 정밀 검수 (법조문 전문 기반) ──
+   본문·제목이 바뀌면 이전 검수 결과는 '만료'로 표시하고, 복사·발행 시 자동으로 다시 돌린다. */
+$('law-version').textContent = LAW_VERSION;
+function reviewSig() { return ($('f-title').value + ' ' + bodyText()).trim(); }
+function reviewIsFresh() {
+  const r = current && current.review;
+  return !!(r && r.sig === reviewSig());
+}
+function renderReviewState() {
+  const el = $('review-state');
+  const r = current && current.review;
+  if (!r) { el.className = 'rv-state stale'; el.textContent = '미검수'; return; }
+  if (r.sig !== reviewSig()) { el.className = 'rv-state stale'; el.textContent = '검수 후 수정됨 — 다시 검수 필요'; return; }
+  const high = (r.issues || []).filter((i) => i.level === 'high').length;
+  const warn = (r.issues || []).length - high;
+  if (high) { el.className = 'rv-state fail'; el.textContent = '위반 위험 ' + high + '건'; }
+  else if (warn) { el.className = 'rv-state pass'; el.textContent = '위반 없음 · 주의 ' + warn + '건'; }
+  else { el.className = 'rv-state pass'; el.textContent = '검수 통과'; }
+}
+function renderReviewResult(r) {
+  const issues = (r && r.issues) || [];
+  let html;
+  if (!issues.length) {
+    html = '<div class="chk-item ok"><span class="badge">AI 통과</span><div>' + esc(r.verdict || '조문에 저촉되는 표현을 찾지 못했습니다.') + '</div></div>';
+  } else {
+    html = issues.map((i) =>
+      '<div class="chk-item ' + (i.level === 'high' ? 'high' : 'warn') + '"><span class="badge">'
+      + (i.level === 'high' ? '위반 위험' : '주의') + '</span><div><mark>' + esc(i.quote || '') + '</mark>'
+      + '<div class="why">' + esc(i.why || '') + '</div>'
+      + (i.fix ? '<div class="why">→ 제안: ' + esc(i.fix) + '</div>' : '')
+      + (i.law ? '<div class="law">' + esc(i.law) + '</div>' : '')
+      + '</div></div>').join('');
+    if (r.verdict) html += '<div class="hint" style="margin-top:8px">총평: ' + esc(r.verdict) + '</div>';
+  }
+  $('check-result').innerHTML = html;
+  renderReviewState();
+}
+async function runAiReview(quiet) {
+  const t = bodyText();
+  if (!t) { if (!quiet) toast('본문이 비어 있습니다.'); return null; }
+  const sig = reviewSig();
+  if (!quiet) busy(true, '법조문에 대조해 검수 중…');
+  try {
+    const sys = [
+      '당신은 의료광고 심의 경험이 있는 검수자입니다. 아래 법령 전문에 근거해서만 판정하세요.',
+      '조문에 없는 내용을 근거로 지적하지 마세요. 과잉 지적은 검수를 무의미하게 만듭니다.',
+      '',
+      MEDICAL_AD_LAW,
+      '',
+      '판정 기준:',
+      '- level "high" = 위 조문의 특정 호에 직접 저촉되어 실제 제재 가능성이 있는 표현.',
+      '- level "warn" = 조문에 바로 걸리진 않으나 표현을 다듬는 것이 안전한 경우.',
+      '- law 에는 근거 조항을 "의료법 제56조제2항제8호" 처럼 호 단위까지 정확히 적으세요. 근거를 특정할 수 없으면 지적하지 마세요.',
+      '- quote 는 반드시 원문에 그대로 존재하는 구절이어야 합니다. 지어내지 마세요.'
+    ].join('\n');
+    const user = [
+      '아래 병원 블로그 글을 위 법령에 대조해 검수하세요.',
+      '',
+      '[제목] ' + $('f-title').value,
+      '[본문]',
+      t,
+      '',
+      '아래 JSON만 출력하세요(설명·코드펜스 금지).',
+      '{"issues":[{"level":"high|warn","quote":"원문 구절 그대로","law":"근거 조항","why":"왜 저촉되는지","fix":"대체 문장 제안"}],"verdict":"한 줄 총평"}',
+      '저촉되는 표현이 없으면 issues 를 빈 배열로 두세요.'
+    ].join('\n');
+    const out = parseAiJson(await callAi(sys, user, 8000));
+    if (!out) { if (!quiet) toast('검수 응답을 해석하지 못했습니다.'); return null; }
+    const issues = (Array.isArray(out.issues) ? out.issues : []).filter((i) => i && i.quote);
+    const r = { sig: sig, issues: issues, verdict: out.verdict || '', at: new Date().toISOString() };
+    current.review = r;
+    renderReviewResult(r);
+    markDirty();
+    if (!quiet) toast(issues.length ? '검수 완료 — ' + issues.length + '건 확인 필요' : '검수 통과');
+    return r;
+  } catch (e) {
+    if (!quiet) toast('검수 실패: ' + (e.message || e));
+    return null;
+  } finally { if (!quiet) busy(false); }
+}
+$('ai-review-btn').addEventListener('click', () => runAiReview(false));
+
+function highIssues() {
+  const r = current && current.review;
+  return ((r && r.issues) || []).filter((i) => i.level === 'high');
+}
+function violationConfirm(action) {
+  const high = highIssues();
+  if (!high.length) return true;
+  const list = high.slice(0, 5).map((i, n) => (n + 1) + '. ' + (i.quote || '').slice(0, 40) + '   [' + (i.law || '') + ']').join('\n');
+  return confirm('⚠ 의료광고법 위반 위험 ' + high.length + '건이 남아 있습니다.\n\n' + list
+    + (high.length > 5 ? '\n…외 ' + (high.length - 5) + '건' : '')
+    + '\n\n그래도 ' + action + '할까요?');
+}
+/* 복사 관문 — 클립보드는 사용자 클릭 순간에만 쓸 수 있어서 동기로 판정한다.
+   검수가 없거나 만료됐으면 복사를 멈추고 검수를 먼저 돌린다(끝나면 다시 누르면 된다). */
+function copyGate() {
+  if (!bodyText()) return true;
+  if (!reviewIsFresh()) {
+    toast('아직 검수 전입니다 — 지금 검수하니 끝나면 다시 눌러주세요.');
+    runAiReview(false);
+    return false;
+  }
+  return violationConfirm('복사');
+}
+/* 발행 표시 관문 — 클립보드와 무관하므로 비동기로 검수까지 마치고 판정한다 */
+async function publishGate() {
+  if (!bodyText()) return true;
+  if (!reviewIsFresh()) {
+    busy(true, '발행 전 법조문 검수 중…');
+    try { await runAiReview(true); } finally { busy(false); }
+  }
+  if (!(current && current.review)) return confirm('검수를 완료하지 못했습니다. 검수 없이 발행 완료로 표시할까요?');
+  return violationConfirm('발행 완료로 표시');
+}
+
+/* ────────── 복사 ────────── */
+function imgPhToText(root) {
+  root.querySelectorAll('.imgph').forEach((n) => {
+    const p = document.createElement('p');
+    p.textContent = (n.textContent || '').replace(/^📷\s*이미지 자리\s*—\s*/, '[사진 삽입: ') + ']';
+    n.replaceWith(p);
+  });
+}
+function naverHtml() {
+  const clone = $('body-editor').cloneNode(true);
+  imgPhToText(clone);
+  clone.querySelectorAll('[style]').forEach((n) => n.removeAttribute('style'));
+  clone.querySelectorAll('[class]').forEach((n) => n.removeAttribute('class'));
+  return '<div>' + clone.innerHTML + '</div>';
+}
+function naverPlain() {
+  const clone = $('body-editor').cloneNode(true);
+  imgPhToText(clone);
+  const out = [];
+  clone.childNodes.forEach((n) => {
+    if (n.nodeType !== 1) { const t = (n.textContent || '').trim(); if (t) out.push(t); return; }
+    if (n.tagName === 'UL' || n.tagName === 'OL') {
+      n.querySelectorAll('li').forEach((li) => out.push('· ' + (li.textContent || '').trim()));
+    } else {
+      const t = (n.textContent || '').trim();
+      if (t) out.push(t);
+    }
+    out.push('');
+  });
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+async function copyRich(html, plain, okMsg) {
+  try {
+    if (navigator.clipboard && window.ClipboardItem) {
+      await navigator.clipboard.write([new ClipboardItem({
+        'text/html': new Blob([html], { type: 'text/html' }),
+        'text/plain': new Blob([plain], { type: 'text/plain' })
+      })]);
+      toast(okMsg); return;
+    }
+  } catch (e) { /* 폴백으로 진행 */ }
+  try {
+    const tmp = document.createElement('div');
+    tmp.style.cssText = 'position:fixed;left:-9999px;top:0';
+    tmp.innerHTML = html;
+    document.body.appendChild(tmp);
+    const r = document.createRange(); r.selectNodeContents(tmp);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    const ok = document.execCommand('copy');
+    sel.removeAllRanges(); tmp.remove();
+    toast(ok ? okMsg : '복사에 실패했습니다. 본문을 직접 선택해 복사해 주세요.');
+  } catch (e) { toast('복사 실패: ' + (e.message || e)); }
+}
+async function copyPlain(text, okMsg) {
+  try { await navigator.clipboard.writeText(text); toast(okMsg); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px';
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand('copy'); ta.remove();
+    toast(ok ? okMsg : '복사 실패');
+  }
+}
+$('copy-body-btn').addEventListener('click', () => {
+  if (!copyGate()) return;
+  copyRich(naverHtml(), naverPlain(), '복사했습니다. 네이버 글쓰기 창에서 Ctrl+V 하세요.');
+});
+$('copy-plain-btn').addEventListener('click', () => {
+  if (!copyGate()) return;
+  copyPlain(naverPlain(), '텍스트를 복사했습니다.');
+});
+$('copy-title-btn').addEventListener('click', () => copyPlain($('f-title').value, '제목을 복사했습니다.'));
+$('copy-tags-btn').addEventListener('click', () => copyPlain(tags.map((t) => '#' + t).join(' '), '태그를 복사했습니다.'));
+
+/* ────────── 발행 기록 ────────── */
+$('open-naver-btn').addEventListener('click', () => window.open('https://blog.naver.com/', '_blank', 'noopener'));
+$('mark-pub-btn').addEventListener('click', async () => {
+  if (!current) return;
+  const url = $('f-naverurl').value.trim();
+  if (!url) { toast('네이버 글 주소를 입력하세요.'); $('f-naverurl').focus(); return; }
+  if (!(await publishGate())) return;
+  current.status = 'published';
+  current.publishedAt = new Date().toISOString();
+  await savePost();
+  toast('발행 완료로 표시했습니다.');
+});
+</script>
+</body>
+</html>

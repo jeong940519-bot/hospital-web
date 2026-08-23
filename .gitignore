@@ -6,3 +6,6 @@ node_modules/
 .env.local
 
 editor.html.baseline.bak
+
+# 로컬 백업 (배포·커밋 대상 아님)
+backup/
