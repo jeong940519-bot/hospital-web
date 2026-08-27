@@ -19,6 +19,12 @@
   _CDN_FONTS['SUIT']=_CDN_FONTS['SUIT Regular'];
   _CDN_FONTS['SUITE']=_CDN_FONTS['SUITE Regular'];
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  /* 게시판 글은 boardId 로 묶인다. 기본값이 "요소 자체 id" 라서, PC 페이지와 모바일 페이지에
+     따로 놓은 게시판은 서로 완전히 다른 게시판이 된다 — PC 에서 쓴 글이 폰에서 안 보인다.
+     boardKey 를 같은 값으로 맞추면 하나로 합쳐진다.
+     편집기(글 관리)와 발행본(글 목록·작성)이 같은 규칙을 써야 하므로 여기 한 곳에만 둔다. */
+  function boardKeyOf(e){ return (e && (e.boardKey || e.id)) || ''; }
   // 표 셀 4방향 테두리 — 변별 폭/색/선스타일(cell.bd[side]= 숫자(레거시) | {w,c,s} | 0/{w:0}없음) — 편집기와 동일 규칙
   function tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2):s==='dotted'?w+','+(w*1.6):''; }
   function tblBdResolve(e,cell,side){
@@ -432,7 +438,7 @@
       return '<div class="el hw-map" data-map-address="'+esc(e.address||'')+'" data-map-level="'+(e.level||3)+'" style="'+base+'overflow:hidden;border-radius:8px;background:#eef0f5"></div>';
     } else if(e.type==='board'){
       var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
-      return '<div class="el hw-board" data-board-id="'+e.id+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
+      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
         +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:16px;font-size:13px">불러오는 중…</div></div>';
     } else if(e.type==='shape'){
       if(e.shape==='line'||e.shape==='line-arrow'){
@@ -883,5 +889,5 @@
       +'<\/script>';
   }
 
-  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS};
+  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS, boardKeyOf:boardKeyOf};
 })();

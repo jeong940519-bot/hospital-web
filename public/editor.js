@@ -3338,6 +3338,18 @@ function renderProps(){
     html += `<div class="grp"><label>배경색 / 강조색</label><div class="row"><button type="button" class="panel-cbtn" id="bd-bg" data-cpkey="boardBg" title="배경색"><span style="background:${e.bg||'#ffffff'}"></span></button><button type="button" class="panel-cbtn" id="bd-accent" data-cpkey="boardAccent" title="강조색(버튼 등)"><span style="background:${e.accent||'#2b6cff'}"></span></button></div></div>`;
     html += `<div class="grp"><label>페이지당 글 수</label><input type="number" id="bd-pagesize" min="3" max="50" value="${e.pageSize||10}"></div>`;
     html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-secret" ${e.allowSecret!==false?'checked':''} style="width:auto"> 비밀글 허용(작성자가 비밀번호로 잠금)</label></div>`;
+    // 글 저장소 — PC/모바일 게시판을 하나로 묶는 곳. 기본값(자기 id)이면 각자 따로 논다.
+    {
+      const _bk=_boardKey(e), _seen=new Set(), _opts=[];
+      _allBoards().forEach(({pg, el:bel}) => {
+        const k=_boardKey(bel); if(_seen.has(k)) return; _seen.add(k);
+        const dev = pg.device==='mobile' ? '모바일' : pg.device==='pc' ? 'PC' : '공용';
+        const lbl = `${pg.name||'페이지'} (${dev})` + (bel===e ? ' — 이 게시판' : '');
+        _opts.push(`<option value="${k}" ${k===_bk?'selected':''}>${escapeHtml(lbl)}</option>`);
+      });
+      html += `<div class="grp"><label>글 저장소</label><select id="bd-key">${_opts.join('')}</select>`
+        + `<div style="font-size:11px;color:var(--sub);padding:4px 2px">PC·모바일 게시판을 같은 저장소로 두면 어느 쪽에서 쓴 글이든 양쪽에 다 보입니다.</div></div>`;
+    }
     html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
   }else if(e.type==='map'){
     html += `<div class="grp"><label>주소</label><input type="text" id="mp-address" value="${escapeHtml(e.address||'')}" placeholder="예: 경남 진주시 진주대로 871"></div>`;
@@ -3615,8 +3627,14 @@ function bindProps(e){
     $('bd-pagesize').addEventListener('input',()=>{ e.pageSize=Math.max(3,parseInt($('bd-pagesize').value)||10); save(true); });
     $('bd-pagesize').addEventListener('change',snapshot);
     $('bd-secret').addEventListener('change',()=>{ e.allowSecret=$('bd-secret').checked; save(true); snapshot(); });
-    $('bd-manage').addEventListener('click',()=>openBoardManage(e));
-    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
+    $('bd-key').addEventListener('change', async ()=>{
+      const oldKey=_boardKey(e), newKey=$('bd-key').value;
+      if(!newKey || newKey===oldKey) return;
+      e.boardKey=newKey; save(true); snapshot(); renderCanvas();
+      await _moveBoardPosts(oldKey, newKey);
+      renderProps();
+    });
+    $('bd-manage').addEventListener('click',()=>openBoardManage(e));    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
       CP_TARGETS.boardBg={ label:'게시판 배경색', rich:false,
         current:()=>{ const x=selId?el(selId):null; return (x&&x.bg)||'#ffffff'; },
         set:v=>{ const x=selId?el(selId):null; if(x){ x.bg=v; renderCanvas(); save(true); } } };
@@ -5846,6 +5864,33 @@ async function checkFontSources(){
   }
   return bad;
 }
+// 게시판 글 저장소 키 — 규칙은 site-render.js 한 곳에 있다(편집기·발행본이 갈리면 글이 사라진 것처럼 보인다).
+const _boardKey = (e) => (window.SiteRender && window.SiteRender.boardKeyOf)
+  ? window.SiteRender.boardKeyOf(e)
+  : ((e && (e.boardKey || e.id)) || '');
+function _allBoards(){
+  const out=[];
+  (project.pages||[]).forEach(pg => (pg.elements||[]).forEach(el => { if(el.type==='board') out.push({pg, el}); }));
+  return out;
+}
+// 저장소를 옮기면 예전 키로 쌓인 글은 화면에서 사라진다 — 지워진 걸로 보이므로 옮길지 물어본다.
+async function _moveBoardPosts(oldKey, newKey){
+  if(!oldKey || oldKey===newKey) return;
+  let qs;
+  try{ qs = await getDocs(query(collection(db,'boardPosts'), where('boardId','==',oldKey), limit(300))); }
+  catch(err){ toast('이전 글을 확인하지 못했습니다: '+(err.message||err)); return; }
+  if(qs.empty) return;
+  if(!isAdmin){ toast(`이전 저장소에 글 ${qs.size}개가 남아 있습니다 — 로그인하면 옮길 수 있습니다`); return; }
+  if(!confirm(`이전 저장소에 글 ${qs.size}개가 있습니다.
+새 저장소로 옮길까요?
+
+옮기지 않으면 그 글은 홈페이지에서 안 보입니다.`)) return;
+  try{
+    for(const d of qs.docs) await setDoc(doc(db,'boardPosts',d.id), {boardId:newKey}, {merge:true});
+    toast(`글 ${qs.size}개를 옮겼습니다`);
+  }catch(err){ toast('글 옮기기 실패: '+(err.message||err)); }
+}
+
 // ── 게시판 글 관리(관리자) ──
 async function openBoardManage(e){
   if(!isAdmin){ toast('로그인이 필요합니다'); openLogin(); return; }
@@ -5855,7 +5900,7 @@ async function openBoardManage(e){
   status.textContent='불러오는 중…'; list.innerHTML=''; m.style.display='flex';
   const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
   try{
-    const qs=await getDocs(query(collection(db,'boardPosts'), where('boardId','==',e.id), orderBy('createdAt','desc'), limit(200)));
+    const qs=await getDocs(query(collection(db,'boardPosts'), where('boardId','==',_boardKey(e)), orderBy('createdAt','desc'), limit(200)));
     if(qs.empty){ status.textContent='아직 작성된 글이 없습니다'; return; }
     status.textContent=qs.size+'개';
     list.innerHTML=qs.docs.map(d=>{
