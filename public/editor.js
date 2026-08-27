@@ -2449,6 +2449,7 @@ function renderEl(e){
     node.style.overflow='hidden';
     node.style.display='flex'; node.style.flexDirection='column';
     node.style.boxSizing='border-box'; node.style.fontFamily="'Noto Sans KR',sans-serif";
+    node.style.setProperty('--hwb-k', String((( +e.baseFont)||13)/13));   // 발행본과 같은 배율
     node.appendChild(buildBoardPreview(e));
   }else if(e.type==='map'){
     node.style.background='#eef0f5';
@@ -3337,6 +3338,11 @@ function renderProps(){
     html += `<div class="grp"><label>게시판 제목</label><input type="text" id="bd-title" value="${escapeHtml(e.title||'게시판')}"></div>`;
     html += `<div class="grp"><label>배경색 / 강조색</label><div class="row"><button type="button" class="panel-cbtn" id="bd-bg" data-cpkey="boardBg" title="배경색"><span style="background:${e.bg||'#ffffff'}"></span></button><button type="button" class="panel-cbtn" id="bd-accent" data-cpkey="boardAccent" title="강조색(버튼 등)"><span style="background:${e.accent||'#2b6cff'}"></span></button></div></div>`;
     html += `<div class="grp"><label>페이지당 글 수</label><input type="number" id="bd-pagesize" min="3" max="50" value="${e.pageSize||10}"></div>`;
+    // 게시판 안쪽 치수 — 글자·여백·버튼이 전부 이 값에 비례한다.
+    // 페이지를 1980px 로 설계하면 화면에선 0.6배로 줄어드니, 13 그대로 두면 글씨가 8px 로 보인다.
+    html += `<div class="grp"><label>안쪽 글자 크기 <span id="bd-bf-v">${(+e.baseFont)||13}</span>px</label>`
+      + `<div class="row" style="gap:8px;align-items:center"><input type="range" id="bd-basefont" min="10" max="48" value="${(+e.baseFont)||13}" style="flex:1"><input type="number" id="bd-basefont-n" min="8" max="80" value="${(+e.baseFont)||13}" style="width:64px"></div>`
+      + `<div style="font-size:11px;color:var(--sub);padding:4px 2px">글·여백·버튼이 함께 커집니다. 이 페이지 폭(${page().w}px) 기준으로 맞춰보세요.</div></div>`;
     html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-secret" ${e.allowSecret!==false?'checked':''} style="width:auto"> 비밀글 허용(작성자가 비밀번호로 잠금)</label></div>`;
     // 글 저장소 — 기본은 공용이라 PC·모바일 어디서 써도 양쪽에 다 보인다.
     const _solo=_boardSolo(e);
@@ -3346,6 +3352,12 @@ function renderProps(){
       + `</select><div style="font-size:11px;color:var(--sub);padding:4px 2px">공용이면 PC에서 쓴 글이 폰에도, 폰에서 쓴 글이 PC에도 그대로 보입니다.</div></div>`;
     html += `<div class="grp"><label>미리보기</label><select id="bd-preview"><option value="list" ${_bdPreview.get(e.id)==='write'?'':'selected'}>글 목록</option><option value="write" ${_bdPreview.get(e.id)==='write'?'selected':''}>글쓰기 화면</option></select></div>`;
     html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
+    html += `<div class="sec-hd">▾ 문구</div>`;
+    _BDL_ORDER.forEach(([k,lbl]) => {
+      const _def = ((window.SiteRender&&window.SiteRender.BD_LABELS)||{})[k]||'';
+      html += `<div class="grp"><label>${lbl}</label><input type="text" id="bdl-${k}" value="${escapeHtml((e.labels&&e.labels[k])||'')}" placeholder="${escapeHtml(_def)}"></div>`;
+    });
+    html += `<div style="font-size:11px;color:var(--sub);padding:0 2px 6px">비워두면 기본 문구를 씁니다.</div>`;
   }else if(e.type==='map'){
     html += `<div class="grp"><label>주소</label><input type="text" id="mp-address" value="${escapeHtml(e.address||'')}" placeholder="예: 경남 진주시 진주대로 871"></div>`;
     html += `<div class="grp"><label>확대 레벨 (1=가까이 ~ 14=멀리)</label><input type="number" id="mp-level" min="1" max="14" value="${e.level||3}"></div>`;
@@ -3619,15 +3631,36 @@ function bindProps(e){
   }else if(e.type==='board'){
     $('bd-title').addEventListener('input',()=>{ e.title=$('bd-title').value; renderCanvas(); save(true); });
     $('bd-title').addEventListener('change',snapshot);
-    $('bd-pagesize').addEventListener('input',()=>{ e.pageSize=Math.max(3,parseInt($('bd-pagesize').value)||10); save(true); });
+    $('bd-pagesize').addEventListener('input',()=>{ e.pageSize=Math.max(3,parseInt($('bd-pagesize').value)||10); save(true); renderCanvas(); });
     $('bd-pagesize').addEventListener('change',snapshot);
+    {
+      const setBF = (v) => {
+        e.baseFont = Math.max(8, Math.min(80, parseInt(v) || 13));
+        $('bd-bf-v').textContent = e.baseFont;
+        $('bd-basefont').value = e.baseFont; $('bd-basefont-n').value = e.baseFont;
+        save(true); renderCanvas();
+      };
+      $('bd-basefont').addEventListener('input', () => setBF($('bd-basefont').value));
+      $('bd-basefont-n').addEventListener('input', () => setBF($('bd-basefont-n').value));
+      $('bd-basefont').addEventListener('change', snapshot);
+      $('bd-basefont-n').addEventListener('change', snapshot);
+    }
     $('bd-secret').addEventListener('change',()=>{ e.allowSecret=$('bd-secret').checked; save(true); snapshot(); });
     $('bd-key').addEventListener('change', ()=>{
       if($('bd-key').value==='solo') e.boardKey=e.id; else delete e.boardKey;
       save(true); snapshot(); renderCanvas(); renderProps();
     });
     $('bd-preview').addEventListener('change', ()=>{ _bdPreview.set(e.id, $('bd-preview').value); renderCanvas(); });
-    $('bd-manage').addEventListener('click',()=>openBoardManage(e));    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
+    $('bd-manage').addEventListener('click',()=>openBoardManage(e));
+    _BDL_ORDER.forEach(([k]) => {
+      const n=$('bdl-'+k); if(!n) return;
+      n.addEventListener('input',()=>{
+        e.labels = e.labels || {};
+        if(n.value.trim()==='') delete e.labels[k]; else e.labels[k]=n.value;
+        save(true); renderCanvas();
+      });
+      n.addEventListener('change', snapshot);
+    });    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
       CP_TARGETS.boardBg={ label:'게시판 배경색', rich:false,
         current:()=>{ const x=selId?el(selId):null; return (x&&x.bg)||'#ffffff'; },
         set:v=>{ const x=selId?el(selId):null; if(x){ x.bg=v; renderCanvas(); save(true); } } };
@@ -5857,6 +5890,11 @@ async function checkFontSources(){
   }
   return bad;
 }
+// 편집기에서 고칠 수 있는 게시판 문구 — 키/기본값은 site-render.js 가 갖고 있다
+const _BDL_ORDER = [['write','글쓰기 버튼'],['back','뒤로가기'],['empty','글이 없을 때'],
+  ['name','이름 칸'],['title','제목 칸'],['content','내용 칸'],
+  ['secret','비밀글 체크'],['pass','비밀번호 칸'],['submit','등록 버튼']];
+const _bdl = (e,k) => ((e.labels&&e.labels[k]) || ((window.SiteRender&&window.SiteRender.BD_LABELS)||{})[k] || '');
 // 게시판 키 규칙은 site-render.js 한 곳에 있다 — 편집기와 발행본이 갈리면 글이 사라진 것처럼 보인다.
 const _SR = () => window.SiteRender || {};
 const _boardKey  = (e) => _SR().boardKeyOf ? _SR().boardKeyOf(e) : ((e && e.boardKey) || 'main');
@@ -5896,35 +5934,35 @@ function _bdHookNav(body, e){
 function buildBoardPreview(e){
   const acc=e.accent||'#2b6cff';
   const body=document.createElement('div');
-  body.style.cssText='flex:1;overflow:hidden;padding:16px;font-size:13px';
+  body.style.cssText='flex:1;overflow:hidden;padding:calc(16px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))';
   body.style.pointerEvents='none';   // 미리보기일 뿐 — 요소 선택·드래그를 막지 않게
   if(_bdPreview.get(e.id)==='write'){
     body.innerHTML =
-      '<div class="hwb-pv-back" style="opacity:.6;font-size:12.5px;padding:0 0 12px">‹ 목록으로</div>'
-      +'<div style="display:flex;flex-direction:column;gap:8px">'
-      +'<input placeholder="이름" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
-      +'<input placeholder="제목" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
-      +'<textarea placeholder="내용" rows="5" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;resize:none"></textarea>'
-      +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:6px;font-size:12.5px"><input type="checkbox" style="width:auto"> 비밀글로 작성</label>':'')
-      +'<button style="margin-top:4px;padding:10px;background:'+acc+';color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px">등록</button></div>';
+      '<div class="hwb-pv-back" style="opacity:.6;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))">'+escapeHtml(_bdl(e,'back'))+'</div>'
+      +'<div style="display:flex;flex-direction:column;gap:calc(8px*var(--hwb-k))">'
+      +'<input placeholder="'+escapeHtml(_bdl(e,'name'))+'" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">'
+      +'<input placeholder="'+escapeHtml(_bdl(e,'title'))+'" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">'
+      +'<textarea placeholder="'+escapeHtml(_bdl(e,'content'))+'" rows="5" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));resize:none"></textarea>'
+      +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:calc(6px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k))"><input type="checkbox" style="width:auto"> '+escapeHtml(_bdl(e,'secret'))+'</label>':'')
+      +'<button style="margin-top:calc(4px*var(--hwb-k));padding:calc(10px*var(--hwb-k));background:'+acc+';color:#fff;border:none;border-radius:calc(8px*var(--hwb-k));font-weight:700;font-size:calc(13.5px*var(--hwb-k))">'+escapeHtml(_bdl(e,'submit'))+'</button></div>';
     _bdHookNav(body, e);
     return body;
   }
   const posts=_bdPosts(_boardReadKeys(e));
   let rows;
-  if(posts===null) rows='<div style="padding:26px 2px;text-align:center;opacity:.55;font-size:13px">글 불러오는 중…</div>';
-  else if(!posts.length) rows='<div style="padding:26px 2px;text-align:center;opacity:.55;font-size:13px">아직 작성된 글이 없습니다</div>';
+  if(posts===null) rows='<div style="padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))">글 불러오는 중…</div>';
+  else if(!posts.length) rows='<div style="padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))">'+escapeHtml(_bdl(e,'empty'))+'</div>';
   else rows=posts.slice(0, e.pageSize||10).map(p =>
-      '<div style="padding:12px 2px;border-bottom:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;gap:10px;align-items:center">'
-    + '<div style="min-width:0"><div style="font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      '<div style="padding:calc(12px*var(--hwb-k)) calc(2px*var(--hwb-k));border-bottom:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;gap:calc(10px*var(--hwb-k));align-items:center">'
+    + '<div style="min-width:0"><div style="font-weight:700;font-size:calc(13.5px*var(--hwb-k));white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
     + (p.secret?'🔒 ':'') + escapeHtml(p.title||'') + '</div>'
-    + '<div style="font-size:11px;opacity:.6;margin-top:2px">'
+    + '<div style="font-size:calc(11px*var(--hwb-k));opacity:.6;margin-top:calc(2px*var(--hwb-k))">'
     + escapeHtml(p.name||'익명') + ' · ' + escapeHtml(String(p.createdAt||'').slice(0,10)) + (p.reply?' · 답변완료':'') + '</div></div>'
     + '<span style="opacity:.4">›</span></div>'
   ).join('');
-  body.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:15px">'
+  body.innerHTML='<div style="display:flex;align-items:center;margin-bottom:calc(8px*var(--hwb-k))"><b style="flex:1;font-size:calc(15px*var(--hwb-k))">'
     + escapeHtml(e.title||'게시판') + '</b>'
-    + '<button class="hwb-pv-write" style="background:'+acc+';color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700">✎ 글쓰기</button></div>'
+    + '<button class="hwb-pv-write" style="background:'+acc+';color:#fff;border:none;border-radius:calc(20px*var(--hwb-k));padding:calc(7px*var(--hwb-k)) calc(14px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k));font-weight:700">'+escapeHtml(_bdl(e,'write'))+'</button></div>'
     + rows;
   _bdHookNav(body, e);
   return body;

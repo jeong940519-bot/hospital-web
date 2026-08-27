@@ -31,6 +31,20 @@
        데이터를 옮기지 않아도 옛 글이 그대로 보이고, 새 글만 공용키로 쌓인다.
        (운영 데이터를 건드리지 않는 게 항상 더 안전하다)
      편집기(글 관리)와 발행본(목록·작성)이 갈리면 글이 사라진 것처럼 보이므로 규칙은 여기 한 곳에만 둔다. */
+  /* 게시판 안에 쓰이는 문구. 병원마다 부르는 말이 달라서(문의/상담/예약…) 바꿀 수 있어야 한다.
+     비어 있으면 아래 기본값을 쓴다. 발행본·편집기 미리보기가 같은 값을 봐야 하므로 여기 둔다. */
+  var BD_LABELS = {
+    write:'✎ 글쓰기', back:'‹ 목록으로', empty:'아직 작성된 글이 없습니다',
+    name:'이름', title:'제목', content:'내용',
+    secret:'비밀글로 작성', pass:'비밀글 비밀번호', submit:'등록'
+  };
+  function bdLabels(e){                       // 바꾼 것만 추려서 요소에 실어 보낸다
+    var o={}, L=(e&&e.labels)||{};
+    Object.keys(BD_LABELS).forEach(function(k){ if(L[k]!=null && String(L[k]).trim()!=='') o[k]=String(L[k]); });
+    return o;
+  }
+  function escA(s){ return esc(s).replace(/"/g,'&quot;'); }   // 속성값용 — esc 는 따옴표를 안 막는다
+
   function boardKeyOf(e){ return (e && e.boardKey) || 'main'; }                 // 새 글을 쌓을 키
   function boardSolo(e){ return !!(e && e.boardKey && e.boardKey === e.id); }   // 이 게시판만 따로?
   function boardReadKeys(project){                                              // 목록에서 함께 볼 키들
@@ -453,8 +467,8 @@
       return '<div class="el hw-map" data-map-address="'+esc(e.address||'')+'" data-map-level="'+(e.level||3)+'" style="'+base+'overflow:hidden;border-radius:8px;background:#eef0f5"></div>';
     } else if(e.type==='board'){
       var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
-      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-solo="'+(boardSolo(e)?'1':'0')+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
-        +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:16px;font-size:13px">불러오는 중…</div></div>';
+      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-solo="'+(boardSolo(e)?'1':'0')+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" data-bd-labels="'+escA(JSON.stringify(bdLabels(e)))+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';--hwb-k:'+(((+e.baseFont)||13)/13)+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
+        +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:calc(16px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">불러오는 중…</div></div>';
     } else if(e.type==='shape'){
       if(e.shape==='line'||e.shape==='line-arrow'){
         var lcol=e.fill||'#333333', llw=Math.max(1,e.borderW||4);
@@ -841,23 +855,26 @@
         +'var bid=box.dataset.boardId,title=box.dataset.boardTitle,pageSize=+box.dataset.boardPagesize||10,allowSecret=box.dataset.boardSecret==="1";'
         /* 새 글은 bid 로 쌓고, 목록은 옛 키까지 함께 읽는다 — 옛 글이 사라져 보이지 않게. */
         +'var rkeys=box.dataset.boardSolo==="1"?[bid]:HWB_KEYS;'
+        /* 관리자가 바꾼 문구 — 없으면 기본값 */
+        +'var LB=(function(){try{return JSON.parse(box.dataset.bdLabels||"{}");}catch(_){return {};}})();'
+        +'function _L(k,d){return (LB&&LB[k])||d;}'
         +'var body=box.querySelector(".hwb-body");var posts=[];'
-        +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","in",rkeys),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:20px;text-align:center;opacity:.6;font-size:13px\\">게시판을 불러오지 못했습니다</div>";}}'
+        +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","in",rkeys),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:calc(20px*var(--hwb-k));text-align:center;opacity:.6;font-size:calc(13px*var(--hwb-k))\\">게시판을 불러오지 못했습니다</div>";}}'
         +'function listView(){'
           +'var rows=posts.slice(0,pageSize).map(function(p){'
-            +'return "<div class=\\"hwb-row\\" data-id=\\""+p.id+"\\" style=\\"padding:12px 2px;border-bottom:1px solid rgba(0,0,0,.08);cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center\\">"'
-              +'+"<div style=\\"min-width:0\\"><div style=\\"font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
-              +'+"<div style=\\"font-size:11px;opacity:.6;margin-top:2px\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,10))+(p.reply?" · 답변완료":"")+"</div></div>"'
+            +'return "<div class=\\"hwb-row\\" data-id=\\""+p.id+"\\" style=\\"padding:calc(12px*var(--hwb-k)) calc(2px*var(--hwb-k));border-bottom:1px solid rgba(0,0,0,.08);cursor:pointer;display:flex;justify-content:space-between;gap:calc(10px*var(--hwb-k));align-items:center\\">"'
+              +'+"<div style=\\"min-width:0\\"><div style=\\"font-weight:700;font-size:calc(13.5px*var(--hwb-k));white-space:nowrap;overflow:hidden;text-overflow:ellipsis\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
+              +'+"<div style=\\"font-size:calc(11px*var(--hwb-k));opacity:.6;margin-top:calc(2px*var(--hwb-k))\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,10))+(p.reply?" · 답변완료":"")+"</div></div>"'
               +'+"<span style=\\"opacity:.4\\">›</span></div>";'
-          +'}).join("")||"<div style=\\"padding:26px 2px;text-align:center;opacity:.55;font-size:13px\\">아직 작성된 글이 없습니다</div>";'
-          +'body.innerHTML="<div style=\\"display:flex;align-items:center;margin-bottom:8px\\"><b style=\\"flex:1;font-size:15px\\">"+_e(title)+"</b><button class=\\"hwb-write-btn\\" style=\\"background:var(--hwb-acc);color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;cursor:pointer;font-weight:700\\">✎ 글쓰기</button></div>"+rows;'
+          +'}).join("")||"<div style=\\"padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))\\">"+_e(_L("empty","아직 작성된 글이 없습니다"))+"</div>";'
+          +'body.innerHTML="<div style=\\"display:flex;align-items:center;margin-bottom:calc(8px*var(--hwb-k))\\"><b style=\\"flex:1;font-size:calc(15px*var(--hwb-k))\\">"+_e(title)+"</b><button class=\\"hwb-write-btn\\" style=\\"background:var(--hwb-acc);color:#fff;border:none;border-radius:calc(20px*var(--hwb-k));padding:calc(7px*var(--hwb-k)) calc(14px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k));cursor:pointer;font-weight:700\\">"+_e(_L("write","✎ 글쓰기"))+"</button></div>"+rows;'
           +'body.querySelectorAll(".hwb-row").forEach(function(r){r.addEventListener("click",function(){detailView(r.dataset.id);});});'
           +'var wb=body.querySelector(".hwb-write-btn");if(wb)wb.addEventListener("click",writeView);'
         +'}'
         +'function detailView(id){'
           +'var p=posts.filter(function(x){return x.id===id;})[0];if(!p)return;'
           +'if(p.secret){'
-            +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button><div style=\\"text-align:center;padding:20px 4px\\"><div style=\\"font-size:13px;margin-bottom:10px\\">🔒 비밀글입니다. 비밀번호를 입력하세요.</div><input type=\\"password\\" class=\\"hwb-pw\\" placeholder=\\"비밀번호\\" style=\\"padding:8px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;width:140px;text-align:center\\"><button class=\\"hwb-pw-go\\" style=\\"margin-left:6px;padding:8px 14px;background:var(--hwb-acc);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:13px\\">확인</button></div>";'
+            +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))\\">"+_e(_L("back","‹ 목록으로"))+"</button><div style=\\"text-align:center;padding:calc(20px*var(--hwb-k)) calc(4px*var(--hwb-k))\\"><div style=\\"font-size:calc(13px*var(--hwb-k));margin-bottom:calc(10px*var(--hwb-k))\\">🔒 비밀글입니다. 비밀번호를 입력하세요.</div><input type=\\"password\\" class=\\"hwb-pw\\" placeholder=\\"비밀번호\\" style=\\"padding:calc(8px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));width:140px;text-align:center\\"><button class=\\"hwb-pw-go\\" style=\\"margin-left:calc(6px*var(--hwb-k));padding:calc(8px*var(--hwb-k)) calc(14px*var(--hwb-k));background:var(--hwb-acc);color:#fff;border:none;border-radius:calc(7px*var(--hwb-k));cursor:pointer;font-size:calc(13px*var(--hwb-k))\\">확인</button></div>";'
             +'body.querySelector(".hwb-back").addEventListener("click",listView);'
             +'body.querySelector(".hwb-pw-go").addEventListener("click",function(){var v=body.querySelector(".hwb-pw").value;if(v&&v===p.pass)renderDetail(p);else alert("비밀번호가 틀렸습니다");});'
             +'return;'
@@ -865,22 +882,22 @@
           +'renderDetail(p);'
         +'}'
         +'function renderDetail(p){'
-          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button>"'
-            +'+"<div style=\\"font-size:15px;font-weight:700;margin-bottom:4px\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
-            +'+"<div style=\\"font-size:11.5px;opacity:.6;margin-bottom:12px\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,16).replace("T"," "))+"</div>"'
-            +'+"<div style=\\"font-size:13.5px;white-space:pre-wrap;line-height:1.6;padding-bottom:14px;border-bottom:1px solid rgba(0,0,0,.08)\\">"+_e(p.content)+"</div>"'
-            +'+(p.reply?"<div style=\\"margin-top:12px;background:rgba(0,0,0,.04);border-radius:8px;padding:10px 12px\\"><div style=\\"font-size:11.5px;font-weight:700;color:var(--hwb-acc);margin-bottom:4px\\">💬 답변</div><div style=\\"font-size:13px;white-space:pre-wrap;line-height:1.6\\">"+_e(p.reply)+"</div></div>":"");'
+          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))\\">"+_e(_L("back","‹ 목록으로"))+"</button>"'
+            +'+"<div style=\\"font-size:calc(15px*var(--hwb-k));font-weight:700;margin-bottom:calc(4px*var(--hwb-k))\\">"+(p.secret?"🔒 ":"")+_e(p.title)+"</div>"'
+            +'+"<div style=\\"font-size:calc(11.5px*var(--hwb-k));opacity:.6;margin-bottom:calc(12px*var(--hwb-k))\\">"+_e(p.name||"익명")+" · "+_e(String(p.createdAt||"").slice(0,16).replace("T"," "))+"</div>"'
+            +'+"<div style=\\"font-size:calc(13.5px*var(--hwb-k));white-space:pre-wrap;line-height:1.6;padding-bottom:calc(14px*var(--hwb-k));border-bottom:1px solid rgba(0,0,0,.08)\\">"+_e(p.content)+"</div>"'
+            +'+(p.reply?"<div style=\\"margin-top:calc(12px*var(--hwb-k));background:rgba(0,0,0,.04);border-radius:calc(8px*var(--hwb-k));padding:calc(10px*var(--hwb-k)) calc(12px*var(--hwb-k))\\"><div style=\\"font-size:calc(11.5px*var(--hwb-k));font-weight:700;color:var(--hwb-acc);margin-bottom:calc(4px*var(--hwb-k))\\">💬 답변</div><div style=\\"font-size:calc(13px*var(--hwb-k));white-space:pre-wrap;line-height:1.6\\">"+_e(p.reply)+"</div></div>":"");'
           +'body.querySelector(".hwb-back").addEventListener("click",listView);'
         +'}'
         +'function writeView(){'
-          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:12.5px;padding:0 0 12px\\">‹ 목록으로</button>"'
-            +'+"<div style=\\"display:flex;flex-direction:column;gap:8px\\">"'
-            +'+"<input class=\\"hwb-f-name\\" placeholder=\\"이름\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">"'
-            +'+"<input class=\\"hwb-f-title\\" placeholder=\\"제목\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">"'
-            +'+"<textarea class=\\"hwb-f-content\\" placeholder=\\"내용\\" rows=\\"5\\" style=\\"padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;resize:vertical\\"></textarea>"'
-            +'+(allowSecret?"<label style=\\"display:flex;align-items:center;gap:6px;font-size:12.5px\\"><input type=\\"checkbox\\" class=\\"hwb-f-secret\\" style=\\"width:auto\\"> 비밀글로 작성</label><input type=\\"password\\" class=\\"hwb-f-pass\\" placeholder=\\"비밀글 비밀번호\\" style=\\"display:none;padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px\\">":"")'
+          +'body.innerHTML="<button class=\\"hwb-back\\" style=\\"background:none;border:none;color:inherit;opacity:.6;cursor:pointer;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))\\">"+_e(_L("back","‹ 목록으로"))+"</button>"'
+            +'+"<div style=\\"display:flex;flex-direction:column;gap:calc(8px*var(--hwb-k))\\">"'
+            +'+"<input class=\\"hwb-f-name\\" placeholder=\\""+_e(_L("name","이름"))+"\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">"'
+            +'+"<input class=\\"hwb-f-title\\" placeholder=\\""+_e(_L("title","제목"))+"\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">"'
+            +'+"<textarea class=\\"hwb-f-content\\" placeholder=\\""+_e(_L("content","내용"))+"\\" rows=\\"5\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));resize:vertical\\"></textarea>"'
+            +'+(allowSecret?"<label style=\\"display:flex;align-items:center;gap:calc(6px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k))\\"><input type=\\"checkbox\\" class=\\"hwb-f-secret\\" style=\\"width:auto\\"> "+_e(_L("secret","비밀글로 작성"))+"</label><input type=\\"password\\" class=\\"hwb-f-pass\\" placeholder=\\""+_e(_L("pass","비밀글 비밀번호"))+"\\" style=\\"display:none;padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">":"")'
             +'+"<input type=\\"text\\" class=\\"hwb-f-hp\\" style=\\"position:absolute;left:-9999px\\" tabindex=\\"-1\\" autocomplete=\\"off\\">"'
-            +'+"<button class=\\"hwb-submit\\" style=\\"margin-top:4px;padding:10px;background:var(--hwb-acc);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:13.5px\\">등록</button></div>";'
+            +'+"<button class=\\"hwb-submit\\" style=\\"margin-top:calc(4px*var(--hwb-k));padding:calc(10px*var(--hwb-k));background:var(--hwb-acc);color:#fff;border:none;border-radius:calc(8px*var(--hwb-k));font-weight:700;cursor:pointer;font-size:calc(13.5px*var(--hwb-k))\\">"+_e(_L("submit","등록"))+"</button></div>";'
           +'body.querySelector(".hwb-back").addEventListener("click",listView);'
           +'var scb=body.querySelector(".hwb-f-secret"),spw=body.querySelector(".hwb-f-pass");'
           +'if(scb)scb.addEventListener("change",function(){spw.style.display=scb.checked?"block":"none";});'
@@ -907,5 +924,5 @@
       +'<\/script>';
   }
 
-  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS, boardKeyOf:boardKeyOf, boardSolo:boardSolo, boardReadKeys:boardReadKeys};
+  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS, boardKeyOf:boardKeyOf, boardSolo:boardSolo, boardReadKeys:boardReadKeys, BD_LABELS:BD_LABELS};
 })();
