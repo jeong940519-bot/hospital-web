@@ -20,11 +20,26 @@
   _CDN_FONTS['SUITE']=_CDN_FONTS['SUITE Regular'];
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-  /* 게시판 글은 boardId 로 묶인다. 기본값이 "요소 자체 id" 라서, PC 페이지와 모바일 페이지에
-     따로 놓은 게시판은 서로 완전히 다른 게시판이 된다 — PC 에서 쓴 글이 폰에서 안 보인다.
-     boardKey 를 같은 값으로 맞추면 하나로 합쳐진다.
-     편집기(글 관리)와 발행본(글 목록·작성)이 같은 규칙을 써야 하므로 여기 한 곳에만 둔다. */
-  function boardKeyOf(e){ return (e && (e.boardKey || e.id)) || ''; }
+  /* 게시판 글은 boardId 로 묶인다. 예전엔 그 값이 "요소 자체 id" 였다 —
+     PC 페이지와 모바일 페이지에 게시판을 각각 놓으면 요소가 둘이라 완전히 다른 게시판이 됐다.
+     PC 에서 쓴 글이 폰에서 안 보이고, 폰에서 쓴 글이 PC 에서 안 보였다.
+
+     이제 기본은 "공용"(main)이다. 한 사이트의 게시판은 어디에 놓든 같은 글을 본다.
+     한 게시판만 따로 굴리려면 boardKey 를 그 요소 id 로 둔다.
+
+     ※ 옛 글은 옛 키(요소 id)로 쌓여 있다. 그래서 읽을 때는 공용키 + 공용 게시판들의 id 를 같이 본다.
+       데이터를 옮기지 않아도 옛 글이 그대로 보이고, 새 글만 공용키로 쌓인다.
+       (운영 데이터를 건드리지 않는 게 항상 더 안전하다)
+     편집기(글 관리)와 발행본(목록·작성)이 갈리면 글이 사라진 것처럼 보이므로 규칙은 여기 한 곳에만 둔다. */
+  function boardKeyOf(e){ return (e && e.boardKey) || 'main'; }                 // 새 글을 쌓을 키
+  function boardSolo(e){ return !!(e && e.boardKey && e.boardKey === e.id); }   // 이 게시판만 따로?
+  function boardReadKeys(project){                                              // 목록에서 함께 볼 키들
+    var keys=['main'];
+    ((project&&project.pages)||[]).forEach(function(p){ (p.elements||[]).forEach(function(e){
+      if(e.type==='board' && !boardSolo(e) && keys.indexOf(e.id)<0) keys.push(e.id);
+    });});
+    return keys.slice(0,30);   // Firestore in 절 상한
+  }
   // 표 셀 4방향 테두리 — 변별 폭/색/선스타일(cell.bd[side]= 숫자(레거시) | {w,c,s} | 0/{w:0}없음) — 편집기와 동일 규칙
   function tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2):s==='dotted'?w+','+(w*1.6):''; }
   function tblBdResolve(e,cell,side){
@@ -438,7 +453,7 @@
       return '<div class="el hw-map" data-map-address="'+esc(e.address||'')+'" data-map-level="'+(e.level||3)+'" style="'+base+'overflow:hidden;border-radius:8px;background:#eef0f5"></div>';
     } else if(e.type==='board'){
       var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
-      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
+      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-solo="'+(boardSolo(e)?'1':'0')+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
         +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:16px;font-size:13px">불러오는 중…</div></div>';
     } else if(e.type==='shape'){
       if(e.shape==='line'||e.shape==='line-arrow'){
@@ -785,7 +800,7 @@
         +'});'
       +'})();'
       +'<\/script>'
-      +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='board';});})?boardRuntimeScript():'')
+      +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='board';});})?boardRuntimeScript(boardReadKeys(project)):'')
       +(project.pages.some(function(p){return (p.elements||[]).some(function(e){return e.type==='map';});})?mapRuntimeScript():'')
       +'</body></html>';
   }
@@ -814,8 +829,9 @@
       +'})();'
       +'<\/script>';
   }
-  function boardRuntimeScript(){
+  function boardRuntimeScript(readKeys){
     return '<script type="module">'
+      +'var HWB_KEYS='+JSON.stringify(readKeys&&readKeys.length?readKeys:['main'])+';'
       +'import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";'
       +'import { getFirestore, collection, query, where, orderBy, limit, getDocs, addDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";'
       +'const _bfb=initializeApp({apiKey:"AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",authDomain:"newworld-1a1d5.firebaseapp.com",projectId:"newworld-1a1d5",storageBucket:"newworld-1a1d5.firebasestorage.app",messagingSenderId:"948363397391",appId:"1:948363397391:web:5d7dee7a383f3bdec0167a"},"hwboard");'
@@ -823,8 +839,10 @@
       +'function _e(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");}'
       +'async function _bdInit(box){'
         +'var bid=box.dataset.boardId,title=box.dataset.boardTitle,pageSize=+box.dataset.boardPagesize||10,allowSecret=box.dataset.boardSecret==="1";'
+        /* 새 글은 bid 로 쌓고, 목록은 옛 키까지 함께 읽는다 — 옛 글이 사라져 보이지 않게. */
+        +'var rkeys=box.dataset.boardSolo==="1"?[bid]:HWB_KEYS;'
         +'var body=box.querySelector(".hwb-body");var posts=[];'
-        +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","==",bid),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:20px;text-align:center;opacity:.6;font-size:13px\\">게시판을 불러오지 못했습니다</div>";}}'
+        +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","in",rkeys),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:20px;text-align:center;opacity:.6;font-size:13px\\">게시판을 불러오지 못했습니다</div>";}}'
         +'function listView(){'
           +'var rows=posts.slice(0,pageSize).map(function(p){'
             +'return "<div class=\\"hwb-row\\" data-id=\\""+p.id+"\\" style=\\"padding:12px 2px;border-bottom:1px solid rgba(0,0,0,.08);cursor:pointer;display:flex;justify-content:space-between;gap:10px;align-items:center\\">"'
@@ -889,5 +907,5 @@
       +'<\/script>';
   }
 
-  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS, boardKeyOf:boardKeyOf};
+  window.SiteRender={buildSiteHtml:buildSiteHtml, renderElStatic:renderElStatic, slStyleVars:slStyleVars, fixTabResolve:fixTabResolve, CDN_FONTS:_CDN_FONTS, boardKeyOf:boardKeyOf, boardSolo:boardSolo, boardReadKeys:boardReadKeys};
 })();

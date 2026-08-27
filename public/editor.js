@@ -2441,15 +2441,15 @@ function renderEl(e){
     node.appendChild(img);
     if(e.fx && e.fx.type==='slider') buildSliderOverlay(node,e);
   }else if(e.type==='board'){
+    // 발행본과 같은 모습으로 그린다 — 점선 상자만 보이면 크기·글자를 맞출 수가 없다
     node.style.background=e.bg||'#ffffff';
-    node.style.border='2px dashed '+(e.accent||'#2b6cff');
-    node.style.borderRadius='10px';
-    node.style.display='flex'; node.style.flexDirection='column'; node.style.alignItems='center'; node.style.justifyContent='center'; node.style.gap='6px';
-    node.style.color=e.accent||'#2b6cff'; node.style.fontSize='13px'; node.style.fontWeight='700'; node.style.textAlign='center'; node.style.padding='10px'; node.style.boxSizing='border-box';
-    const ic=document.createElement('div'); ic.style.fontSize='30px'; ic.textContent='📋';
-    const lb=document.createElement('div'); lb.textContent=e.title||'게시판';
-    const sub=document.createElement('div'); sub.style.cssText='font-size:11px;font-weight:400;color:#889'; sub.textContent='발행 후 실제 목록·글쓰기가 표시됩니다 · 우클릭=글 관리';
-    node.appendChild(ic); node.appendChild(lb); node.appendChild(sub);
+    node.style.color=e.color||'#222222';
+    node.style.borderRadius='12px';
+    node.style.boxShadow='0 2px 14px rgba(0,0,0,.08)';
+    node.style.overflow='hidden';
+    node.style.display='flex'; node.style.flexDirection='column';
+    node.style.boxSizing='border-box'; node.style.fontFamily="'Noto Sans KR',sans-serif";
+    node.appendChild(buildBoardPreview(e));
   }else if(e.type==='map'){
     node.style.background='#eef0f5';
     node.style.border='2px dashed #6c7bff';
@@ -3338,18 +3338,13 @@ function renderProps(){
     html += `<div class="grp"><label>배경색 / 강조색</label><div class="row"><button type="button" class="panel-cbtn" id="bd-bg" data-cpkey="boardBg" title="배경색"><span style="background:${e.bg||'#ffffff'}"></span></button><button type="button" class="panel-cbtn" id="bd-accent" data-cpkey="boardAccent" title="강조색(버튼 등)"><span style="background:${e.accent||'#2b6cff'}"></span></button></div></div>`;
     html += `<div class="grp"><label>페이지당 글 수</label><input type="number" id="bd-pagesize" min="3" max="50" value="${e.pageSize||10}"></div>`;
     html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-secret" ${e.allowSecret!==false?'checked':''} style="width:auto"> 비밀글 허용(작성자가 비밀번호로 잠금)</label></div>`;
-    // 글 저장소 — PC/모바일 게시판을 하나로 묶는 곳. 기본값(자기 id)이면 각자 따로 논다.
-    {
-      const _bk=_boardKey(e), _seen=new Set(), _opts=[];
-      _allBoards().forEach(({pg, el:bel}) => {
-        const k=_boardKey(bel); if(_seen.has(k)) return; _seen.add(k);
-        const dev = pg.device==='mobile' ? '모바일' : pg.device==='pc' ? 'PC' : '공용';
-        const lbl = `${pg.name||'페이지'} (${dev})` + (bel===e ? ' — 이 게시판' : '');
-        _opts.push(`<option value="${k}" ${k===_bk?'selected':''}>${escapeHtml(lbl)}</option>`);
-      });
-      html += `<div class="grp"><label>글 저장소</label><select id="bd-key">${_opts.join('')}</select>`
-        + `<div style="font-size:11px;color:var(--sub);padding:4px 2px">PC·모바일 게시판을 같은 저장소로 두면 어느 쪽에서 쓴 글이든 양쪽에 다 보입니다.</div></div>`;
-    }
+    // 글 저장소 — 기본은 공용이라 PC·모바일 어디서 써도 양쪽에 다 보인다.
+    const _solo=_boardSolo(e);
+    html += `<div class="grp"><label>글 저장소</label><select id="bd-key">`
+      + `<option value="main" ${_solo?'':'selected'}>공용 — PC·모바일 함께 (권장)</option>`
+      + `<option value="solo" ${_solo?'selected':''}>이 게시판만 따로</option>`
+      + `</select><div style="font-size:11px;color:var(--sub);padding:4px 2px">공용이면 PC에서 쓴 글이 폰에도, 폰에서 쓴 글이 PC에도 그대로 보입니다.</div></div>`;
+    html += `<div class="grp"><label>미리보기</label><select id="bd-preview"><option value="list" ${_bdPreview.get(e.id)==='write'?'':'selected'}>글 목록</option><option value="write" ${_bdPreview.get(e.id)==='write'?'selected':''}>글쓰기 화면</option></select></div>`;
     html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
   }else if(e.type==='map'){
     html += `<div class="grp"><label>주소</label><input type="text" id="mp-address" value="${escapeHtml(e.address||'')}" placeholder="예: 경남 진주시 진주대로 871"></div>`;
@@ -3627,13 +3622,11 @@ function bindProps(e){
     $('bd-pagesize').addEventListener('input',()=>{ e.pageSize=Math.max(3,parseInt($('bd-pagesize').value)||10); save(true); });
     $('bd-pagesize').addEventListener('change',snapshot);
     $('bd-secret').addEventListener('change',()=>{ e.allowSecret=$('bd-secret').checked; save(true); snapshot(); });
-    $('bd-key').addEventListener('change', async ()=>{
-      const oldKey=_boardKey(e), newKey=$('bd-key').value;
-      if(!newKey || newKey===oldKey) return;
-      e.boardKey=newKey; save(true); snapshot(); renderCanvas();
-      await _moveBoardPosts(oldKey, newKey);
-      renderProps();
+    $('bd-key').addEventListener('change', ()=>{
+      if($('bd-key').value==='solo') e.boardKey=e.id; else delete e.boardKey;
+      save(true); snapshot(); renderCanvas(); renderProps();
     });
+    $('bd-preview').addEventListener('change', ()=>{ _bdPreview.set(e.id, $('bd-preview').value); renderCanvas(); });
     $('bd-manage').addEventListener('click',()=>openBoardManage(e));    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
       CP_TARGETS.boardBg={ label:'게시판 배경색', rich:false,
         current:()=>{ const x=selId?el(selId):null; return (x&&x.bg)||'#ffffff'; },
@@ -5864,31 +5857,61 @@ async function checkFontSources(){
   }
   return bad;
 }
-// 게시판 글 저장소 키 — 규칙은 site-render.js 한 곳에 있다(편집기·발행본이 갈리면 글이 사라진 것처럼 보인다).
-const _boardKey = (e) => (window.SiteRender && window.SiteRender.boardKeyOf)
-  ? window.SiteRender.boardKeyOf(e)
-  : ((e && (e.boardKey || e.id)) || '');
-function _allBoards(){
-  const out=[];
-  (project.pages||[]).forEach(pg => (pg.elements||[]).forEach(el => { if(el.type==='board') out.push({pg, el}); }));
-  return out;
+// 게시판 키 규칙은 site-render.js 한 곳에 있다 — 편집기와 발행본이 갈리면 글이 사라진 것처럼 보인다.
+const _SR = () => window.SiteRender || {};
+const _boardKey  = (e) => _SR().boardKeyOf ? _SR().boardKeyOf(e) : ((e && e.boardKey) || 'main');
+const _boardSolo = (e) => _SR().boardSolo  ? _SR().boardSolo(e)  : !!(e && e.boardKey && e.boardKey===e.id);
+// 목록에 함께 보일 키들 — 옛 글(요소 id 로 쌓인 것)까지 포함한다
+function _boardReadKeys(e){
+  if(_boardSolo(e)) return [e.id];
+  return _SR().boardReadKeys ? _SR().boardReadKeys(project) : ['main'];
 }
-// 저장소를 옮기면 예전 키로 쌓인 글은 화면에서 사라진다 — 지워진 걸로 보이므로 옮길지 물어본다.
-async function _moveBoardPosts(oldKey, newKey){
-  if(!oldKey || oldKey===newKey) return;
-  let qs;
-  try{ qs = await getDocs(query(collection(db,'boardPosts'), where('boardId','==',oldKey), limit(300))); }
-  catch(err){ toast('이전 글을 확인하지 못했습니다: '+(err.message||err)); return; }
-  if(qs.empty) return;
-  if(!isAdmin){ toast(`이전 저장소에 글 ${qs.size}개가 남아 있습니다 — 로그인하면 옮길 수 있습니다`); return; }
-  if(!confirm(`이전 저장소에 글 ${qs.size}개가 있습니다.
-새 저장소로 옮길까요?
-
-옮기지 않으면 그 글은 홈페이지에서 안 보입니다.`)) return;
-  try{
-    for(const d of qs.docs) await setDoc(doc(db,'boardPosts',d.id), {boardId:newKey}, {merge:true});
-    toast(`글 ${qs.size}개를 옮겼습니다`);
-  }catch(err){ toast('글 옮기기 실패: '+(err.message||err)); }
+// 캔버스 미리보기용 — 키 조합마다 한 번만 읽고 캐시한다(진행중=null)
+const _bdCache = new Map();
+const _bdPreview = new Map();   // 요소 id → 'list' | 'write' (저장 안 되는 편집기 전용 상태)
+function _bdPosts(keys){
+  const k=keys.join('|');
+  if(_bdCache.has(k)) return _bdCache.get(k);
+  _bdCache.set(k, null);
+  getDocs(query(collection(db,'boardPosts'), where('boardId','in',keys), orderBy('createdAt','desc'), limit(50)))
+    .then(qs => { _bdCache.set(k, qs.docs.map(d => Object.assign({id:d.id}, d.data()))); renderCanvas(); })
+    .catch(() => { _bdCache.set(k, []); });
+  return null;
+}
+// 캔버스에 실제 게시판 모습을 그린다 — 발행본과 같은 마크업/치수라 크기·색을 그대로 맞춰볼 수 있다.
+function buildBoardPreview(e){
+  const acc=e.accent||'#2b6cff';
+  const body=document.createElement('div');
+  body.style.cssText='flex:1;overflow:hidden;padding:16px;font-size:13px';
+  body.style.pointerEvents='none';   // 미리보기일 뿐 — 요소 선택·드래그를 막지 않게
+  if(_bdPreview.get(e.id)==='write'){
+    body.innerHTML =
+      '<div style="opacity:.6;font-size:12.5px;padding:0 0 12px">‹ 목록으로</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +'<input placeholder="이름" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
+      +'<input placeholder="제목" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
+      +'<textarea placeholder="내용" rows="5" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;resize:none"></textarea>'
+      +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:6px;font-size:12.5px"><input type="checkbox" style="width:auto"> 비밀글로 작성</label>':'')
+      +'<button style="margin-top:4px;padding:10px;background:'+acc+';color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px">등록</button></div>';
+    return body;
+  }
+  const posts=_bdPosts(_boardReadKeys(e));
+  let rows;
+  if(posts===null) rows='<div style="padding:26px 2px;text-align:center;opacity:.55;font-size:13px">글 불러오는 중…</div>';
+  else if(!posts.length) rows='<div style="padding:26px 2px;text-align:center;opacity:.55;font-size:13px">아직 작성된 글이 없습니다</div>';
+  else rows=posts.slice(0, e.pageSize||10).map(p =>
+      '<div style="padding:12px 2px;border-bottom:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;gap:10px;align-items:center">'
+    + '<div style="min-width:0"><div style="font-weight:700;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+    + (p.secret?'🔒 ':'') + escapeHtml(p.title||'') + '</div>'
+    + '<div style="font-size:11px;opacity:.6;margin-top:2px">'
+    + escapeHtml(p.name||'익명') + ' · ' + escapeHtml(String(p.createdAt||'').slice(0,10)) + (p.reply?' · 답변완료':'') + '</div></div>'
+    + '<span style="opacity:.4">›</span></div>'
+  ).join('');
+  body.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:15px">'
+    + escapeHtml(e.title||'게시판') + '</b>'
+    + '<button style="background:'+acc+';color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700">✎ 글쓰기</button></div>'
+    + rows;
+  return body;
 }
 
 // ── 게시판 글 관리(관리자) ──
@@ -5900,7 +5923,7 @@ async function openBoardManage(e){
   status.textContent='불러오는 중…'; list.innerHTML=''; m.style.display='flex';
   const ea=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
   try{
-    const qs=await getDocs(query(collection(db,'boardPosts'), where('boardId','==',_boardKey(e)), orderBy('createdAt','desc'), limit(200)));
+    const qs=await getDocs(query(collection(db,'boardPosts'), where('boardId','in',_boardReadKeys(e)), orderBy('createdAt','desc'), limit(200)));
     if(qs.empty){ status.textContent='아직 작성된 글이 없습니다'; return; }
     status.textContent=qs.size+'개';
     list.innerHTML=qs.docs.map(d=>{
