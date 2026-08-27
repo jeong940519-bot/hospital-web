@@ -1,6 +1,7 @@
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const { getStorage } = require('firebase-admin/storage');
 
 initializeApp();
 
@@ -199,4 +200,37 @@ exports.fetchSite = onCall({ region: 'asia-northeast3', timeoutSeconds: 60, memo
   const colors = Object.entries(colorCount).sort((a, b) => b[1] - a[1]).slice(0, 10).map((c) => c[0]);
 
   return { url, title, description, themeColor, ogImage, h1, h2, h3, buttons, colors, brandColors, effects, screenshot };
+});
+
+// ── 업로드 글꼴용 버킷 CORS ──────────────────────────────────────────────
+// @font-face 의 글꼴 요청은 <img> 와 달리 '항상' CORS 모드다.
+// Firebase Storage 버킷은 기본값에 CORS 가 없어서, 편집기에서 올린 .ttf 는 발행본에서 차단된다.
+// 이 편집기는 고정 캔버스(px 좌표)라 글꼴이 빠지면 같은 문장이 5~6% 길어지면서
+// 줄이 늘어나고 밑줄·괘선과 어긋난다 — 그런데 에러가 아니라 '조용히' 그렇게 된다.
+// 올린 본인 PC 는 localStorage 사본으로 정상으로 보여서 더 안 잡힌다.
+//
+// gsutil 없이 편집기에서 걸 수 있도록 함수로 둔다. 글꼴을 새로 올릴 때 자동으로 한 번 호출된다.
+exports.setStorageCors = onCall({ region: 'asia-northeast3' }, async (request) => {
+  if (!request.auth) {
+    throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
+  }
+  const DEFAULTS = [
+    'https://newworld-1a1d5.web.app',
+    'https://newworld-1a1d5.firebaseapp.com',
+    'http://localhost:5000'
+  ];
+  // 커스텀 도메인이 붙으면 호출하는 쪽에서 넘긴다. 형식이 맞는 오리진만 받는다.
+  const extra = Array.isArray(request.data && request.data.origins) ? request.data.origins : [];
+  const ok = extra.filter((o) => typeof o === 'string' && /^https?:\/\/[^/\s]+$/.test(o));
+  const origin = Array.from(new Set(DEFAULTS.concat(ok)));
+
+  const bucket = getStorage().bucket();
+  await bucket.setCorsConfiguration([{
+    origin,
+    method: ['GET', 'HEAD'],
+    maxAgeSeconds: 3600,
+    responseHeader: ['Content-Type', 'Content-Length', 'Date']
+  }]);
+  const [meta] = await bucket.getMetadata();
+  return { bucket: bucket.name, cors: meta.cors || [] };
 });

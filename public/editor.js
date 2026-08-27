@@ -28,6 +28,7 @@ const auth = getAuth(fbApp);
 const functions = getFunctions(fbApp, 'asia-northeast3');
 const aiProxy = httpsCallable(functions, 'aiProxy', { timeout: 300000 }); // 클라 타임아웃 300초(기본 70초→이미지·자기검증으로 초과 방지)
 const fetchSite = httpsCallable(functions, 'fetchSite');
+const setStorageCorsFn = httpsCallable(functions, 'setStorageCors');
 const DOC_PATH = ['site','editorProject']; // 공개 홈(도메인 루트)이 읽는 발행본 문서 (🚀 발행이 여기에 씀 / 구 저장 마이그레이션도 겸함)
 let isAdmin = false, DEFAULT_AI_KEY = '';
 let _prjId = localStorage.getItem('hw_prj_id') || null; // 현재 활성 프로젝트 ID
@@ -5787,6 +5788,7 @@ function _collectUsedFonts(){
 // → 발행본이 localStorage(브라우저별)가 아닌 공개 URL로 폰트를 불러와 모든 PC에서 동일하게 적용됨.
 async function uploadEmbeddedFonts(){
   const files=getFontFiles();                         // {family:{b64,fmt,mime}} (localStorage)
+  let _uploaded=0;
   if(!Object.keys(files).length) return;
   const used=_collectUsedFonts();
   if(!project.fontFiles) project.fontFiles={};
@@ -5803,7 +5805,46 @@ async function uploadEmbeddedFonts(){
     const r=sRef(storage, `editor/fonts/${fam.replace(/[^\w가-힣]+/g,'_')}_${uid()}.${ext}`);
     await uploadBytes(r, blob);
     project.fontFiles[fam]={ url: await getDownloadURL(r), fmt: d.fmt||'truetype' };
+    _uploaded++;
   }
+  if(_uploaded) await ensureStorageCors();
+}
+// 올린 글꼴이 발행본에서 실제로 불러와지려면 버킷에 CORS 가 있어야 한다.
+// @font-face 의 글꼴 요청은 <img> 와 달리 항상 CORS 모드라, 설정이 없으면 통째로 차단된다.
+// (차단돼도 에러 대신 시스템 글꼴로 조용히 떨어져서, 줄만 어긋난 채 원인을 못 찾게 된다)
+let _corsEnsured=false;
+async function ensureStorageCors(){
+  if(_corsEnsured) return;
+  try{ await setStorageCorsFn({ origins:[location.origin] }); _corsEnsured=true; }
+  catch(e){ toast('글꼴 CORS 설정 실패 — 올린 글꼴이 다른 PC 에서 안 보일 수 있습니다'); }
+}
+
+// 발행 전 글꼴 점검 — '다른 PC 에서 안 보일' 글꼴을 찾아낸다.
+// 고정 캔버스라 글꼴 하나가 빠지면 그 글꼴을 쓴 줄이 5~6% 길어져 배치가 통째로 어긋난다.
+// 그런데 세 경로가 전부 조용히 실패한다:
+//   · 구글 폰트 — 없는 이름을 섞어 보내면 400 이 아니라 200 을 주고 그 글꼴만 빼버린다
+//   · Storage 업로드 — 버킷 CORS 가 없으면 차단
+//   · localStorage 사본 — 올린 본인 PC 에서만 보여서 정상으로 착각하게 된다
+async function checkFontSources(){
+  const cdn=(window.SiteRender&&window.SiteRender.CDN_FONTS)||{};
+  const urls=project.fontFiles||{};
+  const ls=getFontFiles();
+  const bad=[];
+  for(const fam of _collectUsedFonts()){
+    if(cdn[fam]) continue;                                   // 공개 CDN — 안전
+    if(urls[fam]&&urls[fam].url){
+      // 실제로 CORS 로 받아지는지 그대로 해본다 — 추측하지 않는다
+      try{ const r=await fetch(urls[fam].url,{mode:'cors',cache:'reload'}); if(r.ok) continue; bad.push([fam,'Storage 응답 '+r.status]); }
+      catch(_){ bad.push([fam,'Storage CORS 차단']); }
+      continue;
+    }
+    // 구글 폰트에 그 이름이 실제로 있는지는 하나씩 물어야 안다(섞어 보내면 400 이 안 뜬다)
+    let okG=false;
+    try{ const r=await fetch('https://fonts.googleapis.com/css2?family='+encodeURIComponent(fam).replace(/%20/g,'+')+'&display=swap'); okG=r.ok; }catch(_){}
+    if(okG) continue;
+    bad.push([fam, ls[fam] ? '이 브라우저에만 있음 — 다른 PC 에서 안 보임' : '받아올 곳이 없음']);
+  }
+  return bad;
 }
 // ── 게시판 글 관리(관리자) ──
 async function openBoardManage(e){
@@ -5880,6 +5921,22 @@ async function publishSite(){
   try{
     await uploadEmbeddedImages();
     await uploadEmbeddedFonts();
+    let badFonts = await checkFontSources();
+    // CORS 로 막힌 게 있으면 버킷에 걸어보고, 실제로 풀렸는지 다시 확인한다
+    if(badFonts.some(b => b[1].indexOf('CORS') >= 0)){
+      await ensureStorageCors();
+      badFonts = await checkFontSources();
+    }
+    if(badFonts.length){
+      const list = badFonts.map(b => '  • ' + b[0] + '  (' + b[1] + ')').join(String.fromCharCode(10));
+      const msg = `다음 글꼴은 다른 PC·휴대폰에서 안 보입니다:
+
+${list}
+
+글꼴이 빠지면 그 글꼴을 쓴 줄이 길어져 배치가 어긋납니다.
+그래도 발행할까요?`;
+      if(!confirm(msg)){ toast('발행 취소됨'); return; }
+    }
     // published:true — 내려둔 상태였다면 발행과 동시에 다시 공개된다.
     const payload={ name: project.name||'홈페이지', data: JSON.stringify(project), updatedAt: new Date().toISOString(), published: true };
     await setDoc(doc(db, DOC_PATH[0], DOC_PATH[1]), payload, {merge:true});

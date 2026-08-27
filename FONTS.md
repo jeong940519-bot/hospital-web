@@ -38,7 +38,11 @@ Firebase Storage 버킷은 기본적으로 CORS 설정이 없어서,
 (`SUIT ExtraBold`, 332곳이 이렇게 막혔다). 편집기에서는 localStorage 사본으로 보이기 때문에
 **올린 본인 PC 에서는 멀쩡해 보인다.**
 
-버킷에 CORS 를 한 번 걸어두면 풀린다:
+버킷에 CORS 를 한 번 걸어두면 풀린다. **편집기가 알아서 건다** —
+글꼴 파일을 새로 올리면, 또는 발행할 때 막힌 글꼴이 발견되면
+`setStorageCors` 함수(`functions/index.js`)를 한 번 호출한다. 관리자 로그인 상태여야 한다.
+
+수동으로 걸려면 `gsutil` 이 있는 PC 에서:
 
 ```bash
 gsutil cors set storage.cors.json gs://newworld-1a1d5.firebasestorage.app
@@ -61,6 +65,10 @@ curl -sI -H "Origin: https://newworld-1a1d5.web.app" "<글꼴 URL>" | grep -i ac
   (괘선 위에 얹으려고 작은 상자에 가운데 정렬해 둔다).
 - 화면 폭 변화는 `resize` 외에 `ResizeObserver`·`visualViewport`·`orientationchange` 로도 듣는다.
   폭이 실제로 바뀐 때만 다시 계산한다(`fit()` 이 문서 높이를 바꾸므로 높이까지 반응하면 무한 루프).
+- **발행할 때 글꼴을 점검한다**(`checkFontSources`). 쓰는 글꼴마다 받아올 곳이 실제로 있는지
+  그대로 확인해서(구글 폰트는 한 이름씩 물어야 400 이 뜬다), 다른 PC 에서 안 보일 글꼴이 있으면
+  목록을 띄우고 발행을 물어본다. 조용히 깨지는 것을 막는 게 목적이다.
+- CORS 로 막힌 글꼴이 발견되면 버킷에 CORS 를 걸고 **다시 확인해서** 정말 풀렸는지 본다.
 
 ## 새 글꼴을 추가할 때
 
