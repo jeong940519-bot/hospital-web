@@ -5878,6 +5878,20 @@ function _bdPosts(keys){
     .catch(() => { _bdCache.set(k, []); });
   return null;
 }
+// 미리보기 안에서 화면을 오갈 수 있게 — 글쓰기/목록 버튼만 클릭을 받는다.
+// 나머지는 클릭이 통과해야 요소를 고르고 끌 수 있다.
+function _bdHookNav(body, e){
+  body.querySelectorAll('.hwb-pv-write,.hwb-pv-back').forEach(n => {
+    n.style.pointerEvents='auto';
+    n.style.cursor='pointer';
+    n.addEventListener('mousedown', ev => ev.stopPropagation());   // 캔버스 드래그가 시작되지 않게
+    n.addEventListener('click', ev => {
+      ev.stopPropagation(); ev.preventDefault();
+      _bdPreview.set(e.id, n.classList.contains('hwb-pv-write') ? 'write' : 'list');
+      renderCanvas(); renderProps();
+    });
+  });
+}
 // 캔버스에 실제 게시판 모습을 그린다 — 발행본과 같은 마크업/치수라 크기·색을 그대로 맞춰볼 수 있다.
 function buildBoardPreview(e){
   const acc=e.accent||'#2b6cff';
@@ -5886,13 +5900,14 @@ function buildBoardPreview(e){
   body.style.pointerEvents='none';   // 미리보기일 뿐 — 요소 선택·드래그를 막지 않게
   if(_bdPreview.get(e.id)==='write'){
     body.innerHTML =
-      '<div style="opacity:.6;font-size:12.5px;padding:0 0 12px">‹ 목록으로</div>'
+      '<div class="hwb-pv-back" style="opacity:.6;font-size:12.5px;padding:0 0 12px">‹ 목록으로</div>'
       +'<div style="display:flex;flex-direction:column;gap:8px">'
       +'<input placeholder="이름" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
       +'<input placeholder="제목" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px">'
       +'<textarea placeholder="내용" rows="5" style="padding:9px 10px;border:1px solid #ccc;border-radius:7px;font-size:13px;resize:none"></textarea>'
       +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:6px;font-size:12.5px"><input type="checkbox" style="width:auto"> 비밀글로 작성</label>':'')
       +'<button style="margin-top:4px;padding:10px;background:'+acc+';color:#fff;border:none;border-radius:8px;font-weight:700;font-size:13.5px">등록</button></div>';
+    _bdHookNav(body, e);
     return body;
   }
   const posts=_bdPosts(_boardReadKeys(e));
@@ -5909,8 +5924,9 @@ function buildBoardPreview(e){
   ).join('');
   body.innerHTML='<div style="display:flex;align-items:center;margin-bottom:8px"><b style="flex:1;font-size:15px">'
     + escapeHtml(e.title||'게시판') + '</b>'
-    + '<button style="background:'+acc+';color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700">✎ 글쓰기</button></div>'
+    + '<button class="hwb-pv-write" style="background:'+acc+';color:#fff;border:none;border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700">✎ 글쓰기</button></div>'
     + rows;
+  _bdHookNav(body, e);
   return body;
 }
 
