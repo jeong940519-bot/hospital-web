@@ -66,6 +66,16 @@ const db = getFirestore(app);
       preStyle.textContent = fontFaces;
       document.head.appendChild(preStyle);
     }
+    // 발행본이 실제로 쓰는 글꼴을 이름으로 직접 불러온다.
+    // document.fonts.ready 만으로는 부족하다 — 이 문서엔 그 글꼴로 그린 글자가 없어서
+    // @font-face 가 "미사용"으로 남고 바로 통과해버린다. 그 상태로 넘기면 본문이 시스템 글꼴로
+    // 한 번 그려지면서 줄이 밀리고 상자를 넘친다.
+    const fams = Array.from(new Set((html.match(/font-family:\s*'([^']+)'/g) || [])
+      .map(function(t){ return t.replace(/^font-family:\s*'/, '').replace(/'$/, '').trim(); })
+      .filter(function(f){ return f && !/^(sans-serif|serif|monospace|inherit)$/.test(f); })));
+    fams.forEach(function(f){
+      try{ waits.push(document.fonts.load('16px ' + JSON.stringify(f)).catch(function(){})); }catch(e){}
+    });
     await Promise.race([
       Promise.all(waits).then(function(){ return document.fonts.ready; }),
       new Promise(function(res){ setTimeout(res, 3000); })

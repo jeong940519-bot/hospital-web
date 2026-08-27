@@ -62,6 +62,14 @@ const FONTS = [
   ['Dancing Script','Dancing Script','영문 손글씨'],['Pacifico','Pacifico','영문 손글씨'],
   ['Bebas Neue','Bebas Neue','영문 굵은'],
 ];
+// 공개 CDN 웹폰트(site-render.js 의 CDN_FONTS)도 고를 수 있게 목록에 붙인다.
+// 파일을 올린 PC 에서만 보이면 다른 PC 에서 같은 글꼴을 못 골라 디자인이 갈라진다.
+try{
+  Object.keys((window.SiteRender&&window.SiteRender.CDN_FONTS)||{}).forEach(fam=>{
+    if(fam==='SUIT'||fam==='SUITE') return;                      // Regular 과 같은 별칭 — 목록엔 뺀다
+    if(!FONTS.find(f=>f[0]===fam)) FONTS.push([fam,fam,'한글 CDN']);
+  });
+}catch(e){}
 const _loadedFonts=new Set(['Noto Sans KR','Noto Serif KR','Nanum Gothic','Nanum Myeongjo','Nanum Pen Script','Black Han Sans','Do Hyeon','Jua','Gowun Dodum','Gaegu','Song Myung','Cute Font','Sunflower','East Sea Dokdo','Inter','Roboto','Open Sans','Montserrat','Poppins']);
 function loadFont(family){
   if(_loadedFonts.has(family)) return;
@@ -5786,6 +5794,9 @@ async function uploadEmbeddedFonts(){
     const d=files[fam];
     if(!d || !d.b64) continue;                         // 구글 폰트이거나 데이터 없음 → 스킵
     if(project.fontFiles[fam] && project.fontFiles[fam].url) continue;  // 이미 업로드됨
+    // 공개 CDN 에 있는 글꼴은 올리지 않는다 — 발행 렌더러가 CDN 을 먼저 쓰고,
+    // Storage 업로드본은 버킷 CORS 가 없으면 @font-face 가 차단돼 쓸모가 없다.
+    if(((window.SiteRender&&window.SiteRender.CDN_FONTS)||{})[fam]) continue;
     const mime=d.mime||'font/ttf';
     const blob=await (await fetch(`data:${mime};base64,${d.b64}`)).blob();
     const ext=(d.fmt==='opentype'?'otf':d.fmt==='woff2'?'woff2':d.fmt==='woff'?'woff':'ttf');

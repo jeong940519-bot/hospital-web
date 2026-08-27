@@ -6,6 +6,18 @@
   ['1Thin','2ExtraLight','3Light','4Regular','5Medium','6SemiBold','7Bold','8ExtraBold','9Black'].forEach(function(w){
     _CDN_FONTS['Paperlogy '+w]='https://cdn.jsdelivr.net/gh/fonts-archive/Paperlogy/Paperlogy-'+w+'.woff2';
   });
+
+  // SUIT / SUITE — 편집기에서 파일로 올려 쓰던 폰트를 공개 CDN 으로 고정한다.
+  // Storage 업로드본은 버킷 CORS 가 없으면 @font-face 가 통째로 차단되고(구글 폰트에도 없는 이름이라 대체도 안 된다),
+  // 그러면 글자가 시스템 글꼴로 떨어지면서 줄 길이가 5~6% 늘어 상자를 넘치고 밑줄·괘선과 어긋난다.
+  ['Thin','ExtraLight','Light','Regular','Medium','SemiBold','Bold','ExtraBold','Heavy'].forEach(function(w){
+    _CDN_FONTS['SUIT '+w]='https://cdn.jsdelivr.net/gh/fonts-archive/SUIT/SUIT-'+w+'.woff2';
+  });
+  ['Light','Regular','Medium','SemiBold','Bold','ExtraBold','Heavy'].forEach(function(w){
+    _CDN_FONTS['SUITE '+w]='https://cdn.jsdelivr.net/gh/fonts-archive/SUITE/SUITE-'+w+'.woff2';
+  });
+  _CDN_FONTS['SUIT']=_CDN_FONTS['SUIT Regular'];
+  _CDN_FONTS['SUITE']=_CDN_FONTS['SUITE Regular'];
   function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   // 표 셀 4방향 테두리 — 변별 폭/색/선스타일(cell.bd[side]= 숫자(레거시) | {w,c,s} | 0/{w:0}없음) — 편집기와 동일 규칙
   function tblDash(s,w){ return s==='dashed'?(w*3)+','+(w*2):s==='dotted'?w+','+(w*1.6):''; }
@@ -401,7 +413,7 @@
         content=unit.map(function(u){ if(/^\s+$/.test(u)) return esc(u); var d=(idx++)*stg; return '<span class="c" style="transition-delay:'+d+'ms">'+esc(u)+'</span>'; }).join('');
         charsAttr=' data-fx-chars="1"';
       }
-      var afAttr=e.autofit?' data-autofit="1" data-af-max="'+e.fontSize+'"':'';
+      var afAttr=e.autofit?' data-autofit="1" data-af-max="'+e.fontSize+'"':(e.vertical?'':' data-fs0="'+e.fontSize+'"');
       return '<div class="el"'+lnk+ea+' style="'+s2+'"><div'+afAttr+charsAttr+' style="width:100%;'+inn+'">'+content+'</div></div>';
     } else if(e.type==='image'){
       var s3=base+'overflow:hidden;border-radius:'+(e.clip==='circle'?'50%':e.radius+'px')+';'+(e.borderW>0?'border:'+e.borderW+'px solid '+e.borderColor+';':'')+(e.shadow?'box-shadow:4px 5px 14px rgba(0,0,0,.28);':'');
@@ -684,7 +696,7 @@
       +'function show(id,noPush){'
         +'document.querySelectorAll(".pgwrap").forEach(function(wr){wr.style.display=(wr.getAttribute("data-id")===id)?"block":"none";});'
         +'document.querySelectorAll("nav a").forEach(function(a){a.classList.toggle("active",a.getAttribute("data-id")===id);});'
-        +'fit();window.scrollTo(0,0);'
+        +'fit();fitText();window.scrollTo(0,0);'
       // 사이트 안 페이지 이동을 브라우저 히스토리에 남긴다 → 뒤로가기가 이전 페이지로 (PC·모바일 공통)
       +'try{var _st={pg:id},_u="#"+encodeURIComponent(id);if(noPush)history.replaceState(_st,"",_u);else history.pushState(_st,"",_u);}catch(_e){}'
       +'}'
@@ -707,7 +719,47 @@
       +'var _hb=document.getElementById("hmbtn");if(_hb)_hb.addEventListener("click",function(){hmToggle();});'
       +'var _ho=document.getElementById("hmoverlay");if(_ho)_ho.addEventListener("click",function(){hmToggle(false);});'
       +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'
-      +'window.addEventListener("resize",applyDevice);window.addEventListener("load",applyDevice);applyDevice();'
+      /* 글꼴 안전망 —
+         이 편집기는 고정 캔버스(px 좌표)라 글자 상자 크기도 고정이다. 그래서 지정한 글꼴이 안 오면
+         시스템 글꼴로 떨어지면서 같은 문장이 5~6% 길어지고, 한 줄이 두 줄로 넘어가면서
+         밑줄·괘선 같은 옆 도형과 어긋나고 페이지 밖으로 잘려 나간다.
+         ① 실제로 쓰는 글꼴을 모두 기다렸다가 다시 맞추고,
+         ② 그래도 못 받은 글꼴이 있으면(=_fontLost) 그때만, 줄이 늘어난 글상자의 글자를 줄여 상자 안에 넣는다.
+         정상일 때 상자를 넘치는 글은 대부분 의도된 배치라(괘선 위에 얹으려고 작은 상자에 가운데 정렬)
+         건드리지 않는다. 줄 하나가 통째로 늘어난 경우(허용치 = 줄높이 절반)만 대상이다. */
+      +'var _fontLost=false;'
+      +'function fitText(){'
+        +'if(!_fontLost)return;'
+        +'document.querySelectorAll("[data-fs0]").forEach(function(inner){'
+          +'var box=inner.parentNode;if(!box||!box.clientHeight)return;'
+          +'var max=+inner.getAttribute("data-fs0");if(!(max>0))return;'
+          +'inner.style.fontSize=max+"px";'
+          +'var lh=parseFloat(getComputedStyle(inner).lineHeight)||max*1.4;'
+          +'var tol=Math.max(4,lh*0.5),s=max,step=Math.max(0.5,max*0.02),g=0;'
+          +'while(inner.scrollHeight>box.clientHeight+tol&&s>max*0.8&&g<30){s-=step;inner.style.fontSize=s+"px";g++;}'
+        +'});'
+      +'}'
+      /* 화면 폭이 바뀌면 배율(scale)을 다시 잡아야 한다. resize 이벤트 하나만 믿으면,
+         그 이벤트가 안 오는 경우(브라우저 확대/축소, 모바일 주소창 접힘, 창 복원 등)에
+         옛 배율이 그대로 남아 페이지가 화면보다 커지고 오른쪽이 잘려 나간다.
+         ResizeObserver·visualViewport 까지 함께 듣되, 폭이 실제로 바뀐 때만 다시 계산한다
+         (fit() 이 문서 높이를 바꾸므로 높이까지 반응하면 무한 루프가 된다). */
+      +'var _lastW=-1;'
+      +'function onViewport(){var w=document.documentElement.clientWidth||window.innerWidth;if(w===_lastW)return;_lastW=w;applyDevice();}'
+      +'window.addEventListener("resize",onViewport);'
+      +'window.addEventListener("orientationchange",onViewport);'
+      +'if(window.visualViewport){try{window.visualViewport.addEventListener("resize",onViewport);}catch(_e){}}'
+      +'if(window.ResizeObserver){try{new ResizeObserver(onViewport).observe(document.documentElement);}catch(_e){}}'
+      +'window.addEventListener("load",function(){applyDevice();fitText();});applyDevice();'
+      +'(function(){var _FAM='+JSON.stringify(_usedFonts).replace(/</g,'\\u003c')+';'
+        +'function _done(){fit();fitText();}'
+        +'if(document.fonts&&document.fonts.load){'
+          +'Promise.all(_FAM.map(function(f){'
+            +'return document.fonts.load("16px "+JSON.stringify(f)).then(function(a){return !!(a&&a.length);},function(){return false;});'
+          +'})).then(function(ok){_fontLost=ok.indexOf(false)>=0;_done();});'
+          +'if(document.fonts.ready)document.fonts.ready.then(_done);'
+        +'}else{setTimeout(_done,1200);}'
+      +'})();'
       +'try{var _h0=location.hash?decodeURIComponent(location.hash.slice(1)):"";if(_h0&&hasPg(_h0))show(_h0,true);else{var _c0=null;document.querySelectorAll(".pgwrap").forEach(function(w){if(!_c0&&w.style.display!=="none")_c0=w;});if(_c0)show(_c0.getAttribute("data-id"),true);}}catch(_e){}'
       +'window.addEventListener("popstate",function(ev){var id=(ev.state&&ev.state.pg)||"";if(!id&&location.hash){try{id=decodeURIComponent(location.hash.slice(1));}catch(_e){}}if(id&&hasPg(id))show(id,true);});'
       +fxJs

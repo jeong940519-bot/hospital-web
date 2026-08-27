@@ -1,0 +1,13 @@
+[
+  {
+    "origin": [
+      "https://newworld-1a1d5.web.app",
+      "https://newworld-1a1d5.firebaseapp.com",
+      "http://localhost:5000",
+      "http://localhost:5056"
+    ],
+    "method": ["GET", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Content-Length", "Date", "Access-Control-Allow-Origin"]
+  }
+]
