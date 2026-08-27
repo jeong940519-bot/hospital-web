@@ -2444,8 +2444,9 @@ function renderEl(e){
     // 발행본과 같은 모습으로 그린다 — 점선 상자만 보이면 크기·글자를 맞출 수가 없다
     node.style.background=e.bg||'#ffffff';
     node.style.color=e.color||'#222222';
-    node.style.borderRadius='12px';
-    node.style.boxShadow='0 2px 14px rgba(0,0,0,.08)';
+    node.style.borderRadius=((e.frameRadius!=null)?+e.frameRadius:12)+'px';
+    node.style.boxShadow=(e.frameShadow===false)?'none':'0 2px 14px rgba(0,0,0,.08)';
+    node.style.border=((+e.frameBorderW)||0)>0 ? ((+e.frameBorderW)+'px solid '+(e.frameBorderColor||'#e5e7eb')) : 'none';
     node.style.overflow='hidden';
     node.style.display='flex'; node.style.flexDirection='column';
     node.style.boxSizing='border-box'; node.style.fontFamily="'Noto Sans KR',sans-serif";
@@ -3352,6 +3353,13 @@ function renderProps(){
       + `</select><div style="font-size:11px;color:var(--sub);padding:4px 2px">공용이면 PC에서 쓴 글이 폰에도, 폰에서 쓴 글이 PC에도 그대로 보입니다.</div></div>`;
     html += `<div class="grp"><label>미리보기</label><select id="bd-preview"><option value="list" ${_bdPreview.get(e.id)==='write'?'':'selected'}>글 목록</option><option value="write" ${_bdPreview.get(e.id)==='write'?'selected':''}>글쓰기 화면</option></select></div>`;
     html += `<div class="grp"><button type="button" class="tb-btn" id="bd-manage" style="width:100%">✉ 게시글 관리(관리자 로그인 필요)</button></div>`;
+    html += `<div class="sec-hd">▾ 테두리</div>`;
+    html += `<div class="grp"><label>모서리 둥글기 <span id="bd-r-v">${(e.frameRadius!=null)?+e.frameRadius:12}</span>px</label>`
+      + `<input type="range" id="bd-radius" min="0" max="60" value="${(e.frameRadius!=null)?+e.frameRadius:12}" style="width:100%"></div>`;
+    html += `<div class="grp"><label class="row" style="align-items:center;gap:8px"><input type="checkbox" id="bd-shadow" ${e.frameShadow===false?'':'checked'} style="width:auto"> 그림자</label></div>`;
+    html += `<div class="grp"><label>테두리</label><div class="row"><div class="num-unit" style="flex:1"><span>굵기</span><input type="number" id="bd-bw" min="0" max="20" value="${(+e.frameBorderW)||0}"></div>`
+      + `<button type="button" class="panel-cbtn" id="bd-bc" data-cpkey="boardBorder" title="테두리 색"><span style="background:${e.frameBorderColor||'#e5e7eb'}"></span></button></div>`
+      + `<div style="font-size:11px;color:var(--sub);padding:4px 2px">굵기 0 = 테두리 없음. 그림자도 끄면 상자가 완전히 사라집니다.</div></div>`;
     html += `<div class="sec-hd">▾ 문구</div>`;
     _BDL_ORDER.forEach(([k,lbl]) => {
       const _def = ((window.SiteRender&&window.SiteRender.BD_LABELS)||{})[k]||'';
@@ -3652,6 +3660,14 @@ function bindProps(e){
     });
     $('bd-preview').addEventListener('change', ()=>{ _bdPreview.set(e.id, $('bd-preview').value); renderCanvas(); });
     $('bd-manage').addEventListener('click',()=>openBoardManage(e));
+    {
+      const setR = (v) => { e.frameRadius=Math.max(0,Math.min(60,parseInt(v)||0)); $('bd-r-v').textContent=e.frameRadius; save(true); renderCanvas(); };
+      $('bd-radius').addEventListener('input', () => setR($('bd-radius').value));
+      $('bd-radius').addEventListener('change', snapshot);
+      $('bd-shadow').addEventListener('change', () => { e.frameShadow=$('bd-shadow').checked; save(true); renderCanvas(); snapshot(); });
+      $('bd-bw').addEventListener('input', () => { e.frameBorderW=Math.max(0,Math.min(20,parseInt($('bd-bw').value)||0)); save(true); renderCanvas(); });
+      $('bd-bw').addEventListener('change', snapshot);
+    }
     _BDL_ORDER.forEach(([k]) => {
       const n=$('bdl-'+k); if(!n) return;
       n.addEventListener('input',()=>{
@@ -3660,13 +3676,17 @@ function bindProps(e){
         save(true); renderCanvas();
       });
       n.addEventListener('change', snapshot);
-    });    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
+    });
+    if(typeof CP_TARGETS!=='undefined' && !CP_TARGETS.boardBg){
       CP_TARGETS.boardBg={ label:'게시판 배경색', rich:false,
         current:()=>{ const x=selId?el(selId):null; return (x&&x.bg)||'#ffffff'; },
         set:v=>{ const x=selId?el(selId):null; if(x){ x.bg=v; renderCanvas(); save(true); } } };
       CP_TARGETS.boardAccent={ label:'게시판 강조색', rich:false,
         current:()=>{ const x=selId?el(selId):null; return (x&&x.accent)||'#2b6cff'; },
         set:v=>{ const x=selId?el(selId):null; if(x){ x.accent=v; renderCanvas(); save(true); } } };
+      CP_TARGETS.boardBorder={ label:'게시판 테두리 색', rich:false,
+        current:()=>{ const x=selId?el(selId):null; return (x&&x.frameBorderColor)||'#e5e7eb'; },
+        set:v=>{ const x=selId?el(selId):null; if(x){ x.frameBorderColor=v; renderCanvas(); save(true); } } };
     }
   }else if(e.type==='map'){
     $('mp-address').addEventListener('input',()=>{ e.address=$('mp-address').value; renderCanvas(); save(true); });
@@ -5918,6 +5938,70 @@ function _bdPosts(keys){
 }
 // 미리보기 안에서 화면을 오갈 수 있게 — 글쓰기/목록 버튼만 클릭을 받는다.
 // 나머지는 클릭이 통과해야 요소를 고르고 끌 수 있다.
+// 글쓰기 화면의 입력칸 — 미리보기에서는 상자 모양 div 로 그린다.
+// 진짜 <input> 이면 글자가 placeholder 라서 캔버스에서 고칠 수가 없다.
+function _bdField(e, key, extra){
+  return '<div class="bdl-f" data-bdl="'+key+'" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));'
+    + 'border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));'
+    + 'background:#fff;color:#9aa0a6;'+(extra||'')+'">'+escapeHtml(_bdl(e,key))+'</div>';
+}
+// 내용칸 기본 높이 — 발행본의 rows=5 와 얼추 같게(글자 크기에 비례)
+function _bdContentH(e){
+  const k=(((+e.baseFont)||13)/13);
+  return (+e.formH) || Math.round(98*k);
+}
+// 캔버스에서 문구를 바로 고친다 — 더블클릭하면 글자를 친다.
+// 클릭은 그대로 통과시켜야 요소를 고르고 끌 수 있으므로 mousedown 은 막지 않는다.
+function _bdHookEdit(body, e){
+  body.querySelectorAll('[data-bdl]').forEach(n => {
+    n.style.pointerEvents='auto';
+    n.title='더블클릭해서 문구 수정';
+    n.addEventListener('dblclick', ev => {
+      ev.stopPropagation(); ev.preventDefault();
+      const key=n.getAttribute('data-bdl');
+      n.contentEditable='true';
+      n.style.outline='2px solid '+(e.accent||'#2b6cff');
+      n.style.color='inherit';
+      n.focus();
+      const r=document.createRange(); r.selectNodeContents(n);
+      const sel=getSelection(); sel.removeAllRanges(); sel.addRange(r);
+      const commit=()=>{
+        n.contentEditable='false';
+        const v=(n.textContent||'').trim();
+        const def=((window.SiteRender&&window.SiteRender.BD_LABELS)||{})[key]||'';
+        e.labels = e.labels || {};
+        if(v==='' || v===def) delete e.labels[key]; else e.labels[key]=v;
+        save(true); snapshot(); renderCanvas(); renderProps();
+      };
+      n.addEventListener('blur', commit, {once:true});
+      n.addEventListener('keydown', ev2 => {
+        ev2.stopPropagation();                       // Delete 로 요소가 지워지지 않게
+        if(ev2.key==='Enter' && !ev2.shiftKey){ ev2.preventDefault(); n.blur(); }
+        if(ev2.key==='Escape'){ ev2.preventDefault(); n.textContent=_bdl(e,key); n.blur(); }
+      });
+    });
+  });
+}
+// 내용칸 아래를 끌어 높이를 바꾼다. 화면 픽셀이 아니라 캔버스 좌표로 환산한다(줌 보정).
+function _bdHookResize(body, e){
+  const h=body.querySelector('.bd-rsz'); if(!h) return;
+  h.style.pointerEvents='auto'; h.style.cursor='ns-resize';
+  h.addEventListener('mousedown', ev => {
+    ev.stopPropagation(); ev.preventDefault();
+    const box=h.previousElementSibling;
+    const z=(typeof zoom==="number" && zoom>0) ? zoom : 1;
+    const startY=ev.clientY, startH=_bdContentH(e);
+    const mv=(m)=>{
+      const nh=Math.max(40, Math.round(startH + (m.clientY-startY)/z));
+      box.style.height=nh+'px'; e.formH=nh;
+    };
+    const up=()=>{
+      document.removeEventListener('mousemove',mv); document.removeEventListener('mouseup',up);
+      save(true); snapshot(); renderCanvas();
+    };
+    document.addEventListener('mousemove',mv); document.addEventListener('mouseup',up);
+  });
+}
 function _bdHookNav(body, e){
   body.querySelectorAll('.hwb-pv-write,.hwb-pv-back').forEach(n => {
     n.style.pointerEvents='auto';
@@ -5938,20 +6022,23 @@ function buildBoardPreview(e){
   body.style.pointerEvents='none';   // 미리보기일 뿐 — 요소 선택·드래그를 막지 않게
   if(_bdPreview.get(e.id)==='write'){
     body.innerHTML =
-      '<div class="hwb-pv-back" style="opacity:.6;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))">'+escapeHtml(_bdl(e,'back'))+'</div>'
+      '<div class="hwb-pv-back" data-bdl="back" style="opacity:.6;font-size:calc(12.5px*var(--hwb-k));padding:0 0 calc(12px*var(--hwb-k))">'+escapeHtml(_bdl(e,'back'))+'</div>'
       +'<div style="display:flex;flex-direction:column;gap:calc(8px*var(--hwb-k))">'
-      +'<input placeholder="'+escapeHtml(_bdl(e,'name'))+'" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">'
-      +'<input placeholder="'+escapeHtml(_bdl(e,'title'))+'" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">'
-      +'<textarea placeholder="'+escapeHtml(_bdl(e,'content'))+'" rows="5" style="padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));resize:none"></textarea>'
-      +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:calc(6px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k))"><input type="checkbox" style="width:auto"> '+escapeHtml(_bdl(e,'secret'))+'</label>':'')
-      +'<button style="margin-top:calc(4px*var(--hwb-k));padding:calc(10px*var(--hwb-k));background:'+acc+';color:#fff;border:none;border-radius:calc(8px*var(--hwb-k));font-weight:700;font-size:calc(13.5px*var(--hwb-k))">'+escapeHtml(_bdl(e,'submit'))+'</button></div>';
-    _bdHookNav(body, e);
+      +_bdField(e,'name')
+      +_bdField(e,'title')
+      +'<div style="position:relative">'
+        +_bdField(e,'content','height:'+_bdContentH(e)+'px;overflow:hidden')
+        +'<div class="bd-rsz" title="끌어서 내용칸 높이 조절" style="position:absolute;left:0;right:0;bottom:-4px;height:9px"></div>'
+      +'</div>'
+      +(e.allowSecret!==false?'<label style="display:flex;align-items:center;gap:calc(6px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k))"><input type="checkbox" style="width:auto"> <span data-bdl="secret">'+escapeHtml(_bdl(e,'secret'))+'</span></label>':'')
+      +'<button style="margin-top:calc(4px*var(--hwb-k));padding:calc(10px*var(--hwb-k));background:'+acc+';color:#fff;border:none;border-radius:calc(8px*var(--hwb-k));font-weight:700;font-size:calc(13.5px*var(--hwb-k))" data-bdl="submit">'+escapeHtml(_bdl(e,'submit'))+'</button></div>';
+    _bdHookNav(body, e); _bdHookEdit(body, e); _bdHookResize(body, e);
     return body;
   }
   const posts=_bdPosts(_boardReadKeys(e));
   let rows;
   if(posts===null) rows='<div style="padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))">글 불러오는 중…</div>';
-  else if(!posts.length) rows='<div style="padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))">'+escapeHtml(_bdl(e,'empty'))+'</div>';
+  else if(!posts.length) rows='<div style="padding:calc(26px*var(--hwb-k)) calc(2px*var(--hwb-k));text-align:center;opacity:.55;font-size:calc(13px*var(--hwb-k))" data-bdl="empty">'+escapeHtml(_bdl(e,'empty'))+'</div>';
   else rows=posts.slice(0, e.pageSize||10).map(p =>
       '<div style="padding:calc(12px*var(--hwb-k)) calc(2px*var(--hwb-k));border-bottom:1px solid rgba(0,0,0,.08);display:flex;justify-content:space-between;gap:calc(10px*var(--hwb-k));align-items:center">'
     + '<div style="min-width:0"><div style="font-weight:700;font-size:calc(13.5px*var(--hwb-k));white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
@@ -5962,9 +6049,9 @@ function buildBoardPreview(e){
   ).join('');
   body.innerHTML='<div style="display:flex;align-items:center;margin-bottom:calc(8px*var(--hwb-k))"><b style="flex:1;font-size:calc(15px*var(--hwb-k))">'
     + escapeHtml(e.title||'게시판') + '</b>'
-    + '<button class="hwb-pv-write" style="background:'+acc+';color:#fff;border:none;border-radius:calc(20px*var(--hwb-k));padding:calc(7px*var(--hwb-k)) calc(14px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k));font-weight:700">'+escapeHtml(_bdl(e,'write'))+'</button></div>'
+    + '<button class="hwb-pv-write" style="background:'+acc+';color:#fff;border:none;border-radius:calc(20px*var(--hwb-k));padding:calc(7px*var(--hwb-k)) calc(14px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k));font-weight:700" data-bdl="write">'+escapeHtml(_bdl(e,'write'))+'</button></div>'
     + rows;
-  _bdHookNav(body, e);
+  _bdHookNav(body, e); _bdHookEdit(body, e);
   return body;
 }
 

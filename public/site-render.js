@@ -45,6 +45,17 @@
   }
   function escA(s){ return esc(s).replace(/"/g,'&quot;'); }   // 속성값용 — esc 는 따옴표를 안 막는다
 
+  /* 게시판 카드의 테두리·그림자·모서리. 기본값은 지금 보이는 모습 그대로다.
+     (요소에 남아 있는 옛 shadow/radius 필드는 렌더러가 한 번도 쓴 적이 없어서 값이 못 믿을 상태다.
+      그걸 살리면 아무도 안 건드린 사이트의 모습이 바뀌므로 frame* 새 필드를 쓴다.) */
+  function bdFrameCss(e){
+    var r = (e && e.frameRadius != null) ? +e.frameRadius : 12;
+    var sh = (e && e.frameShadow === false) ? 'none' : '0 2px 14px rgba(0,0,0,.08)';
+    var bw = (e && +e.frameBorderW) || 0;
+    return 'border-radius:'+r+'px;box-shadow:'+sh+';'
+      + (bw>0 ? 'border:'+bw+'px solid '+((e&&e.frameBorderColor)||'#e5e7eb')+';' : '');
+  }
+
   function boardKeyOf(e){ return (e && e.boardKey) || 'main'; }                 // 새 글을 쌓을 키
   function boardSolo(e){ return !!(e && e.boardKey && e.boardKey === e.id); }   // 이 게시판만 따로?
   function boardReadKeys(project){                                              // 목록에서 함께 볼 키들
@@ -467,7 +478,7 @@
       return '<div class="el hw-map" data-map-address="'+esc(e.address||'')+'" data-map-level="'+(e.level||3)+'" style="'+base+'overflow:hidden;border-radius:8px;background:#eef0f5"></div>';
     } else if(e.type==='board'){
       var bAcc=e.accent||'#2b6cff', bBg=e.bg||'#ffffff', bTxt=e.color||'#222222';
-      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-solo="'+(boardSolo(e)?'1':'0')+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" data-bd-labels="'+escA(JSON.stringify(bdLabels(e)))+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';--hwb-k:'+(((+e.baseFont)||13)/13)+';overflow:hidden;background:'+bBg+';color:'+bTxt+';border-radius:12px;box-shadow:0 2px 14px rgba(0,0,0,.08);display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
+      return '<div class="el hw-board" data-board-id="'+boardKeyOf(e)+'" data-board-solo="'+(boardSolo(e)?'1':'0')+'" data-board-title="'+esc(e.title||'게시판')+'" data-board-pagesize="'+(e.pageSize||10)+'" data-board-secret="'+(e.allowSecret!==false?'1':'0')+'" data-bd-labels="'+escA(JSON.stringify(bdLabels(e)))+'" data-bd-contenth="'+((+e.formH)||0)+'" style="'+base+'--hwb-bg:'+bBg+';--hwb-fg:'+bTxt+';--hwb-acc:'+bAcc+';--hwb-k:'+(((+e.baseFont)||13)/13)+';overflow:hidden;background:'+bBg+';color:'+bTxt+';'+bdFrameCss(e)+'display:flex;flex-direction:column;font-family:\'Noto Sans KR\',sans-serif">'
         +'<div class="hwb-body" style="flex:1;overflow-y:auto;padding:calc(16px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))">불러오는 중…</div></div>';
     } else if(e.type==='shape'){
       if(e.shape==='line'||e.shape==='line-arrow'){
@@ -858,6 +869,8 @@
         /* 관리자가 바꾼 문구 — 없으면 기본값 */
         +'var LB=(function(){try{return JSON.parse(box.dataset.bdLabels||"{}");}catch(_){return {};}})();'
         +'function _L(k,d){return (LB&&LB[k])||d;}'
+        /* 내용칸 높이 — 편집기에서 끌어 늘린 값(캔버스 px). 0 이면 기본 5줄. */
+        +'var chh=+box.dataset.bdContenth||0;'
         +'var body=box.querySelector(".hwb-body");var posts=[];'
         +'async function load(){try{var qs=await getDocs(query(collection(_bdb,"boardPosts"),where("boardId","in",rkeys),orderBy("createdAt","desc"),limit(200)));posts=qs.docs.map(function(d){return Object.assign({id:d.id},d.data());});}catch(err){posts=[];body.innerHTML="<div style=\\"padding:calc(20px*var(--hwb-k));text-align:center;opacity:.6;font-size:calc(13px*var(--hwb-k))\\">게시판을 불러오지 못했습니다</div>";}}'
         +'function listView(){'
@@ -894,7 +907,7 @@
             +'+"<div style=\\"display:flex;flex-direction:column;gap:calc(8px*var(--hwb-k))\\">"'
             +'+"<input class=\\"hwb-f-name\\" placeholder=\\""+_e(_L("name","이름"))+"\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">"'
             +'+"<input class=\\"hwb-f-title\\" placeholder=\\""+_e(_L("title","제목"))+"\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">"'
-            +'+"<textarea class=\\"hwb-f-content\\" placeholder=\\""+_e(_L("content","내용"))+"\\" rows=\\"5\\" style=\\"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));resize:vertical\\"></textarea>"'
+            +'+"<textarea class=\\"hwb-f-content\\" placeholder=\\""+_e(_L("content","내용"))+"\\" rows=\\"5\\" style=\\""+(chh?"height:"+chh+"px;":"")+"padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k));resize:vertical\\"></textarea>"'
             +'+(allowSecret?"<label style=\\"display:flex;align-items:center;gap:calc(6px*var(--hwb-k));font-size:calc(12.5px*var(--hwb-k))\\"><input type=\\"checkbox\\" class=\\"hwb-f-secret\\" style=\\"width:auto\\"> "+_e(_L("secret","비밀글로 작성"))+"</label><input type=\\"password\\" class=\\"hwb-f-pass\\" placeholder=\\""+_e(_L("pass","비밀글 비밀번호"))+"\\" style=\\"display:none;padding:calc(9px*var(--hwb-k)) calc(10px*var(--hwb-k));border:1px solid #ccc;border-radius:calc(7px*var(--hwb-k));font-size:calc(13px*var(--hwb-k))\\">":"")'
             +'+"<input type=\\"text\\" class=\\"hwb-f-hp\\" style=\\"position:absolute;left:-9999px\\" tabindex=\\"-1\\" autocomplete=\\"off\\">"'
             +'+"<button class=\\"hwb-submit\\" style=\\"margin-top:calc(4px*var(--hwb-k));padding:calc(10px*var(--hwb-k));background:var(--hwb-acc);color:#fff;border:none;border-radius:calc(8px*var(--hwb-k));font-weight:700;cursor:pointer;font-size:calc(13.5px*var(--hwb-k))\\">"+_e(_L("submit","등록"))+"</button></div>";'
