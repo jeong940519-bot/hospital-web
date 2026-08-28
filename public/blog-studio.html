@@ -124,6 +124,15 @@
     .photo-list .pi b { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 5px; }
     .photo-list .pi a { display: block; text-align: center; font-size: 11px; color: var(--primary); text-decoration: none; margin-top: 3px; }
     .photo-hint { font-size: 12px; color: var(--sub); padding: 8px 0 0; line-height: 1.7; }
+    /* 네이버에 올리기 — 순서대로 눌러 나가는 단계 목록 */
+    .steps { display: flex; flex-direction: column; gap: 8px; }
+    .step { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 9px; background: #fbfcfe; }
+    .step.done { border-color: #b7e3c6; background: #f2fbf5; }
+    .step .no { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--primary); color: #fff; font-size: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+    .step.done .no { background: var(--naver); }
+    .step .tx { flex: 1; font-size: 13px; line-height: 1.6; }
+    .step .tx small { display: block; color: var(--sub); font-size: 11.5px; margin-top: 2px; }
+    .step .btn { flex: none; }
 
     .meta-bar { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--sub); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
     .meta-bar b { color: var(--text); }
@@ -409,9 +418,23 @@
         </div>
       </div>
 
-      <!-- 6. 발행 기록 -->
+      <!-- 6. 네이버에 올리기 -->
       <div class="card">
-        <h3><span class="h-left">6️⃣ 발행 기록</span></h3>
+        <h3><span class="h-left">6️⃣ 네이버에 올리기</span>
+          <span class="h-actions"><button class="btn sm" id="steps-reset">처음부터</button></span>
+        </h3>
+        <div class="steps" id="pub-steps">
+          <div class="step" data-step="open"><span class="no">1</span><span class="tx">네이버 블로그 글쓰기 창을 엽니다<small>새 탭에서 열립니다</small></span><button class="btn sm" id="st-open">열기</button></div>
+          <div class="step" data-step="title"><span class="no">2</span><span class="tx">제목을 복사해 붙여넣습니다<small>제목 칸에 Ctrl+V</small></span><button class="btn sm" id="st-title">제목 복사</button></div>
+          <div class="step" data-step="body"><span class="no">3</span><span class="tx">본문을 복사해 붙여넣습니다<small>본문 칸에 Ctrl+V — 소제목·목록 서식이 함께 옮겨집니다</small></span><button class="btn sm" id="st-body">본문 복사</button></div>
+          <div class="step" data-step="photo"><span class="no">4</span><span class="tx">사진을 저장해 순서대로 올립니다<small id="st-photo-sub">본문에 넣은 사진이 없습니다</small></span><button class="btn sm" id="st-photo">사진 전부 저장</button></div>
+          <div class="step" data-step="tags"><span class="no">5</span><span class="tx">태그를 복사해 붙여넣습니다<small>글 맨 아래 태그 칸에 Ctrl+V</small></span><button class="btn sm" id="st-tags">태그 복사</button></div>
+        </div>
+      </div>
+
+      <!-- 7. 발행 기록 -->
+      <div class="card">
+        <h3><span class="h-left">7️⃣ 발행 기록</span></h3>
         <div class="pub-row">
           <div class="form-group" style="flex:2;min-width:240px">
             <label>네이버 블로그 글 주소</label>
@@ -1003,6 +1026,10 @@ function renderPhotoList() {
   const box = $('photo-list'); if (!box) return;
   const figs = Array.from($('body-editor').querySelectorAll('figure.bimg img'));
   $('cnt-photo').textContent = figs.length;
+  const sub = $('st-photo-sub');
+  if (sub) sub.textContent = figs.length
+    ? '사진 ' + figs.length + '장 — 01, 02 … 순서로 저장됩니다. 네이버 사진 버튼에서 한 번에 고르세요.'
+    : '본문에 넣은 사진이 없습니다';
   if (!figs.length) { box.innerHTML = ''; return; }
   box.innerHTML = '<div class="photo-hint">사진 ' + figs.length + '장 — 「복사에 사진 포함」을 끄면 본문엔 <b>[사진 N 삽입]</b> 표시만 들어갑니다. 아래에서 순서대로 열어 네이버에 올리세요.</div>'
     + '<div class="photo-list">' + figs.map((im, i) =>
@@ -1599,6 +1626,91 @@ $('copy-plain-btn').addEventListener('click', () => {
 });
 $('copy-title-btn').addEventListener('click', () => copyPlain($('f-title').value, '제목을 복사했습니다.'));
 $('copy-tags-btn').addEventListener('click', () => copyPlain(tags.map((t) => '#' + t).join(' '), '태그를 복사했습니다.'));
+
+/* ────────── 네이버에 올리기 (단계) ──────────
+   네이버는 자동 발행 API 가 없고(2020-05 종료), 블로그 설정에도 「메일로 글쓰기」가 없다.
+   서버에 네이버 계정을 심는 자동화는 계정 탈취 위험·약관 문제로 하지 않는다.
+   그래서 남은 길은 "붙여넣기를 최대한 덜 헷갈리게" 다. 순서대로 한 번씩만 누르면 되게 한다. */
+const stepDone = new Set();
+function markStep(k) {
+  stepDone.add(k);
+  const el = document.querySelector('.step[data-step="' + k + '"]');
+  if (el) el.classList.add('done');
+}
+$('steps-reset').addEventListener('click', () => {
+  stepDone.clear();
+  document.querySelectorAll('.step').forEach((s) => s.classList.remove('done'));
+});
+$('st-open').addEventListener('click', () => {
+  window.open('https://blog.naver.com/', '_blank', 'noopener');
+  markStep('open');
+});
+$('st-title').addEventListener('click', () => {
+  copyPlain($('f-title').value, '제목을 복사했습니다. 네이버 제목 칸에 Ctrl+V 하세요.');
+  markStep('title');
+});
+$('st-body').addEventListener('click', () => {
+  if (!copyGate()) return;
+  copyRich(naverHtml(), naverPlain(), '본문을 복사했습니다. 네이버 본문에 Ctrl+V 하세요.');
+  markStep('body');
+});
+$('st-tags').addEventListener('click', () => {
+  copyPlain(tags.map((t) => '#' + t).join(' '), '태그를 복사했습니다.');
+  markStep('tags');
+});
+
+/* 사진 일괄 저장 — 01_, 02_ … 로 번호를 매겨 순서를 잃지 않게.
+   Storage 는 다른 도메인이라 <a download> 만으로는 안 되고(그냥 열려버린다) fetch 로 받아야 하는데,
+   그 fetch 는 버킷 CORS 가 있어야 통과한다. 없으면 한 번 걸고 다시 시도한다. */
+let _corsTried = false;
+async function ensureStorageCors() {
+  if (_corsTried) return;
+  _corsTried = true;
+  try { await httpsCallable(functions, 'setStorageCors')({ origins: [location.origin] }); }
+  catch (e) { /* 실패해도 아래에서 새 탭 열기로 넘어간다 */ }
+}
+function safeName(i, ext) {
+  const t = ($('f-title').value || '사진').replace(/[\\/:*?"<>|]/g, '').trim().slice(0, 20) || '사진';
+  return String(i).padStart(2, '0') + '_' + t + '.' + ext;
+}
+async function saveOnePhoto(url, i) {
+  const res = await fetch(url, { mode: 'cors' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const blob = await res.blob();
+  const ext = ((blob.type || '').split('/')[1] || 'jpg').replace('jpeg', 'jpg').split('+')[0];
+  const a = document.createElement('a');
+  const obj = URL.createObjectURL(blob);
+  a.href = obj; a.download = safeName(i, ext);
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(obj), 5000);
+}
+$('st-photo').addEventListener('click', async () => {
+  const imgs = Array.from($('body-editor').querySelectorAll('figure.bimg img'));
+  if (!imgs.length) { toast('본문에 넣은 사진이 없습니다. 「🖼 사진 넣기」로 먼저 넣어주세요.'); return; }
+  const btn = $('st-photo'); const prev = btn.textContent;
+  btn.disabled = true;
+  let ok = 0; const failed = [];
+  for (let i = 0; i < imgs.length; i++) {
+    btn.textContent = '저장 중 ' + (i + 1) + '/' + imgs.length;
+    try {
+      await saveOnePhoto(imgs[i].src, i + 1); ok++;
+    } catch (e) {
+      // 첫 실패는 대개 버킷 CORS 미설정 — 걸어보고 한 번만 다시 시도한다
+      await ensureStorageCors();
+      try { await saveOnePhoto(imgs[i].src, i + 1); ok++; }
+      catch (e2) { failed.push(imgs[i].src); }
+    }
+    await new Promise((r) => setTimeout(r, 250));   // 연속 다운로드를 브라우저가 막지 않게 텀을 둔다
+  }
+  btn.textContent = prev; btn.disabled = false;
+  if (!failed.length) {
+    markStep('photo');
+    toast('사진 ' + ok + '장을 저장했습니다. 네이버 사진 버튼에서 한 번에 골라 올리세요.');
+  } else {
+    failed.forEach((u) => window.open(u, '_blank', 'noopener'));
+    toast('사진 ' + failed.length + '장은 저장이 막혀 새 탭으로 열었습니다. 마우스 오른쪽 → 이미지를 다른 이름으로 저장.');
+  }
+});
 
 /* ────────── 발행 기록 ────────── */
 $('open-naver-btn').addEventListener('click', () => window.open('https://blog.naver.com/', '_blank', 'noopener'));
