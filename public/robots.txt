@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /editor.html
+Disallow: /admin/
+Disallow: /classic.html
+Disallow: /blog-studio.html
+
+Sitemap: https://www.xn--989aw10blgbjyhotax0bo92b.com/sitemap.xml
