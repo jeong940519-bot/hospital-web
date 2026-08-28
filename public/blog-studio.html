@@ -115,6 +115,15 @@
     #body-editor li { margin-bottom: 6px; }
     #body-editor blockquote { margin: 0 0 14px; padding: 12px 16px; border-left: 4px solid var(--primary); background: #f5f9fc; color: #445; }
     #body-editor .imgph { margin: 0 0 14px; padding: 14px 16px; border: 1px dashed #bcc6d4; border-radius: 8px; background: #f8fafc; color: #7c8794; font-size: 13px; }
+    #body-editor figure.bimg { margin: 0 0 14px; }
+    #body-editor figure.bimg img { max-width: 100%; border-radius: 8px; display: block; }
+    #body-editor figure.bimg figcaption { margin-top: 6px; font-size: 12px; color: #7c8794; }
+    .photo-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 0; }
+    .photo-list .pi { position: relative; width: 78px; }
+    .photo-list .pi img { width: 78px; height: 58px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); display: block; }
+    .photo-list .pi b { position: absolute; top: 3px; left: 3px; background: rgba(0,0,0,.6); color: #fff; font-size: 10px; border-radius: 4px; padding: 1px 5px; }
+    .photo-list .pi a { display: block; text-align: center; font-size: 11px; color: var(--primary); text-decoration: none; margin-top: 3px; }
+    .photo-hint { font-size: 12px; color: var(--sub); padding: 8px 0 0; line-height: 1.7; }
 
     .meta-bar { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--sub); margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
     .meta-bar b { color: var(--text); }
@@ -255,6 +264,7 @@
           <span class="h-actions">
             <button class="btn sm" id="tpl-open-btn">📋 템플릿 넣기</button>
             <button class="btn sm" id="tpl-save-btn">현재 글을 템플릿으로 저장</button>
+            <button class="btn sm" id="tpl-photo-save-btn">📸 사진 세트로 저장</button>
           </span>
         </h3>
         <div class="tpl-bar" id="tpl-bar">
@@ -351,18 +361,23 @@
           <span class="h-left">3️⃣ 본문</span>
           <span class="h-actions">
             <button class="btn sm" id="snip-btn">＋ 문단 넣기</button>
+            <button class="btn sm" id="img-btn">🖼 사진 넣기</button>
             <button class="btn sm" id="copy-body-btn">📋 스마트에디터용 복사</button>
             <button class="btn sm" id="copy-plain-btn">텍스트만 복사</button>
           </span>
         </h3>
         <div id="body-editor" contenteditable="true"></div>
+        <input type="file" id="img-file" accept="image/*" multiple style="display:none" />
         <div class="meta-bar">
           <span>공백 포함 <b id="cnt-all">0</b>자</span>
           <span>공백 제외 <b id="cnt-nospace">0</b>자</span>
           <span>주 키워드 <b id="cnt-kw">0</b>회</span>
           <span>소제목 <b id="cnt-h">0</b>개</span>
           <span>이미지 자리 <b id="cnt-img">0</b>개</span>
+          <span>넣은 사진 <b id="cnt-photo">0</b>장</span>
+          <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="copy-with-img" style="width:auto;margin:0"> 복사에 사진 포함</label>
         </div>
+        <div id="photo-list"></div>
       </div>
 
       <!-- 4. 태그 -->
@@ -422,6 +437,7 @@
     <div class="modal-tabs">
       <div class="modal-tab on" data-tab="builtin">내장 템플릿</div>
       <div class="modal-tab" data-tab="mine">내 템플릿 <span id="mine-count"></span></div>
+      <div class="modal-tab" data-tab="photo">📸 사진 세트 <span id="photo-count"></span></div>
     </div>
     <div class="modal-body">
       <div class="tpl-grid" id="tpl-grid"></div>
@@ -446,6 +462,7 @@ import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/fireba
 import { getFirestore, doc, getDoc, setDoc, addDoc, deleteDoc, collection, query, orderBy, limit, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import { getFunctions, httpsCallable } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
+import { getStorage, ref as sRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 
 const app = initializeApp({
   apiKey: "AIzaSyDq3LRPvBDn1ZH6UDMPGDH_-LC7JnsEhLg",
@@ -458,6 +475,7 @@ const app = initializeApp({
 const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app, 'asia-northeast3');
+const storage = getStorage(app);
 const aiProxy = httpsCallable(functions, 'aiProxy', { timeout: 300000 });
 
 const AI_MODEL = 'claude-opus-5';
@@ -468,6 +486,7 @@ let posts = [];          // 목록
 let current = null;      // 편집 중인 글
 let site = {};           // 병원 기본 정보 (site/content)
 let tags = [];
+let photoTpls = [];        // 사진 세트 템플릿(Firestore) — findTpl 이 참조하므로 위에서 선언
 let dirty = false;
 
 /* ────────── 로그인 ────────── */
@@ -852,8 +871,8 @@ let tplTab = 'builtin';
 let tplPick = null;   // 모달에서 고른 것 (아직 적용 전)
 function openTplModal() { tplPick = current && current.tplKey ? findTpl(current.tplKey) : null; renderTplGrid(); $('tpl-modal').classList.add('on'); }
 function closeTplModal() { $('tpl-modal').classList.remove('on'); }
-function findTpl(key) { return BLOG_TEMPLATES.concat(getMyTpls()).find((t) => t.key === key) || null; }
-$('tpl-open-btn').addEventListener('click', openTplModal);
+function findTpl(key) { return BLOG_TEMPLATES.concat(getMyTpls()).concat(photoTpls).find((t) => t.key === key) || null; }
+$('tpl-open-btn').addEventListener('click', async () => { await loadPhotoTpls(); openTplModal(); });
 $('tpl-close').addEventListener('click', closeTplModal);
 $('tpl-modal').addEventListener('click', (e) => { if (e.target === $('tpl-modal')) closeTplModal(); });
 document.querySelectorAll('.modal-tab').forEach((t) =>
@@ -865,7 +884,8 @@ document.querySelectorAll('.modal-tab').forEach((t) =>
 function renderTplGrid() {
   const mine = getMyTpls();
   $('mine-count').textContent = mine.length ? '(' + mine.length + ')' : '';
-  const list = tplTab === 'mine' ? mine : BLOG_TEMPLATES;
+  $('photo-count').textContent = photoTpls.length ? '(' + photoTpls.length + ')' : '';
+  const list = tplTab === 'mine' ? mine : tplTab === 'photo' ? photoTpls : BLOG_TEMPLATES;
   const el = $('tpl-grid');
   if (!list.length) {
     el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--sub);font-size:13px;line-height:1.8">저장된 템플릿이 없습니다.<br />마음에 드는 글을 완성한 뒤 「현재 글을 템플릿으로 저장」을 눌러보세요.</div>';
@@ -873,7 +893,7 @@ function renderTplGrid() {
   }
   el.innerHTML = list.map((t) =>
     '<div class="tpl-card' + (tplPick && tplPick.key === t.key ? ' on' : '') + '" data-key="' + t.key + '">'
-    + (t.mine ? '<button class="del" data-del="' + t.key + '" title="삭제">×</button>' : '')
+    + (t.mine || t.kind === 'photo' ? '<button class="del" data-del="' + t.key + '" title="삭제">×</button>' : '')
     + '<div class="n">' + (t.icon || '📄') + ' ' + esc(t.name) + '</div>'
     + '<div class="d">' + esc(t.desc || '') + '</div>'
     + '<div class="o">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('<br />') + '</div></div>').join('');
@@ -886,9 +906,15 @@ function renderTplGrid() {
     b.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!confirm('이 템플릿을 삭제할까요?')) return;
-      setMyTpls(getMyTpls().filter((t) => t.key !== b.dataset.del));
+      if (tplTab === 'photo') {
+        deleteDoc(doc(db, 'blogTemplates', b.dataset.del))
+          .then(loadPhotoTpls).then(() => { renderTplGrid(); toast('삭제했습니다.'); })
+          .catch((err) => toast('삭제 실패: ' + (err.message || err)));
+      } else {
+        setMyTpls(getMyTpls().filter((t) => t.key !== b.dataset.del));
+        renderTplGrid(); toast('삭제했습니다.');
+      }
       if (tplPick && tplPick.key === b.dataset.del) tplPick = null;
-      renderTplGrid(); toast('삭제했습니다.');
     }));
 }
 /* 템플릿에 딸린 설정(글 유형·톤·분량)을 폼에 반영 — 적용/뼈대넣기 양쪽에서 공통 사용 */
@@ -900,6 +926,16 @@ function applyTplSettings(t) {
 }
 $('tpl-apply-btn').addEventListener('click', () => {
   if (!tplPick) { toast('템플릿을 먼저 고르세요.'); return; }
+  // 사진 세트는 사진이 이미 자리에 있는 완성된 뼈대다 — AI 를 부르지 않고 그대로 넣는다.
+  if (tplPick.kind === 'photo') {
+    const cur = $('body-editor').innerHTML.trim();
+    if (cur && !confirm('본문 내용을 이 사진 세트로 바꿀까요? (지금 내용은 사라집니다)')) return;
+    $('body-editor').innerHTML = tplPick.bodyHtml || '';
+    applyTplSettings(tplPick);
+    renderTplBar(); markDirty(); updateStats(); closeTplModal();
+    toast('"' + tplPick.name + '" — 사진은 그대로 두고 글자만 고치세요.');
+    return;
+  }
   applyTplSettings(tplPick);
   renderTplBar(); markDirty(); closeTplModal();
   toast('"' + tplPick.name + '" 적용 — 이제 「✨ AI로 초안 생성」을 누르세요.');
@@ -927,6 +963,79 @@ function renderTplBar() {
       + '<div class="outline">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('　') + '</div>'
     : '<span class="none">선택된 템플릿 없음 — 「📋 템플릿 넣기」로 글의 뼈대를 고르면 AI가 그 구성대로 씁니다.</span>';
 }
+
+/* ══════════════════════ 사진 ══════════════════════ */
+/* 네이버는 자동 발행 API 가 없어서 이 도구는 "복사 → 스마트에디터 붙여넣기" 로 쓴다.
+   그래서 사진을 본문에 넣어도 네이버가 외부 이미지를 그대로 받아줄지는 확실하지 않다.
+   기본은 예전처럼 [사진 N 삽입: 설명] 텍스트로 바꿔 복사하고, 아래 사진 목록에서
+   순서대로 열어 네이버에 올리면 된다. 「복사에 사진 포함」을 켜면 <img> 를 그대로 복사한다
+   — 네이버가 받아주는지 한 번 시험해 보라고 둔 스위치다. */
+function imgHtml(url, cap) {
+  return '<figure class="bimg"><img src="' + url + '" alt="" />'
+    + '<figcaption>' + esc(cap || '사진 설명을 적어주세요') + '</figcaption></figure>';
+}
+async function uploadBlogImages(files) {
+  const out = [];
+  for (const f of files) {
+    const safe = f.name.replace(/[^\w.\-]+/g, '_');
+    const r = sRef(storage, 'editor/blog/' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '_' + safe);
+    await uploadBytes(r, f);
+    out.push({ url: await getDownloadURL(r), name: f.name });
+  }
+  return out;
+}
+$('img-btn').addEventListener('click', () => { saveRange(); $('img-file').click(); });
+$('img-file').addEventListener('change', async (ev) => {
+  const files = Array.from(ev.target.files || []);
+  ev.target.value = '';
+  if (!files.length) return;
+  const btn = $('img-btn'); const prev = btn.textContent;
+  btn.textContent = '올리는 중…'; btn.disabled = true;
+  try {
+    const ups = await uploadBlogImages(files);
+    insertSnippet(ups.map((u) => imgHtml(u.url, '')).join(''));
+    toast('사진 ' + ups.length + '장을 넣었습니다.');
+  } catch (e) { toast('사진 올리기 실패: ' + (e.message || e)); }
+  finally { btn.textContent = prev; btn.disabled = false; }
+});
+/* 본문에 들어간 사진 목록 — 네이버에 올릴 때 순서를 보라고 */
+function renderPhotoList() {
+  const box = $('photo-list'); if (!box) return;
+  const figs = Array.from($('body-editor').querySelectorAll('figure.bimg img'));
+  $('cnt-photo').textContent = figs.length;
+  if (!figs.length) { box.innerHTML = ''; return; }
+  box.innerHTML = '<div class="photo-hint">사진 ' + figs.length + '장 — 「복사에 사진 포함」을 끄면 본문엔 <b>[사진 N 삽입]</b> 표시만 들어갑니다. 아래에서 순서대로 열어 네이버에 올리세요.</div>'
+    + '<div class="photo-list">' + figs.map((im, i) =>
+      '<div class="pi"><b>' + (i + 1) + '</b><img src="' + im.src + '" /><a href="' + im.src + '" target="_blank" rel="noopener">열기</a></div>').join('') + '</div>';
+}
+
+/* ── 사진 세트 템플릿 (Firestore) ──
+   내 템플릿은 localStorage 라 다른 PC 에서 안 보인다. 사진까지 묶는 세트는
+   병원 공용으로 써야 하므로 Firestore 에 둔다. */
+async function loadPhotoTpls() {
+  try {
+    const qs = await getDocs(query(collection(db, 'blogTemplates'), orderBy('updatedAt', 'desc'), limit(60)));
+    photoTpls = qs.docs.map((d) => Object.assign({ key: d.id, kind: 'photo', icon: '📸' }, d.data()));
+  } catch (e) { photoTpls = []; }
+}
+$('tpl-photo-save-btn').addEventListener('click', async () => {
+  const ed = $('body-editor');
+  if (!ed.querySelector('figure.bimg')) { toast('먼저 「🖼 사진 넣기」로 사진을 넣어주세요.'); return; }
+  const nm = (prompt('사진 세트 이름:', (current && current.type) || '사진 세트') || '').trim();
+  if (!nm) return;
+  const outline = Array.from(ed.querySelectorAll('h3')).map((h) => (h.textContent || '').trim()).filter(Boolean);
+  const data = {
+    name: nm, desc: '사진 ' + ed.querySelectorAll('figure.bimg').length + '장이 들어간 세트 · 글자만 고쳐 쓰세요',
+    type: (current && current.type) || '', tone: (current && current.tone) || '', length: (current && current.length) || '',
+    outline: outline.length ? outline : [nm],
+    bodyHtml: ed.innerHTML, updatedAt: new Date().toISOString()
+  };
+  try {
+    await addDoc(collection(db, 'blogTemplates'), data);
+    await loadPhotoTpls();
+    toast('"' + nm + '" 사진 세트로 저장했습니다.');
+  } catch (e) { toast('저장 실패: ' + (e.message || e)); }
+});
 
 /* ── 문단 스니펫 삽입 ── */
 let savedRange = null;
@@ -1248,6 +1357,7 @@ function updateStats() {
   $('cnt-kw').textContent = n;
   $('cnt-h').textContent = $('body-editor').querySelectorAll('h3').length;
   $('cnt-img').textContent = $('body-editor').querySelectorAll('.imgph').length;
+  renderPhotoList();
   $('title-len').textContent = $('f-title').value.length;
 }
 
@@ -1407,6 +1517,16 @@ async function publishGate() {
 }
 
 /* ────────── 복사 ────────── */
+/* 넣은 사진을 [사진 N 삽입: 설명] 로 바꾼다 — 「복사에 사진 포함」이 꺼져 있을 때. */
+function photosToText(root) {
+  if ($('copy-with-img').checked) return;   // 켜져 있으면 <img> 를 그대로 둔다
+  root.querySelectorAll('figure.bimg').forEach((n, i) => {
+    const cap = ((n.querySelector('figcaption') || {}).textContent || '').trim();
+    const p = document.createElement('p');
+    p.textContent = '[사진 ' + (i + 1) + ' 삽입' + (cap ? ': ' + cap : '') + ']';
+    n.replaceWith(p);
+  });
+}
 function imgPhToText(root) {
   root.querySelectorAll('.imgph').forEach((n) => {
     const p = document.createElement('p');
@@ -1416,14 +1536,14 @@ function imgPhToText(root) {
 }
 function naverHtml() {
   const clone = $('body-editor').cloneNode(true);
-  imgPhToText(clone);
+  imgPhToText(clone); photosToText(clone);
   clone.querySelectorAll('[style]').forEach((n) => n.removeAttribute('style'));
   clone.querySelectorAll('[class]').forEach((n) => n.removeAttribute('class'));
   return '<div>' + clone.innerHTML + '</div>';
 }
 function naverPlain() {
   const clone = $('body-editor').cloneNode(true);
-  imgPhToText(clone);
+  imgPhToText(clone); photosToText(clone);
   const out = [];
   clone.childNodes.forEach((n) => {
     if (n.nodeType !== 1) { const t = (n.textContent || '').trim(); if (t) out.push(t); return; }

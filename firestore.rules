@@ -15,6 +15,10 @@ service cloud.firestore {
     match /blogPosts/{id} {
       allow read, write, delete: if request.auth != null;
     }
+    // 블로그 사진 세트 템플릿 — 내 템플릿(localStorage)과 달리 병원 공용이라 서버에 둔다.
+    match /blogTemplates/{id} {
+      allow read, write, delete: if request.auth != null;
+    }
     // 게시판(문의·후기) — 누구나 읽기/작성 가능(방문자용), 수정·삭제(답변·모더레이션)는 관리자만.
     match /boardPosts/{id} {
       allow read: if true;
