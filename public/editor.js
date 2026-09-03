@@ -2565,7 +2565,7 @@ function renderEl(e){
       node.appendChild(h);
     }
   }
-  if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+((pageById(e.link)||{}).name||''); node.appendChild(b); }
+  if(e.link){ const b=document.createElement('div'); b.className='link-badge'; b.textContent='🔗'; b.title='링크: '+(/^https?:\/\//.test(e.link)?e.link:((pageById(e.link)||{}).name||'')); node.appendChild(b); }
   if(e.fx && e.fx.type){ const b=document.createElement('div'); b.className='fx-badge'; b.textContent=(FX_ICONS[e.fx.type]||'✨'); b.title='이펙트: '+(FX_NAMES[e.fx.type]||e.fx.type); node.appendChild(b); }
   node.addEventListener('mousedown', ev=>{
     if(_fxPaint && ev.button===0){ ev.stopPropagation(); ev.preventDefault(); const tgt = e.groupId ? page().elements.filter(x=>x.groupId===e.groupId) : [e]; const n=_applyFxTo(tgt); toast(n?('✨ 이펙트 적용됨'+(n>1?` (${n}개)`:'')):'적용하지 못했습니다'); return; }
@@ -3431,13 +3431,15 @@ function renderProps(){
   }
   // 링크 (클릭 시 이동) — 모든 요소 공통
   const others = project.pages.filter(p=>p.id!==page().id && !p.isHeader && !p.isFooter);
+  const isExternalLink = !!(e.link && /^https?:\/\//.test(e.link));
   html += `<div class="grp"><label>🔗 클릭 시 이동 (링크)</label>
     <select id="el-link">
       <option value="">없음</option>
       ${others.map(p=>`<option value="${p.id}" ${e.link===p.id?'selected':''}>${escapeHtml(p.name||'페이지')}</option>`).join('')}
       <option value="__new__">＋ 새 페이지 만들어 연결</option>
+      <option value="__url__" ${isExternalLink?'selected':''}>${isExternalLink?'🔗 '+escapeHtml(e.link):'🔗 외부 사이트 링크(URL) 입력'}</option>
     </select>
-    ${e.link?`<button class="tb-btn" id="el-link-go" style="width:100%;margin-top:6px">✎ 연결된 페이지 편집하러 가기</button>`:''}
+    ${e.link&&!isExternalLink?`<button class="tb-btn" id="el-link-go" style="width:100%;margin-top:6px">✎ 연결된 페이지 편집하러 가기</button>`:''}
   </div>`;
   html += `<div class="grp"><div class="btn-grp"><button id="el-front">맨앞</button><button id="el-back">맨뒤</button><button id="el-dup">복제</button></div></div>`;
   if(e.fx&&e.fx.type){ const FX_NAMES={'scroll-reveal':'📜 스크롤 등장','hover-show':'👁 호버 트리거','hover-hide':'👁 호버 대상','tab-trigger':'🏷 탭 버튼','tab-content':'🏷 탭 내용','hover-zoom':'🔍 호버 줌','hover-expand':'📂 호버 펼침','counter':'🔢 카운터','slider':'🎠 슬라이더'}; html+=`<div style="margin-bottom:8px;padding:7px 10px;background:rgba(230,126,34,.15);border:1px solid rgba(230,126,34,.4);border-radius:7px;font-size:12px;color:#e67e22;cursor:pointer" id="fx-hint">✨ ${FX_NAMES[e.fx.type]||e.fx.type} 적용됨 → 이펙트 탭에서 편집</div>`; }
@@ -3768,6 +3770,11 @@ function bindProps(e){
       const child=newPage(prompt('새로 만들 페이지 이름','새 페이지')||'새 페이지', page().id);
       project.pages.push(child); _t.forEach(x=>x.link=child.id);
       renderProps(); afterMutate(); toast('새 페이지를 만들어 연결했습니다'+(_t.length>1?` (${_t.length}개)`:''));
+    }else if(v==='__url__'){
+      const cur=(e.link&&/^https?:\/\//.test(e.link))?e.link:'https://';
+      const url=prompt('연결할 외부 사이트 주소를 입력하세요 (https://로 시작)', cur);
+      if(url&&url.trim()){ _t.forEach(x=>x.link=url.trim()); liveStyle(); snapshot(); toast('외부 링크 연결됨 🔗'+(_t.length>1?` (${_t.length}개)`:'')); }
+      renderProps();
     }else{ _t.forEach(x=>x.link=v||null); liveStyle(); snapshot(); renderProps(); if(_t.length>1&&v) toast(`${_t.length}개에 링크 연결됨`); }
   });
   const linkGo=$('el-link-go');

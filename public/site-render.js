@@ -764,7 +764,7 @@
       +'document.querySelectorAll(".hmgrp-t").forEach(function(b){b.addEventListener("click",function(){var g=b.parentNode,open=!g.classList.contains("open");document.querySelectorAll(".hmgrp.open").forEach(function(og){if(og!==g)og.classList.remove("open");});g.classList.toggle("open",open);});});'
       +'var _hb=document.getElementById("hmbtn");if(_hb)_hb.addEventListener("click",function(){hmToggle();});'
       +'var _ho=document.getElementById("hmoverlay");if(_ho)_ho.addEventListener("click",function(){hmToggle(false);});'
-      +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){show(el.getAttribute("data-link"));});});'
+      +'document.querySelectorAll("[data-link]").forEach(function(el){el.style.cursor="pointer";el.addEventListener("click",function(){var v=el.getAttribute("data-link");if(/^https?:\\/\\//.test(v)){window.open(v,"_blank","noopener");}else{show(v);}});});'
       /* 글꼴 안전망 —
          이 편집기는 고정 캔버스(px 좌표)라 글자 상자 크기도 고정이다. 그래서 지정한 글꼴이 안 오면
          시스템 글꼴로 떨어지면서 같은 문장이 5~6% 길어지고, 한 줄이 두 줄로 넘어가면서
