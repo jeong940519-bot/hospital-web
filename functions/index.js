@@ -23,20 +23,31 @@ exports.aiProxy = onCall({ region: 'asia-northeast3', timeoutSeconds: 300, memor
     throw new HttpsError('invalid-argument', '요청 본문이 없습니다.');
   }
 
-  let res, data;
-  try {
-    res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-  } catch (e) {
-    // 네트워크/타임아웃 등 — 읽을 수 있는 메시지로 변환
-    throw new HttpsError('internal', 'Anthropic 연결 실패: ' + (e && e.message ? e.message : String(e)));
+  // 분당 토큰 한도(429)·혼잡(529)은 잠시 기다리면 풀린다 — 서버에서 최대 3회 다시 보낸다(총 90초 안)
+  const send = () => fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'content-type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+  let res, data, waited = 0;
+  for (let attempt = 0; ; attempt++) {
+    try {
+      res = await send();
+    } catch (e) {
+      // 네트워크/타임아웃 등 — 읽을 수 있는 메시지로 변환
+      throw new HttpsError('internal', 'Anthropic 연결 실패: ' + (e && e.message ? e.message : String(e)));
+    }
+    if (res.ok || attempt >= 3 || ![429, 529, 500, 502, 503, 504].includes(res.status)) break;
+    const ra = parseFloat(res.headers.get('retry-after') || '');
+    const delay = Math.min(45000, Math.max(3000, (ra > 0 ? ra * 1000 : 0) || (5000 * Math.pow(2, attempt))));
+    if (waited + delay > 90000) break;
+    waited += delay;
+    await res.text().catch(() => '');
+    await new Promise((r) => setTimeout(r, delay));
   }
 
   const raw = await res.text();
@@ -44,6 +55,8 @@ exports.aiProxy = onCall({ region: 'asia-northeast3', timeoutSeconds: 300, memor
 
   if (!res.ok) {
     const msg = (data && data.error && data.error.message) || raw.slice(0, 300) || ('HTTP ' + res.status);
+    // 원인 추적용 — 키는 남기지 않는다. 429 면 어느 한도(요청/입력/출력 토큰)인지 메시지에 나온다
+    console.warn('anthropic ' + res.status + ' after ' + waited + 'ms wait: ' + msg.slice(0, 400) + ' | model=' + (body.model || '?') + ' max_tokens=' + (body.max_tokens || '?') + ' bodyChars=' + JSON.stringify(body).length + ' retry-after=' + (res.headers.get('retry-after') || '-'));
     if (res.status === 402 || /credit|balance/i.test(msg)) {
       throw new HttpsError('resource-exhausted', '크레딧이 소진되었습니다. console.anthropic.com에서 충전해주세요.');
     }
@@ -234,3 +247,6 @@ exports.setStorageCors = onCall({ region: 'asia-northeast3' }, async (request) =
   const [meta] = await bucket.getMetadata();
   return { bucket: bucket.name, cors: meta.cors || [] };
 });
+
+// 참고 블로그 글 구성 읽기 — functions/blogref.js
+exports.fetchBlogRef = require('./blogref').fetchBlogRef;

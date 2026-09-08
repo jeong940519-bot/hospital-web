@@ -81,7 +81,36 @@
     }
     .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--primary); }
     .form-group textarea { min-height: 70px; resize: vertical; line-height: 1.6; }
+    /* 선택창 공통 — 폼 입력칸과 같은 높이·테두리, 화살표는 직접 그린다(브라우저마다 다른 기본 모양 제거) */
+    select {
+      appearance: none; -webkit-appearance: none; -moz-appearance: none;
+      width: 100%; min-height: 42px; padding: 9px 38px 9px 13px; border: 1px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit; color: var(--text); background: var(--white) no-repeat right 13px center;
+      background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1.5l5 5 5-5' fill='none' stroke='%23667085' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+      cursor: pointer; outline: none; line-height: 1.4; transition: border-color .15s, box-shadow .15s;
+    }
+    select:hover { border-color: #b9c3d2; }
+    select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(26,111,173,0.15); }
+    select:disabled { opacity: .55; cursor: default; }
+    select option { padding: 8px 10px; font-size: 14px; }
+    select option:checked { background: #eef6fd; color: var(--primary); }
+    /* 작은 선택창(툴바·상태줄 안) */
+    select.sm { width: auto; min-height: 30px; padding: 4px 28px 4px 10px; font-size: 12.5px; border-radius: 6px; background-position: right 9px center; }
+    .form-group select { padding-right: 38px; }
     .hint { font-size: 11px; color: #98a0ad; margin-top: 4px; line-height: 1.5; }
+    /* 기본값 모달 — 글감 설정과 같은 form-group 레이아웃, 체크 끄면 흐리게 */
+    #def-modal .row { display: flex; gap: 14px; }
+    #def-modal .form-group label.def-lab { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    #def-modal .form-group label.def-lab input { width: 14px; height: 14px; margin: 0; padding: 0; accent-color: var(--primary); }
+    #def-modal .form-group.off input:not([type=checkbox]), #def-modal .form-group.off select, #def-modal .form-group.off textarea { opacity: .45; background: #f6f7f9; }
+    #def-modal .form-group.off label.def-lab { color: #9aa3b0; }
+    #def-modal .sec-title { font-size: 13px; font-weight: 700; color: var(--text); margin: 4px 0 12px; display: flex; align-items: center; gap: 6px; }
+    #def-modal .sec-title small { font-weight: 400; color: #98a0ad; font-size: 11px; }
+    /* 크기 조절 가능한 모달 — 오른쪽 아래 모서리를 끌면 커지고, 크기는 기억된다 */
+    .modal-box.resizable { resize: both; min-width: 520px; min-height: 340px; max-width: 96vw; max-height: 92vh; position: relative; }
+    .modal-box.resizable .modal-body { flex: 1; }
+    .modal-box.resizable::after { content: ''; position: absolute; right: 4px; bottom: 4px; width: 14px; height: 14px; pointer-events: none;
+      background: linear-gradient(135deg, transparent 0 50%, #c5ccd6 50% 60%, transparent 60% 75%, #c5ccd6 75% 85%, transparent 85%); border-radius: 0 0 6px 0; }
 
     /* 글감 후보 */
     .idea-wrap { margin-bottom: 14px; }
@@ -105,10 +134,10 @@
     /* 본문 에디터 */
     #body-editor {
       min-height: 320px; border: 1px solid var(--border); border-radius: 10px;
-      padding: 20px 24px; font-size: 15px; line-height: 1.9; outline: none; background: #fff;
+      padding: 20px 24px; font-size: var(--ed-size, 15px); font-family: var(--ed-font, inherit); line-height: 1.9; outline: none; background: #fff;
     }
     #body-editor:focus { border-color: var(--primary); }
-    #body-editor h3 { font-size: 18px; font-weight: 700; margin: 24px 0 10px; color: #111; }
+    #body-editor h3 { font-size: var(--ed-hsize, 18px); font-weight: 700; margin: 24px 0 10px; color: #111; }
     #body-editor h3:first-child { margin-top: 0; }
     #body-editor p { margin: 0 0 14px; }
     #body-editor ul, #body-editor ol { margin: 0 0 14px 20px; }
@@ -116,6 +145,8 @@
     #body-editor blockquote { margin: 0 0 14px; padding: 12px 16px; border-left: 4px solid var(--primary); background: #f5f9fc; color: #445; }
     #body-editor .imgph { margin: 0 0 14px; padding: 14px 16px; border: 1px dashed #bcc6d4; border-radius: 8px; background: #f8fafc; color: #7c8794; font-size: 13px; }
     #body-editor figure.bimg { margin: 0 0 14px; }
+    .tag.next { outline: 2px solid var(--primary); outline-offset: 1px; }
+    .tag.done { opacity: .45; }
     #body-editor figure.bimg img { max-width: 100%; border-radius: 8px; display: block; }
     #body-editor figure.bimg figcaption { margin-top: 6px; font-size: 12px; color: #7c8794; }
     .photo-list { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 0 0; }
@@ -235,6 +266,7 @@
 <div class="sidebar">
   <div class="sidebar-logo">📝 블로그 스튜디오<span id="hospital-label">병원 블로그</span></div>
   <button class="sidebar-new" id="new-post-btn">+ 새 글 작성</button>
+  <button class="sidebar-new" id="batch-open-btn" style="margin-top:-4px;background:rgba(255,255,255,.12)" title="키워드 여러 개를 넣으면 순서대로 초안을 만들어 목록에 쌓습니다">⚡ 일괄 생성</button>
   <div class="post-list" id="post-list"></div>
   <div class="sidebar-bottom">
     <a href="/admin/">관리자</a>
@@ -273,7 +305,9 @@
           <span class="h-actions">
             <button class="btn sm" id="tpl-open-btn">📋 템플릿 넣기</button>
             <button class="btn sm" id="tpl-save-btn">현재 글을 템플릿으로 저장</button>
-            <button class="btn sm" id="tpl-photo-save-btn">📸 사진 세트로 저장</button>
+            <span id="model-badge" class="hint" style="align-self:center;margin:0 4px 0 0;white-space:nowrap"></span>
+            <button class="btn sm" id="def-open-btn" title="새 글을 시작할 때 자동으로 채울 값">⚙ 기본값</button>
+            <button class="btn sm" id="tpl-photo-save-btn" title="컨셉별 사진 풀을 만들어 두면 글을 만들 때 AI가 사진 자리마다 골라 넣습니다">📸 사진 세트</button>
           </span>
         </h3>
         <div class="tpl-bar" id="tpl-bar">
@@ -300,7 +334,8 @@
         </div>
         <div class="row">
           <div class="form-group">
-            <label>주 키워드 (검색 노출 목표) *</label>
+            <label style="display:flex;align-items:center;gap:8px">주 키워드 (검색 노출 목표) *
+              <button type="button" class="btn sm" id="kw-ai-btn" style="padding:2px 9px;font-size:11.5px;font-weight:600" title="제목(없으면 주제·본문)을 읽고 네이버 검색형 주 키워드와 보조 키워드를 제안합니다">✨ 제목에서 AI 추천</button></label>
             <input type="text" id="f-keyword" placeholder="예: 진주 어깨통증" />
             <div class="hint">제목·첫 문단·소제목에 자연스럽게 배치됩니다.</div>
           </div>
@@ -354,7 +389,7 @@
       <div class="card">
         <h3>
           <span class="h-left">2️⃣ 제목</span>
-          <span class="h-actions"><button class="btn sm" id="copy-title-btn">제목 복사</button></span>
+          <span class="h-actions"><button class="btn sm" id="gen-titles-btn2" title="본문 내용에 맞춰 제목 후보 5개를 새로 뽑습니다 (기본 Opus 5 — 출력이 짧아 저렴)">🔁 제목 다시 뽑기</button><button class="btn sm" id="copy-title-btn">제목 복사</button></span>
         </h3>
         <div class="form-group">
           <label>발행할 제목</label>
@@ -371,6 +406,7 @@
           <span class="h-actions">
             <button class="btn sm" id="snip-btn">＋ 문단 넣기</button>
             <button class="btn sm" id="img-btn">🖼 사진 넣기</button>
+            <button class="btn sm" id="img-fill-btn" title="AI가 남긴 사진 자리(📷)를 저장된 사진 세트의 사진으로 순서대로 채웁니다">📸 세트로 채우기</button>
             <button class="btn sm" id="copy-body-btn">📋 스마트에디터용 복사</button>
             <button class="btn sm" id="copy-plain-btn">텍스트만 복사</button>
           </span>
@@ -384,7 +420,14 @@
           <span>소제목 <b id="cnt-h">0</b>개</span>
           <span>이미지 자리 <b id="cnt-img">0</b>개</span>
           <span>넣은 사진 <b id="cnt-photo">0</b>장</span>
-          <label style="display:flex;align-items:center;gap:5px;cursor:pointer"><input type="checkbox" id="copy-with-img" style="width:auto;margin:0"> 복사에 사진 포함</label>
+          <span style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="켜면 사진이 <img>로 함께 복사되어 네이버가 붙여넣기 때 가져옵니다"><input type="checkbox" id="copy-with-img" checked style="width:auto;margin:0"> 사진 포함</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="네이버는 문단 여백을 무시해서 빈 줄을 넣어야 띄어집니다"><input type="checkbox" id="paste-gap" checked style="width:auto;margin:0"> 문단 사이 빈 줄</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="켜면 사진 아래에 회색 작은 글씨로 사진 설명이 붙습니다"><input type="checkbox" id="copy-with-cap" style="width:auto;margin:0"> 사진 설명 포함</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="네이버 제목칸은 붙여넣기로 채울 수 없어 본문 첫 줄에 제목을 넣습니다. 제목칸에는 「제목 복사」 버튼을 쓰세요"><input type="checkbox" id="copy-with-title" style="width:auto;margin:0"> 제목을 첫 줄에</label>
+            <label style="display:flex;align-items:center;gap:5px;cursor:pointer" title="본문 마지막 줄에 #태그1 #태그2 … 를 넣습니다. 네이버가 본문 해시태그를 태그로 인식하면 태그칸 입력이 필요 없습니다"><input type="checkbox" id="copy-with-tags" style="width:auto;margin:0"> 본문 끝에 #태그</label>
+            <label style="display:flex;align-items:center;gap:5px">정렬 <select id="paste-align" class="sm"><option value="left">왼쪽</option><option value="center">가운데</option></select></label>
+          </span>
         </div>
         <div id="photo-list"></div>
       </div>
@@ -393,7 +436,11 @@
       <div class="card">
         <h3>
           <span class="h-left">4️⃣ 해시태그</span>
-          <span class="h-actions"><button class="btn sm" id="copy-tags-btn">태그 복사</button></span>
+          <span class="h-actions" style="display:flex;align-items:center;gap:6px">
+            <span id="tag-prog" class="hint" style="margin:0;white-space:nowrap"></span>
+            <button class="btn sm" id="copy-next-tag-btn" title="네이버 태그칸은 한 번에 하나만 받습니다(쉼표·#·공백은 특수문자로 거부). 누를 때마다 다음 태그가 복사되니 태그칸에 Ctrl+V → Enter 를 반복하세요">▶ 다음 태그 복사</button>
+            <button class="btn sm" id="copy-tags-btn" title="전부를 한 줄에 하나씩 복사">전체 복사</button>
+            <button class="btn sm" id="tag-bm-btn" title="네이버 발행 창 태그칸에 태그를 자동으로 하나씩 쳐 넣는 북마클릿">🔖 자동 입력 설정</button></span>
         </h3>
         <div class="tag-wrap" id="tag-wrap"></div>
         <div class="form-group" style="margin-top:12px;margin-bottom:0">
@@ -450,6 +497,111 @@
   </div>
 </div>
 
+<!-- 기본값 모달 -->
+<div class="modal" id="def-modal">
+  <div class="modal-box resizable" data-size-key="def" style="max-width:860px">
+    <div class="modal-head"><h4>⚙ 새 글 기본값</h4><button id="def-close">×</button></div>
+    <div class="modal-body">
+      <div class="sec-title">1️⃣ 글감 설정 <small>체크한 항목만 새 글에 미리 채워집니다 · 체크를 끄면 평소처럼 비워 둡니다</small></div>
+      <div id="def-rows"></div>
+      <div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border)">
+        <div class="sec-title">🖼 글 맨 아래 기본 사진 <small>올려두면 모든 글의 끝에 항상 들어갑니다 (오시는 길·진료 안내 이미지 등)</small></div>
+        <div id="footer-drop" style="border:1px dashed #bcc6d4;border-radius:8px;padding:10px 12px;text-align:center;color:#7c8794;font-size:12.5px;background:#f8fafc;margin-bottom:10px">📋 사진을 여기서 <b>Ctrl+V</b> 하거나 끌어다 놓기 · <label style="color:var(--primary);cursor:pointer">파일 선택<input type="file" id="footer-file" accept="image/*" multiple style="display:none"></label></div>
+        <div id="footer-list" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:8px"></div>
+        <div class="hint" style="margin-bottom:12px">순서대로 본문 맨 아래에 붙습니다. 사진 아래 설명은 「사진 설명 포함」 옵션을 켰을 때만 복사됩니다. 저장은 즉시 됩니다.</div>
+      </div>
+      <div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border)">
+        <div class="sec-title">🤖 AI 모델 <small>역할별로 고릅니다 · Opus는 Sonnet의 약 5배 비용</small></div>
+        <div class="row" id="def-models"></div>
+        <div class="hint" style="margin-top:-6px">권장(기본): 글감 추천 Opus 5 · 초안 Sonnet 5 · 제목 다시 뽑기 Opus 5(둘 다 출력 짧아 저렴) · 검수 Opus 5 · 보조 Haiku 4.5 · 형식 가져오기 Sonnet 5. 문장 품질을 특별히 끌어올릴 글만 초안을 Opus 5로 바꿔 생성하세요.</div>
+      </div>
+      <div style="margin-top:6px;padding-top:14px;border-top:1px solid var(--border)">
+        <div class="sec-title">🔤 글꼴 <small>에디터 표시와 네이버 붙여넣기에 함께 적용</small></div>
+        <div class="row">
+          <div class="form-group" style="flex:2"><label>글꼴</label><select id="def-font"></select></div>
+          <div class="form-group"><label>본문 글자 크기</label><select id="def-psize"><option value="0">네이버 기본</option></select></div>
+          <div class="form-group"><label>소제목 글자 크기</label><select id="def-hsize"></select></div>
+        </div>
+        <div class="hint" style="margin-top:-6px">네이버가 글꼴을 못 알아보면 기본 글꼴로 붙습니다 — 그때는 네이버 에디터에서 Ctrl+A 후 글꼴만 한 번 바꾸면 됩니다.</div>
+      </div>
+      <div style="display:flex;gap:6px;justify-content:space-between;margin-top:14px">
+        <div><button class="btn sm" id="def-from-form">지금 화면 값 가져오기</button> <button class="btn sm" id="def-clear" style="color:var(--danger)">모두 해제</button></div>
+        <button class="btn primary" id="def-save">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 사진 세트 관리 모달 -->
+<div class="modal" id="pset-modal">
+  <div class="modal-box resizable" data-size-key="pset" style="max-width:840px">
+    <div class="modal-head"><h4>📸 사진 세트 — 컨셉별로 모아두면 AI가 자리마다 골라 넣습니다</h4><button id="pset-close">×</button></div>
+    <div class="modal-body" style="display:flex;gap:14px;min-height:380px">
+      <div style="width:210px;flex-shrink:0;border-right:1px solid var(--border);padding-right:12px">
+        <button class="btn sm" id="pset-new" style="width:100%;margin-bottom:8px">+ 새 세트</button>
+        <div id="pset-list"></div>
+      </div>
+      <div style="flex:1;min-width:0" id="pset-edit"></div>
+    </div>
+  </div>
+</div>
+
+<!-- 태그 자동 입력 북마클릿 안내 -->
+<div class="modal" id="tagbm-modal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><h4>🔖 네이버 태그칸 자동 입력</h4><button id="tagbm-close">×</button></div>
+    <div class="modal-body" style="font-size:13.5px;line-height:1.8">
+      <p style="margin:0 0 10px">네이버 태그칸은 한 번에 하나만 받습니다. 이 북마클릿은 <b>내 브라우저에서</b> 태그를 하나씩 대신 쳐 넣습니다(로그인·발행은 건드리지 않습니다).</p>
+      <div style="background:#f5f9fc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
+        <div style="font-weight:700;margin-bottom:6px">1. 처음 한 번 — 아래 버튼을 <u>북마크바로 끌어다</u> 놓으세요</div>
+        <a id="tag-bm-link" href="#" style="display:inline-block;padding:8px 14px;background:var(--primary);color:#fff;border-radius:8px;font-weight:700;text-decoration:none;cursor:grab">📌 네이버 태그 자동입력</a>
+        <div class="hint" style="margin-top:6px">북마크바가 안 보이면 Ctrl+Shift+B. 끌어놓기가 안 되면 「주소 복사」 후 북마크를 새로 만들어 주소에 붙여 넣으세요. <button class="btn sm" id="tag-bm-copy" style="padding:2px 8px;font-size:11px">주소 복사</button></div>
+      </div>
+      <div style="font-weight:700;margin-bottom:4px">2. 글마다</div>
+      <ol style="margin:0 0 10px 18px;padding:0">
+        <li>여기서 「전체 복사」</li>
+        <li>네이버 글쓰기 → 발행 창에서 <b>태그 입력칸을 한 번 클릭</b></li>
+        <li>북마크바의 「📌 네이버 태그 자동입력」 클릭 → 뜨는 창에 <b>Ctrl+V → 확인</b></li>
+      </ol>
+      <div class="hint">태그가 하나씩 자동으로 들어갑니다(30개 약 10초). 네이버가 화면을 바꾸면 안 될 수 있는데, 그때는 「▶ 다음 태그 복사」로 하나씩 넣으세요.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 사진 세트 고르기(채우기용) -->
+<div class="modal" id="psel-modal">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><h4>📸 어느 사진 세트로 채울까요?</h4><button id="psel-close">×</button></div>
+    <div class="modal-body">
+      <div id="psel-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px"></div>
+      <div class="hint" style="margin-top:12px">★ 표시는 기본 세트 — 일괄 생성에서 키워드에 맞는 세트가 없을 때 들어갑니다. 세트는 「📸 사진 세트」에서 관리합니다.</div>
+    </div>
+  </div>
+</div>
+
+<!-- 일괄 생성 모달 -->
+<div class="modal" id="batch-modal">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-head"><h4>⚡ 일괄 생성 — 키워드만 넣으면 순서대로 초안을 만듭니다</h4><button id="batch-close">×</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label>키워드 (한 줄에 하나) — 주제는 <code>키워드 | 주제</code>, 글마다 세트를 정하려면 줄 끝에 <code>@세트이름</code></label>
+        <textarea id="batch-keys" rows="6" placeholder="진주 어깨통증&#10;진주 허리디스크 @허리&#10;진주 무릎통증 | 계단 내려갈 때 무릎이 아픈 이유 @무릎 사진"></textarea>
+        <div class="hint" id="batch-sets-hint"></div></div>
+      <div class="row">
+        <div class="form-group"><label>글 구성 템플릿</label><select id="batch-tpl"></select></div>
+        <div class="form-group"><label>사진 세트</label><select id="batch-photo"></select></div>
+      </div>
+      <div class="row">
+        <div class="form-group"><label>톤</label><select id="batch-tone"><option>전문적이고 신뢰감 있게</option><option>쉽고 친근하게</option><option>따뜻한 상담 톤</option></select></div>
+        <div class="form-group"><label>분량</label><select id="batch-length"><option value="short">짧게</option><option value="normal" selected>보통</option><option value="long">길게</option></select></div>
+      </div>
+      <div class="hint">한 글에 1~2분 걸립니다. 이 창을 열어 둔 채 기다리세요. 각 글은 <b>글감 선택 → 본문·제목·태그 생성 → 사진 자리 채우기 → 의료광고법 검수 → 저장</b>까지 자동으로 진행되고, 끝나면 왼쪽 목록에 초안으로 쌓입니다. 이미 쓴 글과 겹치는 글감은 피합니다.</div>
+      <div id="batch-log" style="margin-top:12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12.5px;line-height:1.7;background:#fafbfd;white-space:pre-wrap"></div>
+    </div>
+    <div class="modal-foot"><span class="left-note" id="batch-prog"></span><button class="btn" id="batch-stop" disabled>중지</button><button class="btn primary" id="batch-start">시작</button></div>
+  </div>
+</div>
+
 <!-- 템플릿 모달 -->
 <div class="modal" id="tpl-modal">
   <div class="modal-box">
@@ -461,6 +613,7 @@
       <div class="modal-tab on" data-tab="builtin">내장 템플릿</div>
       <div class="modal-tab" data-tab="mine">내 템플릿 <span id="mine-count"></span></div>
       <div class="modal-tab" data-tab="photo">📸 사진 세트 <span id="photo-count"></span></div>
+      <div class="modal-tab" data-tab="ref">📥 기존 글에서 가져오기</div>
     </div>
     <div class="modal-body">
       <div class="tpl-grid" id="tpl-grid"></div>
@@ -499,9 +652,32 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const functions = getFunctions(app, 'asia-northeast3');
 const storage = getStorage(app);
+storage.maxUploadRetryTime = 30000; storage.maxOperationRetryTime = 30000;   // 네트워크 오류 재시도를 30초로 — 「올리는 중…」이 하염없이 안 걸리게
 const aiProxy = httpsCallable(functions, 'aiProxy', { timeout: 300000 });
+const fetchBlogRef = httpsCallable(functions, 'fetchBlogRef', { timeout: 60000 });   // 참고 블로그 글 구성 읽기
 
-const AI_MODEL = 'claude-opus-5';
+/* 모델은 역할별로 고른다 — 비용 때문에 기본은 Sonnet 5(초안·검수), 사진 배정·세트 선택 같은 잔일은 Haiku 4.5.
+   「⚙ 기본값」에서 바꿀 수 있고 localStorage hw_ai_models 에 기억된다. */
+const AI_MODELS = [
+  { v: 'claude-opus-5', label: 'Opus 5 — 최고 품질, 가장 비쌈(약 5배)' },
+  { v: 'claude-sonnet-5', label: 'Sonnet 5 — 품질·비용 균형(권장)' },
+  { v: 'claude-haiku-4-5-20251001', label: 'Haiku 4.5 — 가장 저렴, 간단한 작업용' }
+];
+const AI_ROLES = [
+  { k: 'write', label: '초안·글감·제목 작성', def: 'claude-sonnet-5' },
+  { k: 'review', label: '의료광고법 검수', def: 'claude-opus-5' },
+  { k: 'titles', label: '제목만 다시 뽑기(출력 짧음 — Opus 부담 적음)', def: 'claude-opus-5' },
+  { k: 'ideas', label: '글감 추천(출력 짧음)', def: 'claude-opus-5' },
+  { k: 'aux', label: '보조 작업(사진 배정·세트 선택)', def: 'claude-haiku-4-5-20251001' },
+  { k: 'extract', label: '형식 가져오기(참고 글·스크린샷 분석)', def: 'claude-sonnet-5' }
+];
+function aiModels() {
+  const d = {}; AI_ROLES.forEach((r) => { d[r.k] = r.def; });
+  try { const saved = JSON.parse(localStorage.getItem('hw_ai_models') || '{}') || {}; AI_ROLES.forEach((r) => { if (saved[r.k] && AI_MODELS.some((m) => m.v === saved[r.k])) d[r.k] = saved[r.k]; }); } catch (e) { /* 기본값 */ }
+  return d;
+}
+function modelFor(role) { return aiModels()[role] || aiModels().write; }
+function modelLabel(v) { const m = AI_MODELS.find((x) => x.v === v); return m ? m.label.split(' — ')[0] : v; }
 const $ = (id) => document.getElementById(id);
 
 /* ────────── 상태 ────────── */
@@ -611,9 +787,10 @@ $('new-post-btn').addEventListener('click', () => {
   current = {
     id: null, title: '', topic: '', keyword: '', subKeywords: '',
     type: '질환 정보', tone: '전문적이고 신뢰감 있게', length: 'normal',
-    imgMode: 'on', brief: '', bodyHtml: '', tags: [], titleCands: [], tplKey: '', ideas: [], review: null,
+    imgMode: 'on', brief: '', bodyHtml: '', tags: [], titleCands: [], tplKey: '', ideas: [], review: null, photoSetKey: '',
     status: 'draft', naverUrl: ''
   };
+  applyDefaults(current);
   fillForm(); showEditor(true); renderPosts();
   dirty = false; $('save-status').textContent = '';
   $('f-topic').focus();
@@ -672,11 +849,70 @@ function readForm() {
   }));
 $('body-editor').addEventListener('input', () => { markDirty(); updateStats(); renderReviewState(); });
 $('body-editor').addEventListener('blur', scanAds);
+$('body-editor').addEventListener('blur', () => { absorbLooseImages(); });
+/* 본문에 사진을 Ctrl+V·끌어놓기로 넣으면 Storage 에 올리고 figure 로 넣는다.
+   캐럿이 AI 사진 자리(📷) 위에 있으면 그 자리를 사진으로 바꾼다. */
+function caretBlock() {
+  const sel = window.getSelection(); if (!sel || !sel.rangeCount) return null;
+  let n = sel.anchorNode; const ed = $('body-editor');
+  if (!n || !ed.contains(n)) return null;
+  while (n && n.parentNode !== ed) n = n.parentNode;
+  return n && n.nodeType === 1 ? n : null;
+}
+$('body-editor').addEventListener('paste', (ev) => {
+  const items = Array.from((ev.clipboardData && ev.clipboardData.items) || []);
+  const files = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+  if (!files.length) return;           // 글자 붙여넣기는 그대로 둔다
+  ev.preventDefault();
+  const blk = caretBlock(); saveRange();
+  insertUploadedPhotos(files, blk && blk.classList.contains('imgph') ? blk : null);
+});
+$('body-editor').addEventListener('dragover', (ev) => { if (ev.dataTransfer && Array.from(ev.dataTransfer.types || []).includes('Files')) ev.preventDefault(); });
+$('body-editor').addEventListener('drop', (ev) => {
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []).filter((f) => (f.type || '').startsWith('image/'));
+  if (!files.length) return;
+  ev.preventDefault();
+  const tgt = ev.target && ev.target.closest ? ev.target.closest('#body-editor > *') : null;
+  insertUploadedPhotos(files, tgt && tgt.classList.contains('imgph') ? tgt : null);
+});
+/* 다른 경로로 들어온 느슨한 <img>(data:/blob:/http)를 figure 로 정리한다 — 저장 전과 편집 이탈 때 부른다.
+   data: 그림은 Storage 에 올린다(그대로 두면 문서가 커져 저장이 막힌다). */
+let _absorbing = false;
+async function absorbLooseImages() {
+  if (_absorbing) return 0;
+  const ed = $('body-editor');
+  const loose = Array.from(ed.querySelectorAll('img')).filter((im) => !im.closest('figure.bimg'));
+  if (!loose.length) return 0;
+  _absorbing = true; let n = 0;
+  try {
+    for (const im of loose) {
+      try {
+        const src = im.getAttribute('src') || '';
+        let url = src;
+        if (src.startsWith('data:') || src.startsWith('blob:')) {
+          const b = await (await fetch(src)).blob();
+          const ups = await uploadBlogImages([new File([b], 'pasted.png', { type: b.type || 'image/png' })]);
+          url = ups[0].url;
+        }
+        if (!url) { im.remove(); continue; }
+        const host = im.closest('#body-editor > *') || im;
+        const tmp = document.createElement('div'); tmp.innerHTML = imgHtml(url, '');
+        const fig = tmp.firstElementChild;
+        if (host === im || (host.classList && host.classList.contains('imgph'))) host.replaceWith(fig);
+        else { host.after(fig); im.remove(); }
+        n++;
+      } catch (e) { console.warn('loose img', e); }
+    }
+  } finally { _absorbing = false; }
+  if (n) { markDirty(); updateStats(); renderPhotoList(); toast('본문의 사진 ' + n + '장을 정리해 올렸습니다.'); }
+  return n;
+}
 
 /* ────────── 저장 / 삭제 ────────── */
 $('save-btn').addEventListener('click', savePost);
 async function savePost() {
   if (!current) return;
+  await absorbLooseImages();
   const c = readForm();
   if (!c.title && !c.topic) { toast('제목이나 주제를 먼저 입력하세요.'); return; }
   const now = new Date().toISOString();
@@ -684,7 +920,7 @@ async function savePost() {
     title: c.title, topic: c.topic, keyword: c.keyword, subKeywords: c.subKeywords,
     type: c.type, tone: c.tone, length: c.length, imgMode: c.imgMode, brief: c.brief,
     bodyHtml: c.bodyHtml, tags: c.tags, titleCands: c.titleCands || [],
-    tplKey: c.tplKey || '', ideas: c.ideas || [], review: c.review || null,
+    tplKey: c.tplKey || '', ideas: c.ideas || [], review: c.review || null, photoSetKey: c.photoSetKey || '',
     status: c.status || 'draft', naverUrl: c.naverUrl || '',
     publishedAt: c.publishedAt || '', updatedAt: now, createdAt: c.createdAt || now
   };
@@ -732,18 +968,39 @@ function parseAiJson(txt) {
   try { return JSON.parse(s.replace(/,\s*([}\]])/g, '$1')); } catch (e) { }
   return null;
 }
-async function callAi(system, userText, maxTokens) {
-  const res = await aiProxy({
+async function callAi(system, userText, maxTokens, imgs, role) {
+  // imgs: [{mediaType, data}] — 스크린샷 등 참고 이미지를 함께 보낼 때
+  const content = (imgs && imgs.length)
+    ? imgs.map((im) => ({ type: 'image', source: { type: 'base64', media_type: im.mediaType, data: im.data } })).concat([{ type: 'text', text: userText }])
+    : userText;
+  const payload = {
     body: {
-      model: AI_MODEL,
+      model: modelFor(role || 'write'),
       max_tokens: maxTokens || 16000,
       thinking: { type: 'adaptive' },
       output_config: { effort: 'medium' },
       system: system,
-      messages: [{ role: 'user', content: userText }]
+      messages: [{ role: 'user', content: content }]
     }
-  });
-  return aiText(res);
+  };
+  // 한도 초과(resource-exhausted)·혼잡(unavailable)은 서버가 먼저 재시도하고, 그래도 실패하면 여기서 안내 후 2회 더
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const res = await aiProxy(payload);
+      return aiText(res);
+    } catch (e) {
+      const code = String((e && e.code) || '');
+      const retriable = /resource-exhausted|unavailable|deadline-exceeded/.test(code) && !/크레딧|credit|balance/i.test((e && e.message) || '');
+      if (!retriable || attempt >= 2) throw e;
+      const wait = 20000 * (attempt + 1);
+      const wasOn = $('overlay').classList.contains('on'); const prevMsg = $('overlay-msg').textContent;
+      for (let left = wait / 1000; left > 0; left -= 1) {
+        busy(true, 'AI 요청이 몰려 잠시 대기 중… ' + left + '초 후 다시 시도 (' + (attempt + 2) + '/3)');
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (wasOn) busy(true, prevMsg); else busy(false);
+    }
+  }
 }
 
 const LENGTH_MAP = { short: '공백 포함 800~1,200자', normal: '공백 포함 1,500~2,000자', long: '공백 포함 2,500~3,000자' };
@@ -910,6 +1167,7 @@ function renderTplGrid() {
   $('photo-count').textContent = photoTpls.length ? '(' + photoTpls.length + ')' : '';
   const list = tplTab === 'mine' ? mine : tplTab === 'photo' ? photoTpls : BLOG_TEMPLATES;
   const el = $('tpl-grid');
+  if (tplTab === 'ref') { renderRefImport(el); return; }
   if (!list.length) {
     el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:30px;color:var(--sub);font-size:13px;line-height:1.8">저장된 템플릿이 없습니다.<br />마음에 드는 글을 완성한 뒤 「현재 글을 템플릿으로 저장」을 눌러보세요.</div>';
     return;
@@ -919,7 +1177,9 @@ function renderTplGrid() {
     + (t.mine || t.kind === 'photo' ? '<button class="del" data-del="' + t.key + '" title="삭제">×</button>' : '')
     + '<div class="n">' + (t.icon || '📄') + ' ' + esc(t.name) + '</div>'
     + '<div class="d">' + esc(t.desc || '') + '</div>'
-    + '<div class="o">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('<br />') + '</div></div>').join('');
+    + '<div class="o">' + (t.kind === 'photo'
+        ? '사진 ' + setPhotos(t).length + '장 · ' + (esc(setPhotos(t).map((q) => q.concept).filter(Boolean).slice(0, 6).join(' · ')) || '컨셉 미입력')
+        : (t.outline || []).map((o, i) => (i + 1) + '. ' + esc(o)).join('<br />')) + '</div></div>').join('');
   el.querySelectorAll('.tpl-card').forEach((cd) =>
     cd.addEventListener('click', (e) => {
       if (e.target.dataset.del) return;
@@ -951,12 +1211,11 @@ $('tpl-apply-btn').addEventListener('click', () => {
   if (!tplPick) { toast('템플릿을 먼저 고르세요.'); return; }
   // 사진 세트는 사진이 이미 자리에 있는 완성된 뼈대다 — AI 를 부르지 않고 그대로 넣는다.
   if (tplPick.kind === 'photo') {
-    const cur = $('body-editor').innerHTML.trim();
-    if (cur && !confirm('본문 내용을 이 사진 세트로 바꿀까요? (지금 내용은 사라집니다)')) return;
-    $('body-editor').innerHTML = tplPick.bodyHtml || '';
-    applyTplSettings(tplPick);
-    renderTplBar(); markDirty(); updateStats(); closeTplModal();
-    toast('"' + tplPick.name + '" — 사진은 그대로 두고 글자만 고치세요.');
+    // 사진 세트 = 컨셉별 사진 풀. 글을 만들면 AI 가 사진 자리마다 골라 넣는다.
+    current.photoSetKey = tplPick.key; markDirty(); closeTplModal(); renderTplBar();
+    const n = $('body-editor').querySelectorAll('.imgph').length;
+    if (n) { busy(true, '사진 자리에 세트 사진을 고르는 중…'); fillPhotosFromSet(tplPick).then((k) => { busy(false); toast('사진 자리 ' + k + '곳을 채웠습니다.'); }); }
+    else toast('"' + tplPick.name + '" 세트 선택 — 초안을 생성하면 사진 자리에 자동으로 채워집니다.');
     return;
   }
   applyTplSettings(tplPick);
@@ -967,7 +1226,7 @@ $('tpl-outline-btn').addEventListener('click', () => {
   if (!tplPick) { toast('템플릿을 먼저 고르세요.'); return; }
   const cur = $('body-editor').innerHTML.trim();
   if (cur && !confirm('본문에 내용이 있습니다. 뼈대를 뒤에 이어붙일까요?')) return;
-  const skeleton = tplPick.outline.map((o) =>
+  const skeleton = (tplPick.outline || []).map((o) =>
     '<h3>' + esc(o) + '</h3><p>내용을 입력하세요.</p>').join('');
   $('body-editor').innerHTML = cur + skeleton;
   applyTplSettings(tplPick);
@@ -978,6 +1237,172 @@ $('tpl-clear').addEventListener('click', () => {
   tplPick = null; current.tplKey = '';
   renderTplBar(); renderTplGrid(); markDirty();
 });
+/* ══════════ 기존 글에서 형식 가져오기 ══════════
+   참고할 블로그 글의 주소(네이버면 서버가 본문 구조를 읽어옴)나 스크린샷을 주면,
+   AI 가 소제목 흐름·블록 리듬(문단/사진/인용 순서)·문체를 뽑아 '내 템플릿'으로 저장한다.
+   이후 그 템플릿으로 생성하면 새 글이 참고 글과 같은 짜임을 따른다. 문구는 가져오지 않는다. */
+const _ref = { blocks: null, title: '', imgs: [], derived: null, srcUrl: '', posts: null };   // posts: 블로그 홈을 넣었을 때 고를 글 목록
+// 스크린샷은 파일 선택 없이 Ctrl+V(붙여넣기)·끌어놓기로도 받는다 — 캡처 직후 바로 붙일 수 있게
+async function refAddImageFiles(files) {
+  let n = 0;
+  for (const f of files) {
+    if (!f || !(f.type || '').startsWith('image/')) continue;
+    if (_ref.imgs.length >= 4) { toast('스크린샷은 최대 4장'); break; }
+    try { _ref.imgs.push(await fileToB64(f, 1400)); n++; } catch (e) { toast(e.message); }
+  }
+  if (n) { _ref.derived = null; renderRefImport($('tpl-grid')); toast('스크린샷 ' + n + '장을 붙였습니다 — 「AI로 형식 뽑기」를 누르세요.'); }
+  return n;
+}
+function refZoneActive() { return tplTab === 'ref' && $('tpl-modal').classList.contains('on'); }
+document.addEventListener('paste', (ev) => {
+  if (!refZoneActive()) return;
+  const items = Array.from((ev.clipboardData && ev.clipboardData.items) || []);
+  const files = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+  if (!files.length) return;               // 글자 붙여넣기(주소 입력 등)는 그대로 둔다
+  ev.preventDefault();
+  refAddImageFiles(files);
+});
+document.addEventListener('dragover', (ev) => { if (refZoneActive()) ev.preventDefault(); });
+document.addEventListener('drop', (ev) => {
+  if (!refZoneActive()) return;
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  if (!files.length) return;
+  ev.preventDefault(); refAddImageFiles(files);
+});
+function rhythmOf(blocks) {
+  return (blocks || []).map((b) => b.t === 'text' ? 'p×' + b.paras.length : b.t === 'image' ? 'image' + (b.n > 1 ? '×' + b.n : '') : b.t).slice(0, 60);
+}
+function fileToB64(file, maxW) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const sc = Math.min(1, (maxW || 1400) / img.width);
+      const c = document.createElement('canvas'); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      const url = c.toDataURL('image/jpeg', 0.85);
+      resolve({ mediaType: 'image/jpeg', data: url.split(',')[1] });
+    };
+    img.onerror = () => reject(new Error('이미지를 읽지 못했습니다'));
+    img.src = URL.createObjectURL(file);
+  });
+}
+function renderRefImport(el) {
+  const r = _ref;
+  const hasSrc = !!(r.blocks || r.imgs.length);
+  let html = '<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:12px">';
+  html += '<div class="hint" style="font-size:12px;line-height:1.7">참고하고 싶은 블로그 글의 <b>주소</b>를 넣거나 <b>스크린샷</b>을 붙이세요. 스크린샷은 캡처(Win+Shift+S) 뒤 이 창에서 <b>Ctrl+V</b> 하면 바로 들어갑니다. 소제목 흐름·문단/사진/인용의 순서·문체를 뽑아 템플릿으로 만듭니다. 문구는 가져오지 않습니다.</div>';
+  html += '<div style="display:flex;gap:6px"><input type="text" id="ref-url" placeholder="https://blog.naver.com/아이디/글번호  (네이버 외 사이트도 가능)" value="' + esc(r.srcUrl) + '" style="flex:1;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px"><button class="btn" id="ref-fetch">글 불러오기</button></div>';
+  if (r.posts && r.posts.length) {
+    html += '<div style="border:1px solid var(--border);border-radius:8px;max-height:220px;overflow:auto;background:#fff">' + r.posts.slice(0, 30).map((pz, i) =>
+      '<div class="ref-post" data-i="' + i + '" style="padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;font-size:13px;display:flex;gap:10px;align-items:center"><span style="color:#98a0ad;flex-shrink:0;font-size:11.5px">' + esc(String(pz.date || '').slice(0, 12)) + '</span><span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(pz.title || pz.url) + '</span><span style="color:var(--primary);font-size:12px;flex-shrink:0">이 글로 →</span></div>').join('') + '</div>';
+    html += '<div class="hint">블로그 홈 주소를 넣으셨네요 — 참고할 글을 하나 고르면 그 글의 구성을 읽어옵니다.</div>';
+  }
+  html += '<div id="ref-paste-zone" style="border:1px dashed #bcc6d4;border-radius:8px;padding:12px;text-align:center;color:#7c8794;font-size:12.5px;background:#f8fafc">📋 캡처한 스크린샷을 여기서 <b>Ctrl+V</b> 하거나 파일을 끌어다 놓으세요' + (r.imgs.length ? ' · <b style="color:var(--primary)">' + r.imgs.length + '장</b> 붙음' : '') + '</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="btn sm" style="cursor:pointer;margin:0">🖼 스크린샷 첨부<input type="file" id="ref-shots" accept="image/*" multiple style="display:none"></label><span id="ref-thumbs" style="display:flex;gap:6px;flex-wrap:wrap"></span>' + (r.imgs.length ? '<button class="btn sm" id="ref-shots-clear">비우기</button>' : '') + '</div>';
+  html += '<div id="ref-status" style="font-size:12.5px;color:var(--sub);line-height:1.7">' + (r.blocks
+    ? '📄 <b>' + esc(r.title || '제목 없음') + '</b> — 문단 ' + r.blocks.filter((b) => b.t === 'text').reduce((a, b) => a + b.paras.length, 0) + ' · 사진 ' + r.blocks.filter((b) => b.t === 'image').reduce((a, b) => a + (b.n || 1), 0) + ' · 인용 ' + r.blocks.filter((b) => b.t === 'quote').length + ' · 소제목 ' + r.blocks.filter((b) => b.t === 'h').length + '<div style="margin-top:4px;color:#98a0ad;font-size:11.5px">' + esc(rhythmOf(r.blocks).join(' → ')) + '</div>'
+    : (r.imgs.length ? '스크린샷 ' + r.imgs.length + '장 첨부됨' : '')) + '</div>';
+  html += '<div><button class="btn primary" id="ref-derive"' + (hasSrc ? '' : ' disabled') + '>✨ AI로 형식 뽑기</button></div>';
+  if (r.derived) {
+    const d = r.derived;
+    html += '<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:#fafbfd">'
+      + '<div class="form-group" style="margin-bottom:10px"><label>템플릿 이름</label><input type="text" id="ref-name" value="' + esc(d.name || '') + '"></div>'
+      + '<div style="font-size:12.5px;color:var(--sub);margin-bottom:8px">' + esc(d.desc || '') + '</div>'
+      + '<div style="font-size:12.5px;margin-bottom:6px"><b>소제목 흐름</b><br>' + (d.outline || []).map((o, i) => (i + 1) + '. ' + esc(o)).join('<br>') + '</div>'
+      + '<div style="font-size:12px;color:#98a0ad;margin-bottom:6px"><b>블록 리듬</b> ' + esc((d.rhythm || []).join(' → ')) + '</div>'
+      + (d.style ? '<div style="font-size:12px;color:#98a0ad"><b>문체</b> ' + esc(d.style) + '</div>' : '')
+      + '<div style="margin-top:10px;display:flex;gap:6px"><button class="btn primary" id="ref-save">내 템플릿으로 저장</button><button class="btn" id="ref-derive-again">다시 뽑기</button></div></div>';
+  }
+  html += '</div>';
+  el.innerHTML = html;
+  el.querySelectorAll('.ref-post').forEach((row) => row.addEventListener('click', () => {
+    const pz = r.posts && r.posts[+row.dataset.i]; if (!pz) return;
+    $('ref-url').value = pz.url; r.posts = null; refFetch();
+  }));
+  const th = $('ref-thumbs');
+  if (th) th.innerHTML = r.imgs.map((im) => '<img src="data:' + im.mediaType + ';base64,' + im.data + '" style="width:44px;height:44px;object-fit:cover;border-radius:6px;border:1px solid var(--border)">').join('');
+  $('ref-fetch').addEventListener('click', refFetch);
+  $('ref-url').addEventListener('keydown', (e) => { if (e.key === 'Enter') refFetch(); });
+  $('ref-shots').addEventListener('change', async (ev) => {
+    const files = Array.from(ev.target.files || []); ev.target.value = '';
+    for (const f of files) { if (r.imgs.length >= 4) { toast('스크린샷은 최대 4장'); break; } try { r.imgs.push(await fileToB64(f, 1400)); } catch (e) { toast(e.message); } }
+    renderRefImport(el);
+  });
+  const clr = $('ref-shots-clear'); if (clr) clr.addEventListener('click', () => { r.imgs = []; renderRefImport(el); });
+  $('ref-derive').addEventListener('click', refDerive);
+  const again = $('ref-derive-again'); if (again) again.addEventListener('click', refDerive);
+  const sv = $('ref-save'); if (sv) sv.addEventListener('click', refSave);
+}
+async function refFetch() {
+  const url = ($('ref-url').value || '').trim();
+  if (!url) { toast('글 주소를 입력하세요.'); return; }
+  _ref.srcUrl = url; _ref.derived = null;
+  busy(true, '글을 읽어오는 중…');
+  try {
+    const res = await fetchBlogRef({ url });
+    const d = res.data || {};
+    if (d.mode === 'list') {
+      // 블로그 홈 주소 — 글 목록을 보여주고 고르게 한다
+      _ref.posts = d.posts || []; _ref.blocks = null;
+      toast(_ref.posts.length ? '이 블로그의 글 ' + _ref.posts.length + '개 — 참고할 글을 고르세요.' : '이 블로그에서 글 목록을 못 읽었습니다. 글 주소를 직접 넣어주세요.');
+      return;
+    }
+    if (!d.blocks || !d.blocks.length) { toast('본문 구조를 읽지 못했습니다. 스크린샷을 올려보세요.'); _ref.blocks = null; }
+    else { _ref.blocks = d.blocks; _ref.title = d.title || ''; _ref.posts = null; toast('글을 읽었습니다 — 이제 「AI로 형식 뽑기」를 누르세요.'); }
+  } catch (e) { toast('불러오기 실패: ' + (e.message || e)); _ref.blocks = null; }
+  finally { busy(false); renderRefImport($('tpl-grid')); }
+}
+async function refDerive() {
+  const r = _ref;
+  if (!r.blocks && !r.imgs.length) { toast('글 주소를 불러오거나 스크린샷을 올려주세요.'); return; }
+  busy(true, '참고 글의 형식을 분석 중…');
+  try {
+    const sys = '당신은 블로그 콘텐츠 편집자입니다. 참고 글의 "짜임"만 뽑습니다 — 문구·주제·병원명은 절대 옮기지 않습니다. 다른 주제의 글에도 그대로 쓸 수 있도록 소제목은 역할 중심으로 일반화합니다.';
+    const L = [];
+    L.push('아래는 참고 블로그 글입니다. 이 글의 구성을 템플릿으로 뽑아 JSON 하나만 출력하세요(설명·코드펜스 금지).');
+    if (r.blocks) {
+      L.push(''); L.push('[제목] ' + (r.title || ''));
+      L.push('[블록 순서와 내용 요약]');
+      r.blocks.slice(0, 80).forEach((b, i) => {
+        if (b.t === 'text') L.push((i + 1) + '. 문단×' + b.paras.length + ' — ' + b.paras.slice(0, 2).map((q) => '"' + q.text.slice(0, 60) + '"(' + q.len + '자)').join(', '));
+        else if (b.t === 'image') L.push((i + 1) + '. 사진' + (b.n > 1 ? '×' + b.n : '') + (b.cap ? ' — 캡션 "' + b.cap + '"' : ''));
+        else if (b.t === 'quote') L.push((i + 1) + '. 인용구 — "' + b.text.slice(0, 60) + '"');
+        else if (b.t === 'h') L.push((i + 1) + '. 소제목 — "' + b.text + '"');
+        else L.push((i + 1) + '. ' + b.t);
+      });
+    }
+    if (r.imgs.length) { L.push(''); L.push('첨부한 스크린샷 ' + r.imgs.length + '장은 참고 글의 실제 화면입니다. 화면에서 소제목·문단·사진·인용의 배치와 문체를 읽으세요.'); }
+    L.push('');
+    L.push('출력 형식:');
+    L.push('{"name":"짧은 템플릿 이름(예: 증상 비교형)","desc":"어떤 글에 맞는지 한 줄","outline":["소제목 흐름 4~6개 — 참고 글의 소제목을 역할 중심으로 일반화(주제어 제거)"],"rhythm":["p","p","image","h","p","p","quote","image","h","list","p"],"imgCount":3,"type":"질환 정보|치료법·시술 소개|자주 묻는 질문(Q&A)|생활 관리·예방 수칙|계절·시즌 이슈|병원 소식·안내|의료진 칼럼 중 하나","tone":"전문적이고 신뢰감 있게|쉽고 친근하게|따뜻한 상담 톤 중 하나","length":"short|normal|long","style":"문체·문단 길이·특징을 2~3문장으로"}');
+    L.push('rhythm 은 p(문단) h(소제목) image(사진) quote(인용) list(목록) 만 쓰고, 참고 글의 실제 순서를 압축해 12~25개로 담으세요. 연속 문단은 p 를 반복해 표현합니다.');
+    const out = parseAiJson(await callAi(sys, L.join('\n'), 4000, r.imgs, 'extract'));
+    if (!out || !Array.isArray(out.outline) || !out.outline.length) { toast('형식을 뽑지 못했습니다. 다시 시도해 주세요.'); return; }
+    out.rhythm = Array.isArray(out.rhythm) ? out.rhythm.filter((x) => ['p', 'h', 'image', 'quote', 'list'].includes(x)).slice(0, 30) : [];
+    if (!out.imgCount) out.imgCount = out.rhythm.filter((x) => x === 'image').length || (r.blocks ? r.blocks.filter((b) => b.t === 'image').length : 0);
+    r.derived = out;
+    toast('형식을 뽑았습니다 — 이름을 확인하고 저장하세요.');
+  } catch (e) { toast('분석 실패: ' + (e.message || e)); }
+  finally { busy(false); renderRefImport($('tpl-grid')); }
+}
+function refSave() {
+  const d = _ref.derived; if (!d) return;
+  const nm = (($('ref-name') || {}).value || d.name || '가져온 형식').trim();
+  const TYPES = ['질환 정보', '치료법·시술 소개', '자주 묻는 질문(Q&A)', '생활 관리·예방 수칙', '계절·시즌 이슈', '병원 소식·안내', '의료진 칼럼'];
+  const item = { key: 'my_' + Date.now(), icon: '📥', name: nm, mine: true,
+    desc: (d.desc || '') + ' · 참고 글에서 가져옴 · 리듬 ' + (d.rhythm || []).length + '단계 · 사진 ' + (d.imgCount || 0) + '장',
+    outline: d.outline.slice(0, 8), rhythm: d.rhythm || [], imgCount: d.imgCount || 0, style: d.style || '',
+    type: TYPES.includes(d.type) ? d.type : '질환 정보',
+    tone: ['전문적이고 신뢰감 있게', '쉽고 친근하게', '따뜻한 상담 톤'].includes(d.tone) ? d.tone : '전문적이고 신뢰감 있게',
+    length: ['short', 'normal', 'long'].includes(d.length) ? d.length : 'normal',
+    srcUrl: _ref.srcUrl || '' };
+  const arr = getMyTpls(); arr.unshift(item); setMyTpls(arr);
+  tplPick = item; tplTab = 'mine';
+  document.querySelectorAll('.modal-tab').forEach((x) => x.classList.toggle('on', x.dataset.tab === 'mine'));
+  renderTplGrid();
+  toast('"' + nm + '" 템플릿으로 저장했습니다 — 「이 템플릿으로 쓰기」를 누르면 그 짜임대로 씁니다.');
+}
+
 function renderTplBar() {
   const t = current && current.tplKey ? findTpl(current.tplKey) : null;
   $('tpl-bar').innerHTML = t
@@ -985,41 +1410,76 @@ function renderTplBar() {
       + '<span style="color:#98a0ad;font-size:12px">구성대로 작성됩니다</span>'
       + '<div class="outline">' + t.outline.map((o, i) => (i + 1) + '. ' + esc(o)).join('　') + '</div>'
     : '<span class="none">선택된 템플릿 없음 — 「📋 템플릿 넣기」로 글의 뼈대를 고르면 AI가 그 구성대로 씁니다.</span>';
+  const ps = current && current.photoSetKey ? photoTpls.find((x) => x.key === current.photoSetKey) : null;
+  if (ps) $('tpl-bar').innerHTML += '<span style="margin-left:auto;font-size:12px;color:var(--primary);white-space:nowrap">📸 ' + esc(ps.name) + ' — 사진 자리 자동 채움</span>';
 }
 
 /* ══════════════════════ 사진 ══════════════════════ */
 /* 네이버는 자동 발행 API 가 없어서 이 도구는 "복사 → 스마트에디터 붙여넣기" 로 쓴다.
-   그래서 사진을 본문에 넣어도 네이버가 외부 이미지를 그대로 받아줄지는 확실하지 않다.
-   기본은 예전처럼 [사진 N 삽입: 설명] 텍스트로 바꿔 복사하고, 아래 사진 목록에서
-   순서대로 열어 네이버에 올리면 된다. 「복사에 사진 포함」을 켜면 <img> 를 그대로 복사한다
-   — 네이버가 받아주는지 한 번 시험해 보라고 둔 스위치다. */
+   SE ONE 은 붙여넣은 HTML 의 <img src=https…> 를 외부 이미지로 가져와 첨부하므로,
+   기본은 사진을 그대로 싣는다(「사진 포함」). 가져오기가 안 되는 환경이면 스위치를 끄고
+   [사진 N 삽입] 표시 + 「사진 전부 저장」으로 순서대로 올리는 예전 방식을 쓴다. */
 function imgHtml(url, cap) {
   return '<figure class="bimg"><img src="' + url + '" alt="" />'
     + '<figcaption>' + esc(cap || '사진 설명을 적어주세요') + '</figcaption></figure>';
 }
-async function uploadBlogImages(files) {
+/* 큰 스크린샷은 올리기 전에 줄인다(가로 1600px, JPEG) — 업로드도 빨라지고 네이버 붙여넣기도 가볍다 */
+async function shrinkImage(file, maxW) {
+  const type = file.type || '';
+  if (!type.startsWith('image/') || type === 'image/gif') return file;
+  // 브라우저가 못 여는 형식(HEIC 등)·읽기 실패면 축소 없이 원본을 그대로 올린다
+  let bmp = null;
+  try {
+    bmp = await withTimeout(new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('decode')); im.src = URL.createObjectURL(file); }), 10000, '이미지 읽기');
+  } catch (e) { console.warn('shrink skip', file.name, file.type, file.size, e.message); return file; }
+  const w = bmp.naturalWidth || bmp.width || 1, h = bmp.naturalHeight || bmp.height || 1;
+  const sc = Math.min(1, (maxW || 1600) / w);
+  if (sc >= 1 && file.size < 900 * 1024) return file;
+  const c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(h * sc));
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const blob = await new Promise((res) => c.toBlob(res, 'image/jpeg', 0.86));
+  const base = (file.name || 'image').replace(/[.][a-zA-Z0-9]+$/, '');
+  return new File([blob], base + '.jpg', { type: 'image/jpeg' });
+}
+function withTimeout(pr, ms, label) {
+  return Promise.race([pr, new Promise((_, rej) => setTimeout(() => rej(new Error((label || '작업') + ' 시간 초과(' + Math.round(ms / 1000) + '초) — 네트워크·로그인 상태를 확인하세요')), ms))]);
+}
+async function uploadBlogImages(files, onProgress) {
   const out = [];
-  for (const f of files) {
-    const safe = f.name.replace(/[^\w.\-]+/g, '_');
+  for (let i = 0; i < files.length; i++) {
+    const f0 = files[i];
+    if (onProgress) onProgress(i + 1, files.length);
+    const f = await shrinkImage(f0, 1600);
+    const safe = (f.name || 'image.jpg').replace(/[^\w.\-]+/g, '_');
     const r = sRef(storage, 'editor/blog/' + Date.now() + '_' + Math.random().toString(36).slice(2, 7) + '_' + safe);
-    await uploadBytes(r, f);
-    out.push({ url: await getDownloadURL(r), name: f.name });
+    await withTimeout(uploadBytes(r, f, { contentType: f.type || 'image/jpeg' }), 60000, '사진 올리기');
+    out.push({ url: await withTimeout(getDownloadURL(r), 20000, '사진 주소 받기'), name: f0.name || 'image' });
   }
   return out;
+}
+/* 올린 사진을 본문에 넣는다. replaceEl(AI 사진 자리 등)이 있으면 그 자리를 사진으로 바꾼다. */
+async function insertUploadedPhotos(files, replaceEl) {
+  const btn = $('img-btn'); const prev = btn.textContent; btn.disabled = true;
+  try {
+    const ups = await uploadBlogImages(files, (i, n) => { btn.textContent = '올리는 중 ' + i + '/' + n + '…'; });
+    const html = ups.map((u) => imgHtml(u.url, '')).join('');
+    if (replaceEl && replaceEl.isConnected) {
+      const tmp = document.createElement('div'); tmp.innerHTML = html;
+      replaceEl.replaceWith(...Array.from(tmp.childNodes));
+      markDirty(); updateStats(); scanAds();
+    } else insertSnippet(html);
+    renderPhotoList();
+    toast('사진 ' + ups.length + '장을 넣었습니다.');
+    return ups.length;
+  } catch (e) { toast('사진 올리기 실패: ' + (e.message || e)); return 0; }
+  finally { btn.textContent = prev; btn.disabled = false; }
 }
 $('img-btn').addEventListener('click', () => { saveRange(); $('img-file').click(); });
 $('img-file').addEventListener('change', async (ev) => {
   const files = Array.from(ev.target.files || []);
   ev.target.value = '';
   if (!files.length) return;
-  const btn = $('img-btn'); const prev = btn.textContent;
-  btn.textContent = '올리는 중…'; btn.disabled = true;
-  try {
-    const ups = await uploadBlogImages(files);
-    insertSnippet(ups.map((u) => imgHtml(u.url, '')).join(''));
-    toast('사진 ' + ups.length + '장을 넣었습니다.');
-  } catch (e) { toast('사진 올리기 실패: ' + (e.message || e)); }
-  finally { btn.textContent = prev; btn.disabled = false; }
+  await insertUploadedPhotos(files, null);
 });
 /* 본문에 들어간 사진 목록 — 네이버에 올릴 때 순서를 보라고 */
 function renderPhotoList() {
@@ -1031,7 +1491,10 @@ function renderPhotoList() {
     ? '사진 ' + figs.length + '장 — 01, 02 … 순서로 저장됩니다. 네이버 사진 버튼에서 한 번에 고르세요.'
     : '본문에 넣은 사진이 없습니다';
   if (!figs.length) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="photo-hint">사진 ' + figs.length + '장 — 「복사에 사진 포함」을 끄면 본문엔 <b>[사진 N 삽입]</b> 표시만 들어갑니다. 아래에서 순서대로 열어 네이버에 올리세요.</div>'
+  const withImg = $('copy-with-img').checked;
+  box.innerHTML = '<div class="photo-hint">' + (withImg
+      ? '사진 ' + figs.length + '장이 본문 복사에 <b>함께 들어갑니다</b>. 붙여넣으면 네이버가 사진을 가져옵니다 — 만약 사진이 빠져서 붙으면 아래 「사진 전부 저장」으로 받아 순서대로 올리세요.'
+      : '사진 ' + figs.length + '장 — 「사진 포함」이 꺼져 있어 본문엔 <b>[사진 N 삽입]</b> 표시만 들어갑니다. 아래에서 순서대로 저장해 네이버에 올리세요.') + '</div>'
     + '<div class="photo-list">' + figs.map((im, i) =>
       '<div class="pi"><b>' + (i + 1) + '</b><img src="' + im.src + '" /><a href="' + im.src + '" target="_blank" rel="noopener">열기</a></div>').join('') + '</div>';
 }
@@ -1042,26 +1505,289 @@ function renderPhotoList() {
 async function loadPhotoTpls() {
   try {
     const qs = await getDocs(query(collection(db, 'blogTemplates'), orderBy('updatedAt', 'desc'), limit(60)));
-    photoTpls = qs.docs.map((d) => Object.assign({ key: d.id, kind: 'photo', icon: '📸' }, d.data()));
+    photoTpls = qs.docs.filter((d) => d.id !== 'footer-photos').map((d) => Object.assign({ key: d.id, kind: 'photo', icon: '📸' }, d.data()));
   } catch (e) { photoTpls = []; }
 }
-$('tpl-photo-save-btn').addEventListener('click', async () => {
-  const ed = $('body-editor');
-  if (!ed.querySelector('figure.bimg')) { toast('먼저 「🖼 사진 넣기」로 사진을 넣어주세요.'); return; }
-  const nm = (prompt('사진 세트 이름:', (current && current.type) || '사진 세트') || '').trim();
-  if (!nm) return;
-  const outline = Array.from(ed.querySelectorAll('h3')).map((h) => (h.textContent || '').trim()).filter(Boolean);
-  const data = {
-    name: nm, desc: '사진 ' + ed.querySelectorAll('figure.bimg').length + '장이 들어간 세트 · 글자만 고쳐 쓰세요',
-    type: (current && current.type) || '', tone: (current && current.tone) || '', length: (current && current.length) || '',
-    outline: outline.length ? outline : [nm],
-    bodyHtml: ed.innerHTML, updatedAt: new Date().toISOString()
+$('tpl-photo-save-btn').addEventListener('click', () => openPsetModal(!!$('body-editor').querySelector('figure.bimg')));
+
+/* ══════════ 모달 크기 기억 ══════════
+   .modal-box.resizable 은 CSS resize 로 늘릴 수 있다. 바뀐 크기를 localStorage 에 두고 다음에 열 때 되살린다. */
+(function initResizableModals() {
+  document.querySelectorAll('.modal-box.resizable').forEach((box) => {
+    const key = 'hw_modal_size_' + (box.dataset.sizeKey || 'x');
+    try {
+      const sz = JSON.parse(localStorage.getItem(key) || 'null');
+      if (sz && sz.w > 300 && sz.h > 200) { box.style.width = Math.min(sz.w, window.innerWidth * 0.96) + 'px'; box.style.height = Math.min(sz.h, window.innerHeight * 0.92) + 'px'; box.style.maxWidth = 'none'; }
+    } catch (e) { /* 무시 */ }
+    if (!window.ResizeObserver) return;
+    let t = null;
+    new ResizeObserver(() => {
+      if (!box.closest('.modal').classList.contains('on')) return;   // 닫혀 있을 때(0×0)는 저장하지 않는다
+      clearTimeout(t);
+      t = setTimeout(() => {
+        const r = box.getBoundingClientRect();
+        if (r.width < 300 || r.height < 200) return;
+        box.style.maxWidth = 'none';
+        try { localStorage.setItem(key, JSON.stringify({ w: Math.round(r.width), h: Math.round(r.height) })); } catch (e) { /* 무시 */ }
+      }, 250);
+    }).observe(box);
+  });
+})();
+
+/* ══════════ 새 글 기본값 ══════════
+   localStorage hw_blog_defaults = { type:{on,val}, tone:{on,val}, … }. on 이 켜진 항목만 새 글·일괄 생성에 채운다. */
+const DEF_FIELDS = [
+  { k: 'type', label: '글 유형', el: 'f-type' },
+  { k: 'tone', label: '톤', el: 'f-tone' },
+  { k: 'length', label: '분량', el: 'f-length' },
+  { k: 'imgMode', label: '이미지 삽입 안내', el: 'f-imgmode' },
+  { k: 'subKeywords', label: '보조 키워드', el: 'f-subkeywords' },
+  { k: 'brief', label: '꼭 넣을 내용 / 참고사항', el: 'f-brief' },
+  { k: 'tplKey', label: '글 구성 템플릿', el: null },
+  { k: 'photoSetKey', label: '사진 세트', el: null }
+];
+function getDefaults() { try { return JSON.parse(localStorage.getItem('hw_blog_defaults') || '{}') || {}; } catch (e) { return {}; } }
+function setDefaults(d) { try { localStorage.setItem('hw_blog_defaults', JSON.stringify(d)); } catch (e) { /* 무시 */ } }
+/* 새 글 객체에 켜진 기본값만 덮어쓴다 */
+function applyDefaults(c) {
+  const d = getDefaults(); let n = 0;
+  DEF_FIELDS.forEach((f) => { const v = d[f.k]; if (v && v.on && v.val != null && v.val !== '') { c[f.k] = v.val; n++; } });
+  return n;
+}
+let _defDraft = null;
+function defControl(f, val) {
+  if (f.el) {
+    const src = $(f.el);
+    if (src.tagName === 'SELECT') return '<select class="def-val" data-k="' + f.k + '">' + Array.from(src.options).map((o) => '<option value="' + esc(o.value) + '"' + (o.value === val ? ' selected' : '') + '>' + esc(o.textContent) + '</option>').join('') + '</select>';
+    if (src.tagName === 'TEXTAREA') return '<textarea class="def-val" data-k="' + f.k + '" placeholder="' + esc(src.placeholder || '') + '">' + esc(val) + '</textarea>';
+    return '<input type="text" class="def-val" data-k="' + f.k + '" value="' + esc(val) + '" placeholder="' + esc(src.placeholder || '') + '">';
+  }
+  if (f.k === 'tplKey') {
+    return '<select class="def-val" data-k="tplKey"><option value="">(없음)</option>' + BLOG_TEMPLATES.concat(getMyTpls()).map((t) => '<option value="' + t.key + '"' + (t.key === val ? ' selected' : '') + '>' + esc((t.icon || '📄') + ' ' + t.name) + '</option>').join('') + '</select>';
+  }
+  return '<select class="def-val" data-k="photoSetKey"><option value="">(없음)</option>' + photoTpls.map((t) => '<option value="' + t.key + '"' + (t.key === val ? ' selected' : '') + '>📸 ' + esc(t.name) + ' (' + setPhotos(t).length + '장)</option>').join('') + '</select>';
+}
+const DEF_LAYOUT = [['type', 'tplKey'], ['subKeywords', 'photoSetKey'], ['tone', 'length', 'imgMode'], ['brief']];
+function renderDefRows() {
+  const d = _defDraft;
+  const byKey = {}; DEF_FIELDS.forEach((f) => { byKey[f.k] = f; });
+  const group = (f) => {
+    const v = d[f.k] || { on: false, val: '' };
+    const hint = f.k === 'tplKey' ? '글의 뼈대 — 새 글마다 자동으로 붙습니다' : f.k === 'photoSetKey' ? '초안 생성 후 사진 자리에 자동으로 골라 넣습니다' : f.k === 'brief' ? '매번 넣는 안내(주차·예약 방법 등)를 적어두면 편합니다' : '';
+    return '<div class="form-group' + (v.on ? '' : ' off') + '" style="flex:' + (f.k === 'type' || f.k === 'subKeywords' ? 2 : 1) + '">'
+      + '<label class="def-lab"><input type="checkbox" class="def-on" data-k="' + f.k + '"' + (v.on ? ' checked' : '') + '>' + f.label + '</label>'
+      + defControl(f, v.val || '') + (hint ? '<div class="hint">' + hint + '</div>' : '') + '</div>';
   };
+  $('def-rows').innerHTML = DEF_LAYOUT.map((row) => '<div class="row">' + row.map((k) => group(byKey[k])).join('') + '</div>').join('');
+  $('def-rows').querySelectorAll('.def-on').forEach((cb) => cb.addEventListener('change', () => { (d[cb.dataset.k] = d[cb.dataset.k] || { val: '' }).on = cb.checked; renderDefRows(); }));
+  $('def-rows').querySelectorAll('.def-val').forEach((inp) => inp.addEventListener('input', () => {
+    const v = (d[inp.dataset.k] = d[inp.dataset.k] || { on: false }); v.val = inp.value;
+    if (!v.on) { v.on = true; const g = inp.closest('.form-group'); g.classList.remove('off'); g.querySelector('.def-on').checked = true; }
+  }));
+}
+/* ══════════ 글 맨 아래 기본 사진 ══════════
+   Firestore blogTemplates/footer-photos = { kind:'footer', photos:[{url, cap}] } — 기기 상관없이 공유.
+   본문에는 figure.bimg[data-footer] 로 들어가며, ensureFooterPhotos() 가 없으면 끝에 붙이고 있으면 최신 목록으로 맞춘다. */
+let footerPhotos = null;   // null = 아직 안 읽음
+async function loadFooterPhotos(force) {
+  if (footerPhotos && !force) return footerPhotos;
+  try { const snap = await getDoc(doc(db, 'blogTemplates', 'footer-photos')); footerPhotos = (snap.exists() && Array.isArray(snap.data().photos)) ? snap.data().photos.filter((q) => q && q.url) : []; }
+  catch (e) { footerPhotos = footerPhotos || []; }
+  return footerPhotos;
+}
+async function saveFooterPhotos() {
+  try { await setDoc(doc(db, 'blogTemplates', 'footer-photos'), { kind: 'footer', name: '글 맨 아래 기본 사진', photos: footerPhotos, updatedAt: new Date().toISOString() }); }
+  catch (e) { toast('기본 사진 저장 실패: ' + (e.message || e)); }
+}
+/* 본문 끝의 기본 사진을 현재 설정과 맞춘다(없으면 추가, 목록이 바뀌었으면 교체, 비었으면 제거). 넣은 장수를 돌려준다 */
+async function ensureFooterPhotos() {
+  const list = await loadFooterPhotos();
+  const ed = $('body-editor');
+  ed.querySelectorAll('figure.bimg[data-footer]').forEach((f) => f.remove());
+  if (!list.length) return 0;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = list.map((q) => imgHtml(q.url, q.cap || '')).join('');
+  Array.from(tmp.children).forEach((fig) => { fig.setAttribute('data-footer', '1'); ed.appendChild(fig); });
+  return list.length;
+}
+function renderFooterList() {
+  const el = $('footer-list'); const list = footerPhotos || [];
+  el.innerHTML = list.map((q, i) =>
+    '<div style="width:150px;border:1px solid var(--border);border-radius:8px;padding:6px;background:#fff"><img src="' + q.url + '" style="width:100%;height:90px;object-fit:cover;border-radius:6px;display:block">'
+    + '<input type="text" class="footer-cap" data-i="' + i + '" value="' + esc(q.cap || '') + '" placeholder="설명(선택)" style="width:100%;margin-top:6px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px">'
+    + '<div style="display:flex;gap:4px;margin-top:4px">' + (i > 0 ? '<button class="btn sm footer-up" data-i="' + i + '" style="flex:1;padding:3px">◀</button>' : '') + '<button class="btn sm footer-del" data-i="' + i + '" style="flex:1;padding:3px;color:var(--danger)">삭제</button></div></div>').join('')
+    + (list.length ? '' : '<div class="hint">아직 없습니다 — 위에서 사진을 넣으면 바로 저장됩니다.</div>');
+  el.querySelectorAll('.footer-cap').forEach((inp) => inp.addEventListener('change', async () => { footerPhotos[+inp.dataset.i].cap = inp.value.trim(); await saveFooterPhotos(); }));
+  el.querySelectorAll('.footer-del').forEach((b) => b.addEventListener('click', async () => { footerPhotos.splice(+b.dataset.i, 1); await saveFooterPhotos(); renderFooterList(); toast('기본 사진을 뺐습니다.'); }));
+  el.querySelectorAll('.footer-up').forEach((b) => b.addEventListener('click', async () => { const i = +b.dataset.i; const t = footerPhotos[i]; footerPhotos[i] = footerPhotos[i - 1]; footerPhotos[i - 1] = t; await saveFooterPhotos(); renderFooterList(); }));
+}
+async function footerAddFiles(files) {
+  const imgs = files.filter((f) => (f.type || '').startsWith('image/')); if (!imgs.length) return;
+  busy(true, '기본 사진 올리는 중…');
   try {
-    await addDoc(collection(db, 'blogTemplates'), data);
-    await loadPhotoTpls();
-    toast('"' + nm + '" 사진 세트로 저장했습니다.');
+    const ups = await uploadBlogImages(imgs, (i, n) => busy(true, '기본 사진 올리는 중… (' + i + '/' + n + ')'));
+    await loadFooterPhotos();
+    ups.forEach((u) => footerPhotos.push({ url: u.url, cap: '' }));
+    await saveFooterPhotos(); renderFooterList();
+    toast('기본 사진 ' + ups.length + '장 추가 — 이제 모든 글 맨 아래에 들어갑니다.');
+  } catch (e) { toast('사진 올리기 실패: ' + (e.message || e)); }
+  finally { busy(false); }
+}
+$('footer-file').addEventListener('change', async (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; await footerAddFiles(files); });
+document.addEventListener('paste', (ev) => {
+  if (!$('def-modal').classList.contains('on')) return;
+  const items = Array.from((ev.clipboardData && ev.clipboardData.items) || []);
+  const files = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  ev.preventDefault(); footerAddFiles(files);
+});
+document.addEventListener('dragover', (ev) => { if ($('def-modal').classList.contains('on')) ev.preventDefault(); });
+document.addEventListener('drop', (ev) => {
+  if (!$('def-modal').classList.contains('on')) return;
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  if (!files.length) return;
+  ev.preventDefault(); footerAddFiles(files);
+});
+
+async function openDefModal() {
+  await loadPhotoTpls();
+  await loadFooterPhotos(true); renderFooterList();
+  _defDraft = JSON.parse(JSON.stringify(getDefaults()));
+  renderDefRows();
+  const o = pasteOpts();
+  const cur = aiModels();
+  $('def-models').innerHTML = AI_ROLES.map((r) => '<div class="form-group"><label>' + r.label + '</label><select class="def-model" data-role="' + r.k + '">'
+    + AI_MODELS.map((m) => '<option value="' + m.v + '"' + (m.v === cur[r.k] ? ' selected' : '') + '>' + esc(m.label) + '</option>').join('') + '</select></div>').join('');
+  $('def-font').innerHTML = NAVER_FONTS.map((f) => '<option value="' + f.v + '"' + (f.v === o.font ? ' selected' : '') + '>' + f.label + '</option>').join('');
+  $('def-psize').innerHTML = '<option value="0">네이버 기본</option>' + P_SIZES.map((n) => '<option value="' + n + '"' + (n === o.pSize ? ' selected' : '') + '>' + n + 'px</option>').join('');
+  $('def-hsize').innerHTML = H_SIZES.map((n) => '<option value="' + n + '"' + (n === (o.hSize || 19) ? ' selected' : '') + '>' + n + 'px</option>').join('');
+  $('def-modal').classList.add('on');
+}
+function renderModelBadge() {
+  const m = aiModels(); const el = $('model-badge'); if (!el) return;
+  el.textContent = '글감 ' + modelLabel(m.ideas) + ' · 초안 ' + modelLabel(m.write) + ' · 제목 ' + modelLabel(m.titles) + ' · 검수 ' + modelLabel(m.review);
+  el.title = '보조 작업: ' + modelLabel(m.aux) + ' · 형식 가져오기: ' + modelLabel(m.extract) + ' — 「⚙ 기본값」에서 변경';
+}
+renderModelBadge();
+$('def-open-btn').addEventListener('click', openDefModal);
+$('def-close').addEventListener('click', () => $('def-modal').classList.remove('on'));
+$('def-modal').addEventListener('click', (e) => { if (e.target === $('def-modal')) $('def-modal').classList.remove('on'); });
+$('def-from-form').addEventListener('click', () => {
+  if (!current) { toast('먼저 글을 하나 열어주세요.'); return; }
+  readForm();
+  DEF_FIELDS.forEach((f) => { const val = current[f.k] || ''; _defDraft[f.k] = { on: !!val, val }; });
+  renderDefRows(); toast('지금 화면의 값을 담았습니다 — 필요 없는 항목은 체크를 끄세요.');
+});
+$('def-clear').addEventListener('click', () => { DEF_FIELDS.forEach((f) => { if (_defDraft[f.k]) _defDraft[f.k].on = false; }); renderDefRows(); });
+$('def-save').addEventListener('click', () => {
+  setDefaults(_defDraft); $('def-modal').classList.remove('on');
+  const mm = {}; $('def-models').querySelectorAll('.def-model').forEach((sel) => { mm[sel.dataset.role] = sel.value; });
+  try { localStorage.setItem('hw_ai_models', JSON.stringify(mm)); } catch (e) { /* 무시 */ }
+  renderModelBadge();
+  savePasteOpts({ font: $('def-font').value, pSize: +$('def-psize').value || 0, hSize: +$('def-hsize').value || 19 });
+  const n = DEF_FIELDS.filter((f) => _defDraft[f.k] && _defDraft[f.k].on).length;
+  toast(n ? '기본값 ' + n + '개를 저장했습니다 — 다음 새 글부터 자동으로 채워집니다.' : '기본값을 모두 해제했습니다.');
+});
+
+/* ══════════ 사진 세트 관리 ══════════
+   세트 = 컨셉 붙인 사진 묶음(Firestore blogTemplates, kind:'photo', photos:[{url,concept}]).
+   옛 형식(bodyHtml 에 사진이 박힌 세트)도 setPhotos() 가 읽어준다. */
+let _psetCur = null;   // 편집 중인 세트 { key|null, name, photos:[{url,concept}] }
+function psetFrom(t) { return { key: t.key, name: t.name || '', isDefault: !!t.isDefault, photos: setPhotos(t).map((q) => ({ url: q.url, concept: q.concept || '' })) }; }
+function bodyFigures() {
+  return photoUrlsOfSet({ bodyHtml: $('body-editor').innerHTML }).map((x) => ({ url: x.url, concept: (x.cap && x.cap !== '사진 설명을 적어주세요') ? x.cap : '' }));
+}
+async function openPsetModal(prefillFromBody) {
+  await loadPhotoTpls();
+  if (prefillFromBody) {
+    _psetCur = { key: null, name: (current && current.keyword) ? current.keyword + ' 사진' : '새 사진 세트', photos: bodyFigures() };
+  } else if (!_psetCur) {
+    _psetCur = photoTpls.length ? psetFrom(photoTpls[0]) : { key: null, name: '새 사진 세트', photos: [] };
+  }
+  renderPset(); $('pset-modal').classList.add('on');
+}
+function renderPset() {
+  const list = $('pset-list'); const c = _psetCur;
+  list.innerHTML = photoTpls.map((t) =>
+    '<div class="pset-item" data-key="' + t.key + '" style="padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px;margin-bottom:4px;' + (c && c.key === t.key ? 'background:#eef6fd;color:var(--primary);font-weight:700' : '') + '">' + (t.isDefault ? '★ ' : '📸 ') + esc(t.name || '(이름 없음)') + ' <span style="color:#98a0ad;font-size:11px">' + setPhotos(t).length + '장</span></div>').join('')
+    + (c && !c.key ? '<div style="padding:8px 10px;border-radius:7px;font-size:13px;background:#eef6fd;color:var(--primary);font-weight:700">✎ ' + esc(c.name) + ' <span style="color:#98a0ad;font-size:11px">(저장 전)</span></div>' : '');
+  list.querySelectorAll('.pset-item').forEach((it) => it.addEventListener('click', () => { const t = photoTpls.find((x) => x.key === it.dataset.key); if (t) { _psetCur = psetFrom(t); renderPset(); } }));
+  const ed = $('pset-edit');
+  if (!c) { ed.innerHTML = ''; return; }
+  ed.innerHTML = '<div class="row"><div class="form-group" style="flex:2"><label>세트 이름</label><input type="text" id="pset-name" value="' + esc(c.name) + '" placeholder="예: 어깨 통증용 / 진료실·장비"></div>'
+    + '<div class="form-group" style="flex:1"><label>기본 세트</label><label style="display:flex;align-items:center;gap:6px;padding:10px 0;font-size:13px;color:var(--text);font-weight:400;cursor:pointer"><input type="checkbox" id="pset-default"' + (c.isDefault ? ' checked' : '') + ' style="width:14px;height:14px;margin:0;accent-color:var(--primary)"> ★ 키워드에 맞는 세트가 없을 때 이 세트를 사용</label></div></div>'
+    + '<div id="pset-drop" style="border:1px dashed #bcc6d4;border-radius:8px;padding:12px;text-align:center;color:#7c8794;font-size:12.5px;background:#f8fafc;margin-bottom:10px">📋 사진을 여기서 <b>Ctrl+V</b> 하거나 끌어다 놓기 · <label style="color:var(--primary);cursor:pointer">파일 선택<input type="file" id="pset-file" accept="image/*" multiple style="display:none"></label> · <a href="#" id="pset-from-body" style="color:var(--primary)">본문 사진 가져오기</a></div>'
+    + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">' + c.photos.map((q, i) =>
+      '<div style="border:1px solid var(--border);border-radius:8px;padding:6px;background:#fff"><img src="' + q.url + '" style="width:100%;height:96px;object-fit:cover;border-radius:6px;display:block"><input type="text" class="pset-concept" data-i="' + i + '" value="' + esc(q.concept) + '" placeholder="컨셉 (예: 어깨 짚는 환자)" style="width:100%;margin-top:6px;padding:6px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px"><button class="btn sm pset-del" data-i="' + i + '" style="width:100%;margin-top:4px;color:var(--danger)">삭제</button></div>').join('') + '</div>'
+    + (c.photos.length ? '' : '<div class="hint" style="margin-top:8px">사진이 없습니다. 위에서 붙여넣거나 파일을 선택하세요.</div>')
+    + '<div class="hint" style="margin-top:10px">컨셉은 짧게 — "어깨 짚는 환자", "진료실 상담", "초음파 장비", "허리 스트레칭". 글을 만들 때 AI가 각 사진 자리의 설명과 대조해 골라 넣습니다.</div>'
+    + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">' + (c.key ? '<button class="btn sm" id="pset-delete" style="color:var(--danger)">세트 삭제</button>' : '') + '<button class="btn primary" id="pset-save">저장</button></div>';
+  $('pset-name').addEventListener('input', (e) => { c.name = e.target.value; });
+  $('pset-default').addEventListener('change', (e) => { c.isDefault = e.target.checked; });
+  ed.querySelectorAll('.pset-concept').forEach((inp) => inp.addEventListener('input', (e) => { c.photos[+e.target.dataset.i].concept = e.target.value; }));
+  ed.querySelectorAll('.pset-del').forEach((b) => b.addEventListener('click', () => { c.photos.splice(+b.dataset.i, 1); renderPset(); }));
+  $('pset-file').addEventListener('change', async (e) => { const files = Array.from(e.target.files || []); e.target.value = ''; await psetAddFiles(files); });
+  $('pset-from-body').addEventListener('click', (e) => {
+    e.preventDefault();
+    const figs = bodyFigures(); if (!figs.length) { toast('본문에 사진이 없습니다.'); return; }
+    let added = 0; figs.forEach((x) => { if (!c.photos.some((q) => q.url === x.url)) { c.photos.push(x); added++; } });
+    renderPset(); toast('본문 사진 ' + added + '장을 가져왔습니다.');
+  });
+  $('pset-save').addEventListener('click', psetSave);
+  const del = $('pset-delete'); if (del) del.addEventListener('click', psetDelete);
+}
+async function psetAddFiles(files) {
+  const c = _psetCur; if (!c) return;
+  const imgs = files.filter((f) => (f.type || '').startsWith('image/')); if (!imgs.length) return;
+  busy(true, '사진 올리는 중…');
+  try {
+    const ups = await uploadBlogImages(imgs, (i, n) => busy(true, '사진 올리는 중… (' + i + '/' + n + ')'));
+    ups.forEach((u) => c.photos.push({ url: u.url, concept: '' }));
+    toast('사진 ' + ups.length + '장 추가 — 컨셉을 적어주세요.');
+  } catch (e) { toast('사진 올리기 실패: ' + (e.message || e)); }
+  finally { busy(false); renderPset(); }
+}
+async function psetSave() {
+  const c = _psetCur; if (!c) return;
+  const name = (c.name || '').trim(); if (!name) { toast('세트 이름을 적어주세요.'); return; }
+  if (!c.photos.length) { toast('사진이 없습니다.'); return; }
+  const data = { name, kind: 'photo', photos: c.photos.map((q) => ({ url: q.url, concept: (q.concept || '').trim() })),
+    desc: '사진 ' + c.photos.length + '장 · ' + (c.photos.map((q) => (q.concept || '').trim()).filter(Boolean).slice(0, 4).join(', ') || '컨셉 미입력'),
+    outline: [], isDefault: !!c.isDefault, updatedAt: new Date().toISOString() };
+  try {
+    if (c.key) await setDoc(doc(db, 'blogTemplates', c.key), data);
+    else { const ref = await addDoc(collection(db, 'blogTemplates'), data); c.key = ref.id; }
+    // 기본 세트는 하나만 — 다른 세트의 ★ 를 내린다
+    if (c.isDefault) await Promise.all(photoTpls.filter((t) => t.isDefault && t.key !== c.key).map((t) => setDoc(doc(db, 'blogTemplates', t.key), { isDefault: false }, { merge: true })));
+    await loadPhotoTpls(); renderPset(); toast('"' + name + '" 세트를 저장했습니다.');
   } catch (e) { toast('저장 실패: ' + (e.message || e)); }
+}
+async function psetDelete() {
+  const c = _psetCur; if (!c || !c.key) return;
+  if (!confirm('"' + c.name + '" 세트를 삭제할까요?')) return;
+  try {
+    await deleteDoc(doc(db, 'blogTemplates', c.key)); await loadPhotoTpls();
+    _psetCur = photoTpls.length ? psetFrom(photoTpls[0]) : { key: null, name: '새 사진 세트', photos: [] };
+    renderPset(); toast('삭제했습니다.');
+  } catch (e) { toast('삭제 실패: ' + (e.message || e)); }
+}
+$('pset-close').addEventListener('click', () => $('pset-modal').classList.remove('on'));
+$('pset-modal').addEventListener('click', (e) => { if (e.target === $('pset-modal')) $('pset-modal').classList.remove('on'); });
+$('pset-new').addEventListener('click', () => { _psetCur = { key: null, name: '새 사진 세트', photos: [] }; renderPset(); });
+function psetZoneActive() { return $('pset-modal').classList.contains('on'); }
+document.addEventListener('paste', (ev) => {
+  if (!psetZoneActive()) return;
+  const items = Array.from((ev.clipboardData && ev.clipboardData.items) || []);
+  const files = items.filter((it) => it.kind === 'file' && (it.type || '').startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+  if (!files.length) return;
+  ev.preventDefault(); psetAddFiles(files);
+});
+document.addEventListener('dragover', (ev) => { if (psetZoneActive()) ev.preventDefault(); });
+document.addEventListener('drop', (ev) => {
+  if (!psetZoneActive()) return;
+  const files = Array.from((ev.dataTransfer && ev.dataTransfer.files) || []);
+  if (!files.length) return;
+  ev.preventDefault(); psetAddFiles(files);
 });
 
 /* ── 문단 스니펫 삽입 ── */
@@ -1133,7 +1859,33 @@ function writerSystem() {
     '- 한 문단은 2~4문장으로 짧게. 네이버 블로그는 모바일 가독성이 중요합니다.',
     '- 소제목을 3~5개 사용해 흐름을 나눕니다.',
     '- 과장 없이 담백하게. 이모지는 소제목에 쓰지 않습니다.',
-    '- 병원명·전화번호는 글 마지막 안내 부분에서만 자연스럽게 1회 언급합니다.'
+    '- 병원명·전화번호는 글 마지막 안내 부분에서만 자연스럽게 1회 언급합니다.',
+    '',
+    '[제목 규칙 — 네이버 검색 노출과 클릭을 함께 노린다]',
+    '- 길이 25~35자(공백 포함). 주 키워드는 앞쪽 15자 안에 자연스럽게 넣는다. 지역명이 키워드에 있으면 그대로 살린다.',
+    '- 독자가 "내 얘기"라고 느끼는 구체적 상황·증상·시점을 담는다. 예) "아침에 유독", "계단 내려갈 때", "3주 넘게".',
+    '- 하나의 제목에는 하나의 이득 또는 궁금증만. 낚시·과장·공포 조성 금지. 물음표 남발·특수문자(【】★!) 금지. 마침표 없이 끝낸다.',
+    '- 의료광고법 준수: 완치·최고·유일·100%·부작용 없음·비교/비방·후기 암시 표현은 제목에서도 금지.',
+    '- 제목 후보 5개는 반드시 서로 다른 패턴으로 만든다(같은 패턴 2개 금지):',
+    '  ① 질문형(독자의 실제 검색 질문 그대로) ② 상황 공감형(구체적 장면·시점) ③ 오해 바로잡기형("~라고요? 사실은…"식 단정 없이)',
+    '  ④ 숫자·체크리스트형(3가지·5가지 신호) ⑤ 정보 안내형(담백하게 무엇을 알려주는지)',
+    '- 후보는 좋은 순서대로 나열한다. 첫 후보는 바로 발행해도 되는 완성도여야 한다.',
+    '',
+    '[제목 — 좋은 예와 나쁜 예 (형태만 참고, 문구를 베끼지 말 것)]',
+    '  좋음: "진주 어깨통증, 팔을 올릴 때만 아프면 회전근개부터 의심해 보세요" — 키워드 앞, 구체적 장면, 독자가 할 행동이 보임',
+    '  좋음: "허리디스크 초기 신호 4가지, 앉아 있다 일어날 때 찌릿하다면" — 숫자 + 장면, 낚시 없음',
+    '  좋음: "무릎에서 소리가 나요, 병원에 가야 하는 경우와 아닌 경우" — 실제 검색 문장 + 분명한 이득',
+    '  나쁨: "어깨통증의 원인과 치료법 총정리" — 추상 명사 나열, 누구 얘기인지 모름, 모든 글에 붙일 수 있는 제목',
+    '  나쁨: "어깨통증 알아보기 / 어깨통증에 대해 알아보자" — 진부한 어미, 정보 없음',
+    '  나쁨: "어깨통증 완치 가능? 최고의 치료법" — 의료광고법 위반(완치·최고) + 낚시',
+    '  나쁨: "통증이 있다면 신세계제통의원으로" — 제목에 병원명, 검색어 없음',
+    '',
+    '[제목 작성 절차 — 반드시 이 순서로]',
+    '  1) 독자가 네이버에 실제로 칠 검색 문장 3개를 떠올린다(예: "어깨 팔 올릴때 통증", "어깨통증 병원 언제").',
+    '  2) 본문(또는 주제)에서 가장 구체적인 사실 하나 — 숫자·시점·장면·기준 — 를 고른다. 제목마다 이 중 하나가 들어가야 한다.',
+    '  3) 후보를 8개 만든 뒤, 각 후보를 (검색어 포함 / 구체성 / 25~35자 / 법 준수 / 본문과 일치) 5항목으로 스스로 채점한다.',
+    '  4) 5항목 모두 통과한 것만 남기고, 패턴이 겹치지 않게 5개를 좋은 순서대로 제출한다. 통과 후보가 5개 미만이면 고쳐서 채운다.',
+    '  5) 마지막으로 각 후보에서 "알아보기·총정리·모든 것·에 대해·꿀팁" 같은 진부한 표현과 병원명을 제거했는지 확인한다.'
   ].join('\n');
 }
 
@@ -1159,14 +1911,39 @@ function genUserPrompt(mode) {
     L.push('소제목 문구는 이 주제에 맞게 자연스럽게 다듬어도 되지만, 순서와 역할은 바꾸지 마세요.');
     L.push('');
   }
+  if (tpl && mode !== 'titles' && Array.isArray(tpl.rhythm) && tpl.rhythm.length) {
+    L.push('[블록 리듬 — 참고 글에서 뽑은 순서. blocks 를 이 순서·개수대로 구성하라 (p=문단, h=소제목, image=사진 자리, quote=인용, list=목록)]');
+    L.push(tpl.rhythm.join(' → '));
+    if (tpl.style) L.push('[문체 참고] ' + tpl.style);
+    L.push('');
+  }
   if (c.keyword) {
     L.push('주 키워드 "' + c.keyword + '"는 제목에 1회, 첫 문단에 1회, 소제목 중 1곳, 본문 전체에서 3~5회 자연스럽게 등장시키세요. 억지로 반복하지 마세요.');
+    L.push('');
+  }
+  if (mode === 'titles') {
+    // 본문이 있으면 그 내용에 맞는 제목을, 이미 뽑은 후보와는 겹치지 않게
+    const bodyTxt = ($('body-editor').innerText || '').replace(/\s+/g, ' ').trim();
+    if (bodyTxt) {
+      L.push('[이미 작성된 본문 — 이 내용과 정확히 맞는 제목을 뽑는다. 본문에 없는 내용을 제목에 넣지 마라]');
+      L.push(bodyTxt.slice(0, 1800) + (bodyTxt.length > 1800 ? ' …(이하 생략)' : ''));
+      L.push('');
+    }
+    const prev = (current && Array.isArray(current.titleCands) ? current.titleCands : []).filter(Boolean);
+    if (prev.length) {
+      L.push('[이전 후보 — 표현·패턴이 겹치지 않는 새 후보를 만든다]');
+      prev.slice(0, 10).forEach((t) => L.push('- ' + t));
+      L.push('');
+    }
+    L.push('제목 5개를 뽑기 전에 이 글을 읽을 사람이 네이버에 어떤 말로 검색할지 3가지를 속으로 떠올리고, 그 검색어가 자연스럽게 들어가게 하라.');
+    if (bodyTxt) L.push('본문에서 제목에 쓸 수 있는 가장 구체적인 사실(숫자·시점·장면·판단 기준) 3개를 먼저 고르고, 후보마다 그중 하나를 반드시 담아라. 본문 결론(예: "병원에 가야 하는 경우")과 어긋나는 제목은 만들지 마라.');
+    L.push('후보는 8개를 만들어 [제목 작성 절차]대로 채점한 뒤 통과한 5개만 titles 에 담아라. 채점 과정은 출력하지 않는다.');
     L.push('');
   }
   L.push('아래 JSON 형식으로만 답하세요. 설명·인사말·코드펜스 없이 JSON 객체 하나만 출력합니다.');
   L.push('');
   L.push('{');
-  if (mode !== 'body') L.push('  "titles": ["제목 후보 5개, 각 25~35자, 주 키워드 포함, 낚시성 금지"],');
+  if (mode !== 'body') L.push('  "titles": ["제목 후보 5개 — 좋은 순서대로, 각 25~35자, 주 키워드는 앞쪽에, ①질문형 ②상황공감형 ③오해바로잡기형 ④숫자형 ⑤정보안내형 각 1개"],');
   if (mode !== 'titles') {
     L.push('  "blocks": [');
     L.push('    {"type":"p","text":"문단 본문"},');
@@ -1177,13 +1954,13 @@ function genUserPrompt(mode) {
     L.push('  ],');
     L.push('  "tags": ["해시태그 10~15개, # 없이 단어만, 지역명+진료과목 조합 포함"]');
   } else {
-    L.push('  "titles": ["..."]');
+    L.push('  "titles": ["질문형", "상황 공감형", "오해 바로잡기형", "숫자·체크리스트형", "정보 안내형"]');
   }
   L.push('}');
   if (mode !== 'titles') {
     L.push('');
     L.push('blocks 규칙: 첫 블록은 반드시 독자의 상황에 공감하는 도입 문단(p)입니다. 마지막에는 의료진 상담 권유와 병원 안내 문단을 넣습니다.');
-    if (wantImg) L.push('image 블록은 2~4개, 소제목 사이에 배치하세요.');
+    if (wantImg) L.push('image 블록은 ' + (tpl && tpl.imgCount ? tpl.imgCount + '개(참고 글과 같게)' : '2~4개') + ', 소제목 사이에 배치하세요.');
     else L.push('image 블록은 사용하지 마세요.');
   }
   return L.join('\n');
@@ -1232,7 +2009,7 @@ async function suggestIdeas() {
   if (!c.keyword) { toast('주 키워드를 먼저 입력하세요.'); $('f-keyword').focus(); return; }
   busy(true, '"' + c.keyword + '"로 쓸 만한 글감을 찾는 중…');
   try {
-    const out = parseAiJson(await callAi(writerSystem(), ideaUserPrompt(), 4000));
+    const out = parseAiJson(await callAi(writerSystem(), ideaUserPrompt(), 4000, null, 'ideas'));
     const ideas = out && Array.isArray(out.ideas) ? out.ideas.filter((i) => i && i.topic) : [];
     if (!ideas.length) { toast('글감을 받지 못했습니다. 다시 시도해 주세요.'); return; }
     current.ideas = ideas;
@@ -1276,6 +2053,7 @@ function pickIdea(i) {
 $('gen-btn').addEventListener('click', () => generate('all'));
 $('regen-body-btn').addEventListener('click', () => generate('body'));
 $('gen-titles-btn').addEventListener('click', () => generate('titles'));
+$('gen-titles-btn2').addEventListener('click', () => generate('titles'));
 
 async function generate(mode) {
   const c = readForm();
@@ -1286,7 +2064,7 @@ async function generate(mode) {
   }
   busy(true, mode === 'titles' ? '제목 후보를 뽑는 중…' : 'AI가 글을 작성 중입니다… (30초~1분)');
   try {
-    const txt = await callAi(writerSystem(), genUserPrompt(mode), 16000);
+    const txt = await callAi(writerSystem(), genUserPrompt(mode), mode === 'titles' ? 2000 : 16000, null, mode === 'titles' ? 'titles' : 'write');
     const out = parseAiJson(txt);
     if (!out) { toast('AI 응답을 해석하지 못했습니다. 다시 시도해 주세요.'); return; }
 
@@ -1302,6 +2080,12 @@ async function generate(mode) {
       tags = out.tags.map(normTag).filter(Boolean).slice(0, 30);
       renderTags();
     }
+    if (mode !== 'titles' && current.photoSetKey) {
+      if (!photoTpls.length) await loadPhotoTpls();
+      const ps = photoTpls.find((t) => t.key === current.photoSetKey);
+      if (ps) { busy(true, '사진 자리에 세트 사진을 고르는 중…'); await fillPhotosFromSet(ps); }
+    }
+    if (mode !== 'titles') await ensureFooterPhotos();
     markDirty(); updateStats(); scanAds();
     if (mode === 'titles') { toast('제목 후보를 새로 뽑았습니다.'); return; }
     // 생성 직후 법조문 검수까지 자동으로 돌린다
@@ -1341,6 +2125,45 @@ function renderTitleCands(list) {
   el.querySelectorAll('.title-cand').forEach((it) =>
     it.addEventListener('click', () => selectTitle(it.dataset.t)));
 }
+/* ── 주 키워드 AI 추천 ──
+   제목(없으면 주제, 그것도 없으면 본문 앞부분)을 읽고, 실제 네이버 검색어 형태의 주 키워드 1개와 보조 키워드 5개를 제안한다.
+   후보 3개를 받아 첫 번째를 채우고, 나머지는 토스트로 보여준다. 보조 키워드는 비어 있을 때만 채운다. */
+async function suggestKeywordFromTitle() {
+  const c = readForm();
+  const bodyTxt = ($('body-editor').innerText || '').replace(/\s+/g, ' ').trim();
+  const basis = c.title ? '제목: ' + c.title : c.topic ? '주제: ' + c.topic : bodyTxt ? '본문 앞부분: ' + bodyTxt.slice(0, 600) : '';
+  if (!basis) { toast('제목이나 주제를 먼저 적어주세요.'); $('f-title').focus(); return; }
+  const region = (site.address || '').match(/([가-힣]{2,4})(?:시|군|구)\b/); const regionName = region ? region[1] : '';
+  busy(true, '검색 키워드를 고르는 중…');
+  try {
+    const sys = '당신은 네이버 블로그 검색 최적화 담당자입니다. 병원 글의 제목·주제를 보고 사람들이 실제로 네이버 검색창에 치는 형태의 키워드를 고릅니다. JSON 만 출력합니다.';
+    const L = [];
+    L.push(basis);
+    if (c.keyword) L.push('현재 주 키워드(참고, 더 좋은 것이 있으면 바꿔도 됨): ' + c.keyword);
+    if (regionName) L.push('병원 지역: ' + regionName + ' — 지역 환자를 노리는 글이면 주 키워드 앞에 지역명을 붙이는 형태("' + regionName + ' 어깨통증")를 우선 고려한다.');
+    if (site.hospitalName) L.push('병원명: ' + site.hospitalName + ' (키워드에 병원명은 넣지 않는다)');
+    L.push('');
+    L.push('규칙:');
+    L.push('- 주 키워드는 2~4어절, 실제 검색량이 있을 법한 일반 표현(증상·부위·질환명 중심). 조사·서술어 없이 명사구로.');
+    L.push('- 제목의 핵심 의도와 정확히 맞아야 한다(제목이 "목 통증 담 vs 디스크"면 "목 디스크 초기증상"처럼).');
+    L.push('- 후보 3개를 검색 노출 가능성 순으로. 첫 번째가 가장 무난한 것.');
+    L.push('- 보조 키워드 5개: 주 키워드와 함께 본문에 자연스럽게 들어갈 연관 검색어(증상·원인·치료·병원 관련), 쉼표 없이 배열로.');
+    L.push('- 의료광고법상 문제 되는 표현(완치, 최고, 유일 등)은 넣지 않는다.');
+    L.push('');
+    L.push('출력: {"main":["주 키워드 후보1","후보2","후보3"],"sub":["보조1","보조2","보조3","보조4","보조5"]}');
+    const out = parseAiJson(await callAi(sys, L.join(String.fromCharCode(10)), 500, null, 'ideas'));
+    const mains = (out && Array.isArray(out.main) ? out.main : []).map((x) => String(x || '').trim()).filter(Boolean);
+    const subs = (out && Array.isArray(out.sub) ? out.sub : []).map((x) => String(x || '').trim()).filter(Boolean);
+    if (!mains.length) { toast('키워드를 받지 못했습니다. 다시 시도해 주세요.'); return; }
+    $('f-keyword').value = mains[0];
+    if (!$('f-subkeywords').value.trim() && subs.length) $('f-subkeywords').value = subs.slice(0, 5).join(', ');
+    markDirty(); updateStats();
+    toast('주 키워드: ' + mains[0] + (mains.length > 1 ? '  (다른 후보: ' + mains.slice(1).join(' / ') + ')' : ''));
+  } catch (e) { toast('키워드 추천 실패: ' + (e.message || e)); }
+  finally { busy(false); }
+}
+$('kw-ai-btn').addEventListener('click', suggestKeywordFromTitle);
+
 function selectTitle(t) {
   $('f-title').value = t;
   $('title-len').textContent = t.length;
@@ -1355,10 +2178,57 @@ function normTag(t) {
 }
 function renderTags() {
   $('tag-wrap').innerHTML = tags.map((t, i) =>
-    '<span class="tag">#' + esc(t) + '<button data-i="' + i + '">×</button></span>').join('');
+    '<span class="tag' + (i === _tagCursor ? ' next' : '') + (i < _tagCursor ? ' done' : '') + '" data-i="' + i + '" title="클릭하면 이 태그만 복사" style="cursor:pointer">#' + esc(t) + '<button data-i="' + i + '" title="삭제">×</button></span>').join('');
   $('tag-wrap').querySelectorAll('button').forEach((b) =>
-    b.addEventListener('click', () => { tags.splice(+b.dataset.i, 1); renderTags(); markDirty(); }));
+    b.addEventListener('click', (e) => { e.stopPropagation(); tags.splice(+b.dataset.i, 1); if (_tagCursor > tags.length) _tagCursor = tags.length; renderTags(); markDirty(); }));
+  $('tag-wrap').querySelectorAll('.tag').forEach((el) =>
+    el.addEventListener('click', () => { const i = +el.dataset.i; _tagCursor = i + 1; copyPlain(tags[i], '"' + tags[i] + '" 복사 — 네이버 태그칸에 Ctrl+V → Enter'); renderTags(); }));
+  const pg = $('tag-prog'); if (pg) pg.textContent = tags.length ? (_tagCursor >= tags.length ? '모두 복사함 ' + tags.length + '/' + tags.length : '다음 ' + (_tagCursor + 1) + '/' + tags.length) : '';
 }
+/* ── 네이버 태그칸 자동 입력 북마클릿 ──
+   사용자가 네이버 발행 창의 태그칸을 클릭한 뒤 북마크를 누르면, 붙여 넣은 목록을 하나씩 '타이핑 + Enter' 로 넣는다.
+   React 입력칸이라 값은 네이티브 setter 로 넣고 input 이벤트를 쏜다. Enter 가 안 먹으면 Space 로 한 번 더 시도. */
+async function naverTagTyper() {
+  const el = document.activeElement;
+  const isIn = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+  const inp = isIn ? el : document.querySelector('input[placeholder*="태그"], input[class*="tag"], [contenteditable][class*="tag"]');
+  if (!inp) { alert('네이버 발행 창의 태그 입력칸을 먼저 클릭한 뒤 북마크를 눌러주세요.'); return; }
+  const raw = prompt('태그 목록을 붙여 넣으세요 (줄바꿈·쉼표·공백·# 로 구분)', '');
+  if (!raw) return;
+  const list = raw.split(/[\n\r,\s#]+/).map((t) => t.trim()).filter(Boolean).slice(0, 30);
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const setter = inp.tagName === 'INPUT' ? Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
+    : inp.tagName === 'TEXTAREA' ? Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set : null;
+  const fire = (type, key) => inp.dispatchEvent(new KeyboardEvent(type, { key: key, code: key === 'Enter' ? 'Enter' : 'Space', keyCode: key === 'Enter' ? 13 : 32, which: key === 'Enter' ? 13 : 32, bubbles: true, cancelable: true }));
+  let ok = 0;
+  for (const t of list) {
+    inp.focus();
+    if (setter) { setter.call(inp, t); inp.dispatchEvent(new Event('input', { bubbles: true })); }
+    else { document.execCommand('selectAll', false, null); document.execCommand('insertText', false, t); }
+    await wait(150);
+    fire('keydown', 'Enter'); fire('keypress', 'Enter'); fire('keyup', 'Enter');
+    await wait(250);
+    if (setter && inp.value === t) { fire('keydown', ' '); fire('keyup', ' '); await wait(250); }
+    if (!setter || inp.value !== t) ok++;
+  }
+  alert('태그 ' + list.length + '개 중 ' + ok + '개 입력됨 — 태그 목록을 확인하세요.' + (ok < list.length ? ' 안 들어간 것은 「▶ 다음 태그 복사」로 넣어주세요.' : ''));
+}
+function tagBookmarkletHref() { return 'javascript:' + encodeURIComponent('(' + naverTagTyper.toString() + ')();'); }
+$('tag-bm-btn').addEventListener('click', () => { $('tag-bm-link').href = tagBookmarkletHref(); $('tagbm-modal').classList.add('on'); });
+$('tagbm-close').addEventListener('click', () => $('tagbm-modal').classList.remove('on'));
+$('tagbm-modal').addEventListener('click', (e) => { if (e.target === $('tagbm-modal')) $('tagbm-modal').classList.remove('on'); });
+$('tag-bm-link').addEventListener('click', (e) => { e.preventDefault(); toast('클릭이 아니라 북마크바로 끌어다 놓으세요. 안 되면 「주소 복사」.'); });
+$('tag-bm-copy').addEventListener('click', () => copyPlain(tagBookmarkletHref(), '북마클릿 주소를 복사했습니다 — 새 북마크의 URL 칸에 붙여 넣으세요.'));
+
+/* 네이버 태그칸은 태그 하나씩만 받는다(쉼표·#·공백 → "특수문자" 거부). 그래서 순서대로 하나씩 복사하는 커서를 둔다. */
+let _tagCursor = 0;
+$('copy-next-tag-btn').addEventListener('click', () => {
+  if (!tags.length) { toast('태그가 없습니다.'); return; }
+  if (_tagCursor >= tags.length) _tagCursor = 0;
+  const t = tags[_tagCursor]; _tagCursor++;
+  copyPlain(t, '"' + t + '" 복사 (' + _tagCursor + '/' + tags.length + ') — 태그칸에 Ctrl+V → Enter, 그리고 다시 이 버튼');
+  renderTags();
+});
 $('tag-input').addEventListener('keydown', (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
@@ -1370,7 +2240,7 @@ $('tag-input').addEventListener('keydown', (e) => {
 /* ────────── 통계 ────────── */
 function bodyText() {
   const clone = $('body-editor').cloneNode(true);
-  clone.querySelectorAll('.imgph').forEach((n) => n.remove());
+  clone.querySelectorAll('.imgph, figure.bimg[data-footer]').forEach((n) => n.remove());   // 기본 사진은 검수 서명에 넣지 않는다(붙여도 검수가 안 풀리게)
   clone.querySelectorAll('h3,p,li,blockquote,div').forEach((n) => n.append('\n'));
   return (clone.textContent || '').replace(/\n{2,}/g, '\n').trim();
 }
@@ -1493,7 +2363,7 @@ async function runAiReview(quiet) {
       '{"issues":[{"level":"high|warn","quote":"원문 구절 그대로","law":"근거 조항","why":"왜 저촉되는지","fix":"대체 문장 제안"}],"verdict":"한 줄 총평"}',
       '저촉되는 표현이 없으면 issues 를 빈 배열로 두세요.'
     ].join('\n');
-    const out = parseAiJson(await callAi(sys, user, 8000));
+    const out = parseAiJson(await callAi(sys, user, 8000, null, 'review'));
     if (!out) { if (!quiet) toast('검수 응답을 해석하지 못했습니다.'); return null; }
     const issues = (Array.isArray(out.issues) ? out.issues : []).filter((i) => i && i.quote);
     const r = { sig: sig, issues: issues, verdict: out.verdict || '', at: new Date().toISOString() };
@@ -1543,6 +2413,192 @@ async function publishGate() {
   return violationConfirm('발행 완료로 표시');
 }
 
+/* ══════════ 사진 세트로 사진 자리 채우기 ══════════ */
+function photoUrlsOfSet(set) {
+  const tmp = document.createElement('div'); tmp.innerHTML = (set && set.bodyHtml) || '';
+  return Array.from(tmp.querySelectorAll('figure.bimg'))
+    .map((f) => ({ url: (f.querySelector('img') || {}).src || '', cap: ((f.querySelector('figcaption') || {}).textContent || '').trim() }))
+    .filter((x) => x.url);
+}
+/* 세트의 사진 목록 — 새 형식 photos[{url,concept}] 우선, 옛 형식(bodyHtml 의 figure)은 캡션을 컨셉으로 */
+function setPhotos(set) {
+  if (set && Array.isArray(set.photos) && set.photos.length) return set.photos.filter((q) => q && q.url);
+  return photoUrlsOfSet(set).map((x) => ({ url: x.url, concept: (x.cap && x.cap !== '사진 설명을 적어주세요') ? x.cap : '' }));
+}
+/* 본문의 AI 사진 자리(.imgph)마다 세트에서 가장 어울리는 사진을 AI 가 골라 넣는다.
+   AI 가 실패하면 순서대로 채운다. 자리가 사진보다 많으면 남은 자리는 그대로 둔다. */
+async function fillPhotosFromSet(set) {
+  const photos = setPhotos(set); if (!photos.length) return 0;
+  const phs = Array.from($('body-editor').querySelectorAll('.imgph'));
+  if (!phs.length) return 0;
+  const slots = phs.map((ph, i) => ({ i, desc: (ph.textContent || '').replace('📷 이미지 자리 — ', '').trim() }));
+  let map = null;
+  if (photos.some((q) => q.concept)) {
+    try {
+      const sys = '당신은 블로그 사진 배치 도우미입니다. 각 사진 자리의 설명에 가장 어울리는 사진을 컨셉 설명으로 고릅니다. 같은 사진을 두 번 쓰지 마세요(사진이 자리보다 적으면 가장 덜 어색한 것을 재사용해도 됩니다). JSON 만 출력하세요.';
+      const user = JSON.stringify({ slots, photos: photos.map((q, j) => ({ j, concept: q.concept || '' })) })
+        + String.fromCharCode(10) + '출력: {"map":[{"i":자리번호,"j":사진번호}, ...]} — 모든 자리에 하나씩.';
+      const out = parseAiJson(await callAi(sys, user, 600, null, 'aux'));
+      if (out && Array.isArray(out.map)) { map = {}; out.map.forEach((m) => { if (m && Number.isInteger(m.i) && Number.isInteger(m.j) && photos[m.j]) map[m.i] = m.j; }); }
+    } catch (e) { map = null; }
+  }
+  let n = 0;
+  phs.forEach((ph, i) => {
+    const j = (map && map[i] != null) ? map[i] : (i < photos.length ? i : -1);
+    if (j < 0 || !photos[j]) return;
+    const cap = photos[j].concept || slots[i].desc;
+    const tmp = document.createElement('div'); tmp.innerHTML = imgHtml(photos[j].url, cap);
+    ph.replaceWith(tmp.firstElementChild); n++;
+  });
+  if (n) { markDirty(); updateStats(); renderPhotoList(); }
+  return n;
+}
+/* 세트 카드(고르기 모달·일괄 생성 안내에 공통) */
+function psetCardHtml(t, extraCls) {
+  const ph = setPhotos(t);
+  return '<div class="tpl-card ' + (extraCls || '') + '" data-key="' + t.key + '" style="cursor:pointer">'
+    + '<div class="n">' + (t.isDefault ? '★ ' : '📸 ') + esc(t.name) + ' <span style="color:#98a0ad;font-size:11px;font-weight:400">' + ph.length + '장</span></div>'
+    + '<div style="display:flex;gap:4px;margin:6px 0">' + ph.slice(0, 5).map((q) => '<img src="' + q.url + '" style="width:44px;height:34px;object-fit:cover;border-radius:4px">').join('') + '</div>'
+    + '<div class="d">' + (esc(ph.map((q) => q.concept).filter(Boolean).slice(0, 5).join(' · ')) || '컨셉 미입력') + '</div></div>';
+}
+function defaultPhotoSet() { return photoTpls.find((t) => t.isDefault) || null; }
+/* 채우기용 세트 고르기 — 카드 모달 */
+async function pickPhotoSet() {
+  await loadPhotoTpls();
+  if (!photoTpls.length) { toast('저장된 사진 세트가 없습니다 — 「📸 사진 세트」에서 먼저 만들어 주세요.'); return null; }
+  // 세트가 하나뿐이어도 어떤 세트가 들어가는지 보고 고르게 한다
+  return new Promise((res) => {
+    const m = $('psel-modal'); const list = $('psel-list');
+    const curKey = current && current.photoSetKey;
+    list.innerHTML = photoTpls.map((t) => psetCardHtml(t, t.key === curKey ? 'on' : '')).join('');
+    const close = (v) => { m.classList.remove('on'); res(v); };
+    list.querySelectorAll('.tpl-card').forEach((cd) => cd.addEventListener('click', () => close(photoTpls.find((t) => t.key === cd.dataset.key) || null)));
+    $('psel-close').onclick = () => close(null);
+    m.onclick = (e) => { if (e.target === m) close(null); };
+    m.classList.add('on');
+  });
+}
+/* 일괄 생성용: 키워드·주제에 어울리는 세트를 AI 가 고른다. 못 고르면 ★기본 세트, 그것도 없으면 null */
+async function chooseSetForPost(kw, topic) {
+  if (!photoTpls.length) return null;
+  if (photoTpls.length === 1) return photoTpls[0];
+  try {
+    const sys = '당신은 블로그 사진 세트 선택 도우미입니다. 글의 키워드·주제에 어울리는 사진 세트 하나를 고릅니다. 어울리는 것이 없으면 -1. JSON 만 출력: {"j":번호}';
+    const user = JSON.stringify({ keyword: kw, topic: topic || '', sets: photoTpls.map((t, j) => ({ j, name: t.name, concepts: setPhotos(t).map((q) => q.concept).filter(Boolean).slice(0, 12) })) });
+    const out = parseAiJson(await callAi(sys, user, 200, null, 'aux'));
+    if (out && Number.isInteger(out.j) && photoTpls[out.j]) return photoTpls[out.j];
+  } catch (e) { /* 아래 기본 세트로 */ }
+  return defaultPhotoSet();
+}
+/* 줄 끝의 @세트이름 → 세트 (이름 일부만 써도 됨) */
+function setByName(nm) {
+  const q = (nm || '').trim().toLowerCase(); if (!q) return null;
+  return photoTpls.find((t) => (t.name || '').toLowerCase() === q) || photoTpls.find((t) => (t.name || '').toLowerCase().includes(q)) || null;
+}
+$('img-fill-btn').addEventListener('click', async () => {
+  if (!$('body-editor').querySelector('.imgph')) { toast('채울 사진 자리(📷)가 없습니다.'); return; }
+  const set = await pickPhotoSet(); if (!set) return;
+  const n = await fillPhotosFromSet(set);
+  toast(n ? '사진 자리 ' + n + '곳을 세트 사진으로 채웠습니다.' : '채울 수 없었습니다.');
+});
+
+/* ══════════ 일괄 생성 (양산) ══════════
+   키워드를 줄마다 하나씩 넣으면 순서대로 글감 선택 → 초안 생성 → 사진 세트 채우기 → 검수 → 저장.
+   한 글에 1~2분. 창을 열어둔 채 기다린다(닫으면 멈춘다). 실패한 글은 건너뛰고 다음으로 간다. */
+let _batchStop = false, _batchRunning = false;
+async function openBatchModal() {
+  const sel = $('batch-tpl');
+  sel.innerHTML = '<option value="">글감별 AI 추천 (자동)</option>' + BLOG_TEMPLATES.concat(getMyTpls()).map((t) => '<option value="' + t.key + '">' + esc((t.icon || '📄') + ' ' + t.name) + '</option>').join('');
+  $('batch-tone').value = $('f-tone').value; $('batch-length').value = $('f-length').value;
+  if (!_batchRunning) { $('batch-log').innerHTML = ''; $('batch-prog').textContent = ''; }
+  $('batch-modal').classList.add('on');
+  await loadPhotoTpls();
+  const ps = $('batch-photo');
+  const dft = defaultPhotoSet();
+  ps.innerHTML = '<option value="auto">글마다 AI가 어울리는 세트 선택' + (dft ? ' (없으면 ★' + esc(dft.name) + ')' : ' (기본 세트 없음)') + '</option>'
+    + '<option value="">사진 자리만 표시 (나중에 넣기)</option>'
+    + photoTpls.map((t) => '<option value="' + t.key + '">통합: ' + (t.isDefault ? '★ ' : '📸 ') + esc(t.name) + ' (' + setPhotos(t).length + '장)</option>').join('');
+  $('batch-sets-hint').innerHTML = photoTpls.length
+    ? '세트: ' + photoTpls.map((t) => '<span class="batch-set-chip" data-name="' + esc(t.name) + '" style="cursor:pointer;color:var(--primary)">@' + esc(t.name) + (t.isDefault ? ' ★' : '') + '</span>').join(' · ') + ' — 줄 끝에 붙이면 그 글만 그 세트로. 없으면 위 「사진 세트」 선택대로.'
+    : '사진 세트가 없습니다 — 「📸 사진 세트」에서 만들면 글마다 자동으로 골라 넣습니다.';
+  $('batch-sets-hint').querySelectorAll('.batch-set-chip').forEach((ch) => ch.addEventListener('click', () => {
+    const ta = $('batch-keys'); const v = ta.value; const pos = ta.selectionStart == null ? v.length : ta.selectionStart;
+    const lineEnd = v.indexOf(String.fromCharCode(10), pos); const end = lineEnd < 0 ? v.length : lineEnd;
+    ta.value = v.slice(0, end) + ' @' + ch.dataset.name + v.slice(end); ta.focus();
+  }));
+  const d = getDefaults();
+  if (d.tone && d.tone.on && d.tone.val) $('batch-tone').value = d.tone.val;
+  if (d.length && d.length.on && d.length.val) $('batch-length').value = d.length.val;
+  if (d.tplKey && d.tplKey.on && d.tplKey.val) sel.value = d.tplKey.val;
+  if (d.photoSetKey && d.photoSetKey.on && d.photoSetKey.val) ps.value = d.photoSetKey.val;
+}
+function batchLog(msg, color) {
+  const d = document.createElement('div'); d.textContent = msg; if (color) d.style.color = color;
+  const box = $('batch-log'); box.appendChild(d); box.scrollTop = 1e9;
+}
+async function runBatch() {
+  if (_batchRunning) return;
+  const lines = $('batch-keys').value.split('\n').map((x) => x.trim()).filter(Boolean);
+  if (!lines.length) { toast('키워드를 한 줄에 하나씩 입력하세요.'); return; }
+  const tplKey = $('batch-tpl').value, photoKey = $('batch-photo').value, tone = $('batch-tone').value, len = $('batch-length').value;
+  const unifiedSet = (photoKey && photoKey !== 'auto') ? photoTpls.find((t) => t.key === photoKey) : null;
+  _batchRunning = true; _batchStop = false;
+  $('batch-start').disabled = true; $('batch-stop').disabled = false;
+  let ok = 0;
+  for (let i = 0; i < lines.length; i++) {
+    if (_batchStop) { batchLog('■ 중지했습니다.', '#c22'); break; }
+    // 줄 끝 @세트이름 분리
+    let lineSetName = ''; const rawLine = lines[i].replace(/\s@([^|@]+)\s*$/, (m0, nm) => { lineSetName = nm.trim(); return ''; });
+    const parts = rawLine.split('|').map((x) => x.trim());
+    const kw = parts[0], topicIn = parts[1] || '';
+    let set = null;
+    if (lineSetName) { set = setByName(lineSetName); if (!set) batchLog('   @' + lineSetName + ' 세트를 찾지 못해 ' + (photoKey === 'auto' ? 'AI 선택' : unifiedSet ? '통합 세트' : '사진 자리만') + '으로 진행', '#b26a00'); }
+    if (!set) set = unifiedSet;
+    $('batch-prog').textContent = (i + 1) + ' / ' + lines.length;
+    batchLog('▶ ' + kw + (topicIn ? ' — ' + topicIn : ''));
+    try {
+      dirty = false; $('new-post-btn').click();
+      $('f-keyword').value = kw; $('f-tone').value = tone; $('f-length').value = len;
+      if (tplKey) { const t = findTpl(tplKey); if (t) applyTplSettings(t); }
+      if (topicIn) $('f-topic').value = topicIn;
+      else {
+        const io = parseAiJson(await callAi(writerSystem(), ideaUserPrompt(), 4000, null, 'ideas'));
+        const ideas = io && Array.isArray(io.ideas) ? io.ideas.filter((x) => x && x.topic) : [];
+        if (!ideas.length) throw new Error('글감을 받지 못했습니다');
+        current.ideas = ideas; $('f-topic').value = ideas[0].topic;
+        if (!tplKey && ideas[0].tpl) { const t = findTpl(ideas[0].tpl); if (t) applyTplSettings(t); }
+        batchLog('   글감: ' + ideas[0].topic, '#667');
+      }
+      if (_batchStop) { batchLog('■ 중지했습니다.', '#c22'); break; }
+      if (!set && photoKey === 'auto' && !lineSetName) { set = await chooseSetForPost(kw, $('f-topic').value); if (set) batchLog('   사진 세트: ' + (set.isDefault ? '★ ' : '') + set.name, '#667'); }
+      else if (!set && photoKey === 'auto' && lineSetName) { set = await chooseSetForPost(kw, $('f-topic').value); }
+      const out = parseAiJson(await callAi(writerSystem(), genUserPrompt('all'), 16000));
+      if (!out || !Array.isArray(out.blocks) || !out.blocks.length) throw new Error('본문을 받지 못했습니다');
+      if (Array.isArray(out.titles) && out.titles.length) { current.titleCands = out.titles; $('f-title').value = out.titles[0]; $('top-title').textContent = out.titles[0]; }
+      $('body-editor').innerHTML = blocksToHtml(out.blocks);
+      if (Array.isArray(out.tags)) { tags = out.tags.map(normTag).filter(Boolean).slice(0, 30); renderTags(); }
+      let filled = 0; if (set) { current.photoSetKey = set.key; filled = await fillPhotosFromSet(set); }
+      await ensureFooterPhotos();
+      renderTitleCands(current.titleCands || []); renderTplBar(); markDirty(); updateStats(); scanAds(); renderPhotoList();
+      const r = await runAiReview(true);
+      const high = r ? (r.issues || []).filter((x) => x.level === 'high').length : -1;
+      await savePost();
+      ok++;
+      batchLog('   ✓ 저장: ' + $('f-title').value + (set ? ' · 사진 ' + filled + '장' : '') + (high > 0 ? ' · ⚠ 위반 위험 ' + high + '건' : high === 0 ? ' · 검수 통과' : ' · 검수 실패'), high > 0 ? '#c22' : '#1d7a44');
+    } catch (e) { batchLog('   ✗ 실패: ' + (e.message || e), '#c22'); }
+  }
+  _batchRunning = false; $('batch-start').disabled = false; $('batch-stop').disabled = true;
+  batchLog('완료 — ' + ok + ' / ' + lines.length + '개 저장됨. 왼쪽 목록에서 열어 확인하세요.');
+  toast('일괄 생성 완료: ' + ok + '개');
+}
+$('batch-open-btn').addEventListener('click', openBatchModal);
+$('batch-close').addEventListener('click', () => {
+  if (_batchRunning && !confirm('진행 중입니다. 닫으면 멈춥니다. 닫을까요?')) return;
+  _batchStop = true; $('batch-modal').classList.remove('on');
+});
+$('batch-start').addEventListener('click', runBatch);
+$('batch-stop').addEventListener('click', () => { _batchStop = true; });
+
 /* ────────── 복사 ────────── */
 /* 넣은 사진을 [사진 N 삽입: 설명] 로 바꾼다 — 「복사에 사진 포함」이 꺼져 있을 때. */
 function photosToText(root) {
@@ -1561,12 +2617,114 @@ function imgPhToText(root) {
     n.replaceWith(p);
   });
 }
+/* 붙여넣기 옵션 — 한 번 맞춰두면 기억한다 */
+/* 네이버 스마트에디터 ONE 글꼴 — value 는 SE 가 쓰는 font-family 이름, css 는 에디터 미리보기용 대체 글꼴 */
+const NAVER_FONTS = [
+  { v: '', label: '(지정 안 함 — 네이버 기본)', css: '' },
+  { v: 'nanumgothic', label: '나눔고딕', css: '"Nanum Gothic","나눔고딕","Noto Sans KR",sans-serif' },
+  { v: 'nanumbarungothic', label: '나눔바른고딕', css: '"Nanum Barun Gothic","나눔바른고딕","Noto Sans KR",sans-serif' },
+  { v: 'nanumsquare', label: '나눔스퀘어', css: '"NanumSquare","나눔스퀘어","Noto Sans KR",sans-serif' },
+  { v: 'nanummyeongjo', label: '나눔명조', css: '"Nanum Myeongjo","나눔명조",serif' },
+  { v: 'maruburi', label: '마루부리', css: '"MaruBuri","마루부리",serif' },
+  { v: 'nanumbarunpen', label: '나눔바른펜', css: '"Nanum Barun Pen","나눔바른펜",cursive' },
+  { v: 'nanumdasisijaghae', label: '나눔손글씨 다시시작해', css: '"Nanum Dasisijaghae",cursive' }
+];
+const P_SIZES = [13, 15, 16, 19];        // SE ONE 글자 크기 단계 중 본문에 맞는 것
+const H_SIZES = [16, 19, 24, 28];
+function pasteOpts() {
+  const d = { align: 'left', gap: true, img: true, cap: false, title: false, tags: false, hSize: 19, pSize: 0, font: '' };
+  try { return Object.assign(d, JSON.parse(localStorage.getItem('hw_paste_opts') || '{}')); } catch (e) { return d; }
+}
+function savePasteOpts(extra) {
+  const prev = pasteOpts();
+  const o = Object.assign(prev, { align: $('paste-align').value, gap: $('paste-gap').checked, img: $('copy-with-img').checked, cap: $('copy-with-cap').checked, title: $('copy-with-title').checked, tags: $('copy-with-tags').checked }, extra || {});
+  try { localStorage.setItem('hw_paste_opts', JSON.stringify(o)); } catch (e) {}
+  applyEditorFont();
+}
+/* 설정한 글꼴을 에디터 표시에도 반영해 붙여넣기 결과와 비슷하게 보인다 */
+function applyEditorFont() {
+  const o = pasteOpts(); const f = NAVER_FONTS.find((x) => x.v === o.font);
+  const r = document.documentElement.style;
+  if (f && f.css) r.setProperty('--ed-font', f.css); else r.removeProperty('--ed-font');
+  if (o.pSize) r.setProperty('--ed-size', o.pSize + 'px'); else r.removeProperty('--ed-size');
+  r.setProperty('--ed-hsize', (o.hSize || 19) + 'px');
+}
+applyEditorFont();
+(function initPasteOpts() {
+  const o = pasteOpts();
+  $('paste-align').value = o.align; $('paste-gap').checked = !!o.gap; $('copy-with-img').checked = !!o.img; $('copy-with-cap').checked = !!o.cap; $('copy-with-title').checked = !!o.title; $('copy-with-tags').checked = !!o.tags;
+  ['paste-align', 'paste-gap', 'copy-with-img', 'copy-with-cap', 'copy-with-title', 'copy-with-tags'].forEach((id) => $(id).addEventListener('change', () => { savePasteOpts(); renderPhotoList(); }));
+})();
+/* 인라인 서식(b/i/u/br/a)만 남기고 나머지 태그·속성은 벗긴다 */
+function inlineHtml(node) {
+  const c = node.cloneNode(true);
+  Array.from(c.querySelectorAll('*')).forEach((el) => {
+    const t = el.tagName;
+    if (['B', 'STRONG', 'I', 'EM', 'U', 'BR', 'A'].includes(t)) {
+      Array.from(el.attributes).forEach((a) => { if (!(t === 'A' && a.name === 'href')) el.removeAttribute(a.name); });
+    } else {
+      el.replaceWith(...Array.from(el.childNodes));
+    }
+  });
+  return c.innerHTML;
+}
+/* ── 네이버 스마트에디터 ONE 붙여넣기용 HTML ──
+   SE ONE 은 붙여넣은 HTML 을 자기 컴포넌트로 바꿔 넣는다. 그 과정에서
+   - 정렬이 없는 문단은 편집기의 기본 정렬을 따른다(가운데로 두고 쓰는 블로그가 많다) → 문단마다 text-align 을 박는다
+   - <p> 여백은 버려진다 → 문단 사이에 빈 줄(<p><br></p>)을 넣어야 띄어진다
+   - <h3> 는 굵기만 남는다 → 굵게 + 글자 크기로 소제목을 만든다 (19px 는 SE 글자 크기 단계 중 하나)
+   - <blockquote> 는 인용구 컴포넌트가 된다
+   - <img src=https…> 는 외부 이미지를 가져와 첨부한다 → 사진을 그대로 싣는다 */
 function naverHtml() {
-  const clone = $('body-editor').cloneNode(true);
-  imgPhToText(clone); photosToText(clone);
-  clone.querySelectorAll('[style]').forEach((n) => n.removeAttribute('style'));
-  clone.querySelectorAll('[class]').forEach((n) => n.removeAttribute('class'));
-  return '<div>' + clone.innerHTML + '</div>';
+  const o = pasteOpts();
+  const al = 'text-align:' + (o.align === 'center' ? 'center' : 'left');
+  const alAttr = (o.align === 'center' ? 'center' : 'left');
+  const fnt = NAVER_FONTS.find((x) => x.v === o.font);
+  const fstyle = (fnt && fnt.v ? 'font-family:' + fnt.v + ';' : '') + (o.pSize ? 'font-size:' + o.pSize + 'px;' : '');
+  const P = (inner) => '<p align="' + alAttr + '" style="' + al + '">' + (fstyle ? '<span style="' + fstyle + '">' + inner + '</span>' : inner) + '</p>';
+  const IMG = (src) => '<p align="center" style="text-align:center"><img src="' + src + '" alt=""></p>';
+  const GAP = o.gap ? '<p><br></p>' : '';
+  const out = []; let n = 0;
+  const ttl = ($('f-title').value || '').trim();
+  if (o.title && ttl) { out.push(P('<b><span style="font-size:' + Math.max(o.hSize || 19, 24) + 'px">' + esc(ttl) + '</span></b>')); }
+  Array.from($('body-editor').childNodes).forEach((node) => {
+    if (node.nodeType === 3) { const t = (node.textContent || '').trim(); if (t) out.push(P(esc(t))); return; }
+    if (node.nodeType !== 1) return;
+    const tag = node.tagName;
+    if (tag === 'H2' || tag === 'H3' || tag === 'H4') {
+      out.push(P('<b><span style="font-size:' + o.hSize + 'px">' + esc((node.textContent || '').trim()) + '</span></b>'));
+    } else if (tag === 'UL' || tag === 'OL') {
+      // 스마트에디터의 목록 컴포넌트는 정렬을 따로 먹어 가운데로 튄다 → 항목을 '• ' 문단으로 풀어 넣는다
+      const items = Array.from(node.querySelectorAll('li'));
+      out.push(items.map((li, i) => P((tag === 'OL' ? (i + 1) + '. ' : '• ') + inlineHtml(li))).join(''));
+    } else if (tag === 'IMG') {
+      const src = node.getAttribute('src') || '';
+      if (o.img && src.startsWith('http')) out.push(IMG(src));
+    } else if (tag === 'BLOCKQUOTE') {
+      out.push('<blockquote>' + inlineHtml(node) + '</blockquote>');
+    } else if (node.classList.contains('imgph')) {
+      // 사진 자리 안에 붙여넣은 그림이 있으면 그 그림을 싣고, 없으면 자리 안내 문구
+      const im = node.querySelector('img'); const isrc = im ? (im.getAttribute('src') || '') : '';
+      if (o.img && isrc.startsWith('http')) out.push(IMG(isrc));
+      else out.push(P(esc((node.textContent || '').replace('📷 이미지 자리 — ', '[사진 삽입: ').trim() + ']')));
+    } else if (tag === 'FIGURE' && node.classList.contains('bimg')) {
+      n++;
+      const img = node.querySelector('img');
+      const cap = ((node.querySelector('figcaption') || {}).textContent || '').trim();
+      const realCap = cap && cap !== '사진 설명을 적어주세요' ? cap : '';
+      if (o.img && img && img.src) {
+        out.push('<p align="center" style="text-align:center"><img src="' + img.src + '" alt="' + esc(realCap) + '"></p>');
+        if (realCap && o.cap) out.push('<p align="center" style="text-align:center"><span style="font-size:13px;color:#888">' + esc(realCap) + '</span></p>');
+      } else {
+        out.push(P(esc('[사진 ' + n + ' 삽입' + (realCap ? ': ' + realCap : '') + ']')));
+      }
+    } else {
+      const inner = inlineHtml(node);
+      if (inner.trim()) out.push(P(inner));
+    }
+  });
+  if (o.tags && tags.length) out.push(P(esc(tags.map((t) => '#' + t).join(' '))));
+  return '<div>' + out.join(GAP) + '</div>';
 }
 function naverPlain() {
   const clone = $('body-editor').cloneNode(true);
@@ -1616,7 +2774,8 @@ async function copyPlain(text, okMsg) {
     toast(ok ? okMsg : '복사 실패');
   }
 }
-$('copy-body-btn').addEventListener('click', () => {
+$('copy-body-btn').addEventListener('click', async () => {
+  if (!$('body-editor').querySelector('figure.bimg[data-footer]')) { const n = await ensureFooterPhotos(); if (n) { markDirty(); updateStats(); renderPhotoList(); } }
   if (!copyGate()) return;
   copyRich(naverHtml(), naverPlain(), '복사했습니다. 네이버 글쓰기 창에서 Ctrl+V 하세요.');
 });
@@ -1625,7 +2784,10 @@ $('copy-plain-btn').addEventListener('click', () => {
   copyPlain(naverPlain(), '텍스트를 복사했습니다.');
 });
 $('copy-title-btn').addEventListener('click', () => copyPlain($('f-title').value, '제목을 복사했습니다.'));
-$('copy-tags-btn').addEventListener('click', () => copyPlain(tags.map((t) => '#' + t).join(' '), '태그를 복사했습니다.'));
+$('copy-tags-btn').addEventListener('click', () => {
+  if (!tags.length) { toast('태그가 없습니다.'); return; }
+  copyPlain(tags.join(String.fromCharCode(10)), '태그 ' + tags.length + '개를 한 줄에 하나씩 복사했습니다(메모용). 네이버 태그칸에는 「▶ 다음 태그 복사」로 하나씩 넣으세요.');
+});
 
 /* ────────── 네이버에 올리기 (단계) ──────────
    네이버는 자동 발행 API 가 없고(2020-05 종료), 블로그 설정에도 「메일로 글쓰기」가 없다.
