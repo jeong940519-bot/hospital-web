@@ -558,7 +558,7 @@
     <div class="modal-body" style="font-size:13.5px;line-height:1.8">
       <p style="margin:0 0 10px">네이버 태그칸은 한 번에 하나만 받습니다. 이 북마클릿은 <b>내 브라우저에서</b> 태그를 하나씩 대신 쳐 넣습니다(로그인·발행은 건드리지 않습니다).</p>
       <div style="background:#f5f9fc;border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:12px">
-        <div style="font-weight:700;margin-bottom:6px">1. 처음 한 번 — 아래 버튼을 <u>북마크바로 끌어다</u> 놓으세요</div>
+        <div style="font-weight:700;margin-bottom:6px">1. 처음 한 번 — 아래 버튼을 <u>북마크바로 끌어다</u> 놓으세요 <span class="hint" style="display:inline;font-weight:400">(v2 · 예전에 만든 북마크는 지우고 다시)</span></div>
         <a id="tag-bm-link" href="#" style="display:inline-block;padding:8px 14px;background:var(--primary);color:#fff;border-radius:8px;font-weight:700;text-decoration:none;cursor:grab">📌 네이버 태그 자동입력</a>
         <div class="hint" style="margin-top:6px">북마크바가 안 보이면 Ctrl+Shift+B. 끌어놓기가 안 되면 「주소 복사」 후 북마크를 새로 만들어 주소에 붙여 넣으세요. <button class="btn sm" id="tag-bm-copy" style="padding:2px 8px;font-size:11px">주소 복사</button></div>
       </div>
@@ -2216,27 +2216,35 @@ function renderTags() {
    사용자가 네이버 발행 창의 태그칸을 클릭한 뒤 북마크를 누르면, 붙여 넣은 목록을 하나씩 '타이핑 + Enter' 로 넣는다.
    React 입력칸이라 값은 네이티브 setter 로 넣고 input 이벤트를 쏜다. Enter 가 안 먹으면 Space 로 한 번 더 시도. */
 async function naverTagTyper() {
-  const el = document.activeElement;
-  const isIn = el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-  const inp = isIn ? el : document.querySelector('input[placeholder*="태그"], input[class*="tag"], [contenteditable][class*="tag"]');
-  if (!inp) { alert('네이버 발행 창의 태그 입력칸을 먼저 클릭한 뒤 북마크를 눌러주세요.'); return; }
+  // blog.naver.com 은 글쓰기·발행 화면을 iframe(#mainFrame) 안에 띄운다. 북마크 클릭으로 포커스가 날아가므로
+  // activeElement 에 기대지 말고, 최상위 문서 + 같은 출처 iframe 을 전부 뒤져 태그 입력칸을 찾는다.
+  const docs = [];
+  const walk = (d) => { docs.push(d); Array.prototype.forEach.call(d.querySelectorAll('iframe'), (f) => { try { const cd = f.contentDocument; if (cd && docs.indexOf(cd) < 0) walk(cd); } catch (e) { /* 다른 출처 */ } }); };
+  walk(document);
+  const isTagInput = (el) => el && el.tagName === 'INPUT' && el.type !== 'file' && el.type !== 'hidden'
+    && /태그|tag/i.test((el.placeholder || '') + ' ' + (el.className || '') + ' ' + (el.id || '') + ' ' + (el.name || ''));
+  let inp = null;
+  for (const d of docs) { const a = d.activeElement; if (isTagInput(a)) { inp = a; break; } }
+  if (!inp) for (const d of docs) { const c = Array.prototype.filter.call(d.querySelectorAll('input'), isTagInput).filter((el) => el.offsetParent !== null); if (c.length) { inp = c[c.length - 1]; break; } }
+  if (!inp) for (const d of docs) { const a = d.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) { inp = a; break; } }
+  if (!inp) { alert('태그 입력칸을 찾지 못했습니다. 발행 창을 연 상태(태그칸이 보이는 상태)에서 다시 눌러주세요.'); return; }
   const raw = prompt('태그 목록을 붙여 넣으세요 (줄바꿈·쉼표·공백·# 로 구분)', '');
   if (!raw) return;
   const list = raw.split(/[\n\r,\s#]+/).map((t) => t.trim()).filter(Boolean).slice(0, 30);
+  const win = inp.ownerDocument.defaultView || window;
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
-  const setter = inp.tagName === 'INPUT' ? Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set
-    : inp.tagName === 'TEXTAREA' ? Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set : null;
-  const fire = (type, key) => inp.dispatchEvent(new KeyboardEvent(type, { key: key, code: key === 'Enter' ? 'Enter' : 'Space', keyCode: key === 'Enter' ? 13 : 32, which: key === 'Enter' ? 13 : 32, bubbles: true, cancelable: true }));
+  const proto = inp.tagName === 'TEXTAREA' ? win.HTMLTextAreaElement.prototype : win.HTMLInputElement.prototype;
+  const setter = Object.getOwnPropertyDescriptor(proto, 'value').set;
+  const fire = (type, key) => inp.dispatchEvent(new win.KeyboardEvent(type, { key: key, code: key === 'Enter' ? 'Enter' : 'Space', keyCode: key === 'Enter' ? 13 : 32, which: key === 'Enter' ? 13 : 32, bubbles: true, cancelable: true }));
   let ok = 0;
   for (const t of list) {
     inp.focus();
-    if (setter) { setter.call(inp, t); inp.dispatchEvent(new Event('input', { bubbles: true })); }
-    else { document.execCommand('selectAll', false, null); document.execCommand('insertText', false, t); }
+    setter.call(inp, t); inp.dispatchEvent(new win.Event('input', { bubbles: true }));
     await wait(150);
     fire('keydown', 'Enter'); fire('keypress', 'Enter'); fire('keyup', 'Enter');
     await wait(250);
-    if (setter && inp.value === t) { fire('keydown', ' '); fire('keyup', ' '); await wait(250); }
-    if (!setter || inp.value !== t) ok++;
+    if (inp.value === t) { fire('keydown', ' '); fire('keyup', ' '); await wait(250); }
+    if (inp.value !== t) ok++;
   }
   alert('태그 ' + list.length + '개 중 ' + ok + '개 입력됨 — 태그 목록을 확인하세요.' + (ok < list.length ? ' 안 들어간 것은 「▶ 다음 태그 복사」로 넣어주세요.' : ''));
 }
