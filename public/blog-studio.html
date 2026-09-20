@@ -488,6 +488,7 @@
             <input type="text" id="f-naverurl" placeholder="https://blog.naver.com/아이디/글번호" />
           </div>
           <button class="btn naver" id="mark-pub-btn">발행 완료로 표시</button>
+          <button class="btn" id="mark-draft-btn" title="발행 표시를 취소하고 초안으로 되돌립니다">초안으로 되돌리기</button>
           <button class="btn" id="open-naver-btn">네이버 글쓰기 열기 ↗</button>
         </div>
         <div class="hint" style="margin-top:10px">붙여넣기로 발행한 뒤, 글 주소를 여기에 저장해 두면 목록에서 발행 여부를 한눈에 볼 수 있습니다.</div>
@@ -2915,12 +2916,21 @@ $('open-naver-btn').addEventListener('click', () => window.open('https://blog.na
 $('mark-pub-btn').addEventListener('click', async () => {
   if (!current) return;
   const url = $('f-naverurl').value.trim();
-  if (!url) { toast('네이버 글 주소를 입력하세요.'); $('f-naverurl').focus(); return; }
+  // 주소가 없어도 강제로 발행 처리할 수 있다(네이버에 올렸는데 주소를 안 적은 글 정리용). 검수 관문은 그대로.
+  if (!url && !confirm('네이버 글 주소가 비어 있습니다. 주소 없이 발행 완료로 표시할까요?')) { $('f-naverurl').focus(); return; }
   if (!(await publishGate())) return;
   current.status = 'published';
   current.publishedAt = new Date().toISOString();
   await savePost();
   toast('발행 완료로 표시했습니다.');
+});
+$('mark-draft-btn').addEventListener('click', async () => {
+  if (!current) return;
+  if (current.status !== 'published') { toast('이미 초안 상태입니다.'); return; }
+  if (!confirm('발행 표시를 취소하고 초안으로 되돌릴까요?')) return;
+  current.status = 'draft'; current.publishedAt = null;
+  await savePost();
+  toast('초안으로 되돌렸습니다.');
 });
 </script>
 </body>
